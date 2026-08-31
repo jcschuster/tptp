@@ -1,0 +1,211 @@
+# tptp
+
+```elixir
+Mix.install([{:tptp, path: Path.join(__DIR__, "..")}])
+```
+
+## Reading a problem
+
+`from_string/2` never raises. It hands back a `%Tptp.File{}` and a list of
+diagnostics — success carries diagnostics too, because a warning does not stop you
+getting a tree.
+
+```elixir
+source = """
+%----Dreadbury Mansion, abridged
+fof(someone_killed, axiom,
+    ? [X] : ( lives(X) & killed(X, agatha) ) ).
+
+fof(agatha_lives, axiom, lives(agatha) ).
+
+fof(conj, conjecture, killed(agatha, agatha) ).
+"""
+
+{:ok, file, diagnostics} = Tptp.from_string(source)
+{length(file.statements), diagnostics}
+```
+
+Each statement keeps its four grammatical slots apart, and every node carries the
+byte range it came from.
+
+```elixir
+statement = hd(file.statements)
+
+%{
+  name: statement.name.text,
+  role: statement.role.text,
+  formula: Tptp.Node.text(statement.formula, source),
+  where: Tptp.Statement.span(statement, file.id)
+}
+```
+
+## Walking the tree
+
+Node kinds are BNF nonterminals. Nothing is elaborated, normalised or typed — the
+tree says what the file said.
+
+```elixir
+statement.formula
+|> Tptp.Node.walk()
+|> Enum.filter(&Tptp.Node.leaf?/1)
+|> Enum.map(&{&1.kind, &1.text})
+```
+
+`Tptp.Query` answers the questions a consumer usually has before routing a problem
+to a backend. Everything it reports is read off the syntax; nothing is inferred.
+
+```elixir
+%{
+  dialect: Tptp.Query.dialect(file),
+  roles: Tptp.Query.roles(file),
+  conjectures: file |> Tptp.Query.conjectures() |> Enum.map(& &1.name.text)
+}
+```
+
+## When the input is wrong
+
+One bad statement does not poison the file. The rest still parse, and the
+diagnostic points at the offending bytes.
+
+```elixir
+{:ok, broken, problems} = Tptp.from_string """
+fof(a, axiom, p).
+fof(b, axiom, & q).
+fof(c, axiom, r).
+"""
+
+{length(broken.statements), Enum.map(problems, &{&1.code, &1.severity, &1.message})}
+```
+
+```elixir
+IO.puts(Tptp.File.format_diagnostics(broken))
+```
+
+## Printing
+
+Three printers, three contracts. Canonical is deterministic and comment-free;
+pretty breaks to a width; the format-preserving one moves white space and provably
+changes no token.
+
+```elixir
+{:ok, one, []} = Tptp.Parser.statement_from_string("fof( a,axiom, p(X)&q(X)&r(X)&s(X) ).")
+
+%{
+  canonical: Tptp.Printer.Canonical.to_string(one),
+  pretty: Tptp.Printer.Pretty.to_string(one, width: 28)
+}
+```
+
+```elixir
+IO.puts(Tptp.Printer.Pretty.to_string(one, width: 28))
+```
+
+```elixir
+IO.puts(Tptp.Printer.Format.to_string("fof( a,axiom,p&q ).  % kept, and so is this line's place\n"))
+```
+
+## Includes
+
+`include` makes the statement set a graph. Resolvers are values you pass in, and
+the default follows nothing — reaching the filesystem or the network is the
+caller's decision.
+
+```elixir
+resolver =
+  {Tptp.Resolver.Map,
+   files: %{
+     "axioms.ax" => "fof(ax1, axiom, p). fof(ax2, axiom, q).",
+     "root.p" => "include('axioms.ax').\nfof(goal, conjecture, p & q)."
+   }}
+```
+
+```elixir
+{:ok, unit, []} =
+  Tptp.Unit.from_string("include('axioms.ax').\nfof(goal, conjecture, p & q).",
+    resolver: resolver
+  )
+
+for {file_id, statement} <- Tptp.Unit.statements(unit) do
+  {file_id, statement.name.text, statement.role.text}
+end
+```
+
+Every statement is tagged with the file it came from, so a diagnostic about a
+symbol declared in an axiom file and used in the problem can point at both.
+
+## Linting
+
+Eight rules, one fused walk. `Tptp.Lint` reports; it never rewrites.
+
+```elixir
+{:ok, suspect, []} =
+  Tptp.from_string("""
+  fof(a, axiom, p(x)).
+  fof(a, axiom, q(x, y)).
+  tff(t, type, f: $nosuchtype).
+  """)
+
+suspect |> Tptp.Lint.run() |> Enum.map(&{&1.code, &1.severity, &1.message})
+```
+
+## SZS
+
+The status lines a prover prints, over a generated ontology of the 111 published
+values. An unrecognised word comes back as a binary — no atom is ever created from
+prover output.
+
+```elixir
+output = """
+% Running in auto input_syntax mode.
+% SZS status Unsatisfiable for GRP001-1
+% SZS output start CNFRefutation for GRP001-1
+cnf(c1, axiom, p).
+% SZS output end CNFRefutation for GRP001-1
+"""
+
+%{
+  status: Tptp.Szs.status(output),
+  success?: Tptp.Szs.success?(output),
+  blocks: Tptp.Szs.blocks(output)
+}
+```
+
+```elixir
+%{
+  unknown: Tptp.Szs.status("% SZS status Marzipan for X"),
+  from_annotation: Tptp.Szs.Ontology.from_status_value("thm"),
+  described: Tptp.Szs.Ontology.describe(:counter_satisfiable)
+}
+```
+
+## Large files
+
+`stream_string!/1` yields one statement at a time and never materialises the token
+stream. The 455 MB axiom set in the TPTP library is 3.3 million statements; peak
+heap is one statement, whatever the size.
+
+```elixir
+"fof(a,axiom,p). fof(b,axiom,q). fof(c,axiom,r)."
+|> Tptp.stream_string!()
+|> Stream.map(fn {:ok, statement, []} -> statement.name.text end)
+|> Enum.take(2)
+```
+
+## Fetching from tptp.org
+
+Never a default, and cached on disk after the first request. `:inets` and `:ssl`
+are started here rather than by the library, so a consumer that never fetches never
+starts them.
+
+```elixir
+# Uncomment to reach the network.
+# {:ok, unit, []} =
+#   Tptp.Unit.from_name("Problems/PUZ/PUZ001+1.p", resolver: Tptp.Resolver.Http)
+
+# Enum.map(Tptp.Unit.formulae(unit), fn {_file_id, statement} ->
+#   statement.name.text
+# end)
+```
+
+Set `TPTP_ROOT` instead and `Tptp.Resolver.Fs` reads the library from disk;
+`Tptp.Resolver.Cascade` tries local first and falls back to the network.

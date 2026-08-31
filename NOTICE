@@ -1,0 +1,33 @@
+This package redistributes material from the TPTP World, which is not covered by
+the MIT licence in LICENSE.
+
+    The TPTP is copyrighted 1993-onwards, by Geoff Sutcliffe & Christian Suttner.
+    Verbatim redistribution of the TPTP and parts of the TPTP is permitted provided
+    that the redistribution is clearly attributed to the TPTP. Distribution of any
+    modified version or modified part of the TPTP requires permission.
+
+        -- https://tptp.org/cgi-bin/SeeTPTP?Category=Documents&File=ReadMe
+
+The redistributed files, both attributed to the TPTP and both carried unmodified:
+
+    priv/bnf/SyntaxBNF-v9.3.1.2
+        The TPTP syntax BNF, version 9.3.1.2, taken as plain text from
+        https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html
+        sha256 2c8d5be6e4feee13279c34de6dadd37904283d505c086e2fe2e2da18efaf54ee
+
+    priv/szs/SZSOntology-2026-08-31.html
+        The SZS ontology page, fetched on 2026-08-31 from
+        https://tptp.org/UserDocs/SZSOntology
+        sha256 22b1f4f9294331e062a630fc589bef8fd43422f3d3b9c6ac4ce11b3fe949f359
+
+Both are vendored so that installing this package needs no network access. The BNF
+is the text content of its page character for character, with no trailing newline;
+the ontology is its page's markup byte for byte. Nothing in this repository edits
+either file. The files under lib/ and src/ that are derived from them are produced
+by `mix tptp.gen` and are regenerated rather than hand-maintained.
+
+Note that the BNF served by SeeTPTP under Category=Documents lags the UserDocs page:
+at the time of writing it is version 9.3.0.4. The UserDocs page above is the source
+to check against, not that one.
+
+TPTP World is the work of Geoff Sutcliffe. See https://tptp.org.

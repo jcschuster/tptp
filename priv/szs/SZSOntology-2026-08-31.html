@@ -1,0 +1,442 @@
+<HTML>
+<HEAD>
+<TITLE> SZS Ontology </TITLE>
+<LINK REL="icon" HREF="https://tptp.org/Logos/SZS.png" type="image/png" />
+</HEAD>
+<BODY ALIGN=JUSTIFY>
+<HR><!-- -------------------------------------------------------------------------------------- -->
+<H1 ALIGN=CENTER> SZS Ontology </H1>
+
+The SZS ontologies (named after the authors of the original paper describing the success ontology 
+[<A HREF="http://tptp.org/cgi-bin/SeeTPTP?Category=BibTeX&File=SZS03">SZS03</A>,
+ <A HREF="http://tptp.org/cgi-bin/SeeTPTP?Category=BibTeX&File=SZS04">SZS04</A>,
+ <A HREF="http://tptp.org/cgi-bin/SeeTPTP?Category=BibTeX&File=Sut08-KEAPPA">Sut08</A>]
+provide status values to describe logical data. 
+The SZS <EM>success</EM> ontology provides status values to describe what is known or has been 
+successfully established about the relationship between the axioms and conjectures in logical data. 
+The SZS <EM>no-success</EM> ontology provides status values to describe why a Success Ontology 
+value has not been established. 
+The SZS <EM>dataform</EM> ontology provides status values to describe the nature of logical data. 
+All status values are expressed as <TT>OneWord</TT> to make system output parsing simple, and also 
+have a three letter mnemonic.
+In the figures below many of the "<TT>OneWord</TT>" status values are abbreviated - see the list 
+below for the official full "<TT>OneWord</TT>"s. 
+The lines in the ontologies can be followed up the hierarchy as "isa" links, e.g., an 
+<TT>EquivalentTheorem</TT> (<TT>ETH</TT>) isa <TT>Equivalent</TT> (<TT>EQV</TT>) isa 
+<TT>Satisfiable</TT> (<TT>SAT</TT>) and isa <TT>SatisfiableAxiomsTheorem</TT> (<TT>STH</TT>).
+
+<H3> Commonly Used Ontology Values </H3>
+
+The ontologies are very fine grained ontology, which have more status values and dataforms than are 
+commonly used by ATP systems. 
+Suitable subsets for practical purposes are as follows:
+<UL>
+<LI> For <TT>Semantic Success</TT>
+     <UL>
+     <LI> For problems with conjectures - report <TT>Theorem</TT> or <TT>ContradictoryAxioms</TT> 
+          or <TT>CounterSatisfiable</TT>
+     <LI> For problems without conjectures - report <TT>Satisfiable</TT> or <TT>Unsatisfiable</TT>
+     </UL>
+<LI> For <TT>NoSuccess</TT>
+     <UL>
+     <LI> System stopped due to CPU limit - report <TT>Timeout</TT>
+     <LI> System gave up due to incompleteness - report <TT>GaveUp</TT>
+     <LI> System stopped due to an error - report <TT>Error</TT>
+     </UL>
+<LI> For <TT>Dataforms</TT>
+     <UL>
+     <LI> A generic proof - report <TT>Proof</TT>
+     <LI> A CNF refutation - report <TT>CNFRefutation</TT>
+     <LI> A generic model - report <TT>Model</TT>
+     <LI> A finite model - report <TT>FiniteModel</TT>
+     <LI> An infinite model - report <TT>InfiniteModel</TT>
+     <LI> A saturation - report <TT>Saturation</TT>
+     </UL>
+</UL>
+
+Semantic success ontology values are also used in TPTP format proofs to record the relationship 
+between the parents and inferred formula of each inference step.
+Commonly used values are:
+<UL>
+<LI> The inferred formula is a theorem of the parents (logical consequences, e.g., resolvants, 
+     etc.) - report <TT>Theorem</TT>
+<LI> The inferred and parent formulae are equisatisfiable (e.g., Skolemization) - report 
+     <TT>EquiSatisfiable</TT>
+<LI> The negation of the inferred formula is a theorem of the parents (e.g., negating the 
+     conjecture in a proof by refutation) - report <TT>CounterTheorem</TT>
+</UL>
+
+<H3> Standard Presentation of Ontology Values </H3>
+
+The solution status should be reported exactly once, in a line starting 
+"<TT>%&nbsp;SZS&nbsp;status</TT>" (the leading '<TT>%</TT>' makes the line into a TPTP language 
+comment). 
+For examples:
+<PRE>
+    % SZS status Unsatisfiable for SYN075+1
+
+    % SZS status GaveUp for SYN075+1
+</PRE>
+
+A success or no-success ontology value should be presented as early as possible, at least before 
+any data (proof/model/whatever) is output to justify the value. 
+The justifying data should be reported exactly once, delimited by lines starting 
+"<TT>%&nbsp;SZS&nbsp;output&nbsp;start</TT>" and "<TT>%&nbsp;SZS&nbsp;output&nbsp;end</TT>".
+For example:
+<PRE>
+    % SZS output start CNFRefutation for SYN075-1
+      ... in this case a CNF refutation goes here ...
+    % SZS output end CNFRefutation for SYN075-1
+</PRE>
+
+All "<TT>%&nbsp;SZS</TT>" lines can optionally have software specific information appended, 
+separated by a <TT>:</TT>. 
+For examples:
+<PRE>
+    % SZS status GaveUp for SYN075+1 : Could not complete CNF conversion
+
+    % SZS output end CNFRefutation for SYN075-1 : Completed in CNF conversion
+</PRE>
+
+<P>
+<HR> <!-- ------------------------------------------------------------------------------------- -->
+<H3> The <TT>Success</TT> Ontology </H3>
+
+The Success ontology has thee subontologies:
+<UL>
+<LI> The semantic success subontology is the original success ontology, designed for setting the
+     status of problems, and the reporting the results of reasoning.
+     The semantic success ontology assumes that the input is a 2-tuple of the form 
+     &lt;<EM>Ax</EM>,<EM>C</EM>&gt;, where <EM>Ax</EM> is a set (conjunction) of axioms and 
+     <EM>C</EM> is a set (conjunction) of 
+     conjectures.
+     This is a common standard usage of ATP systems (often there is only a single conjecture). 
+     If the input does not have any conjectures, e.g., a set of axioms, then the set (conjunction)
+     of formulae are used to form <EM>C</EM> and the 2-tuple is &lt;TRUE,<EM>C</EM>&gt;. 
+     The ontology values are based on the possible relationships between the sets of models of 
+     <EM>Ax</EM> and <EM>C</EM>. 
+<LI> The type checking success subontology is designed to specify the results of type checking
+     in typed logics.
+<LI> The verification success subontology is designed to specify the results of proof and model
+     verification.
+</UL>
+<P>
+<IMG SRC="Success.png" WIDTH=60%>
+<UL>
+<LI> <TT>Success</TT> (<TT>SUC</TT>):<BR>
+     The logical data has been processed successfully.
+<LI> <TT>SemanticSuccess</TT> (<TT>SSU</TT>):<BR>
+     The logical data has been reasoned about successfully.
+     <UL>
+     <LI> <TT>UnsatisfiabilityPreserving</TT> (<TT>UNP</TT>):<BR>
+          If there does not exist a model of <EM>Ax</EM> then there does not exist a model of 
+          <EM>C</EM>, i.e., if <EM>Ax</EM> is unsatisfiable then <EM>C</EM> is unsatisfiable.
+     <LI> <TT>SatisfiabilityPreserving</TT> (<TT>SAP</TT>):<BR>
+          If there exists a model of <EM>Ax</EM> then there exists a model of <EM>C</EM>, 
+          i.e., if <EM>Ax</EM> is satisfiable then <EM>C</EM> is satisfiable.
+     <LI> <TT>TautologyPreserving</TT> (<TT>TAP</TT>):<BR>
+          If every interpretation is a model of <EM>Ax</EM> then every interpretation is a model 
+          of <EM>C</EM>, 
+          i.e., if <EM>Ax</EM> is a tautology then <EM>C</EM> is a tautology.
+     <LI> <TT>EquiSatisfiable</TT> (<TT>ESA</TT>):<BR>
+          There exists a model of <EM>Ax</EM> iff there exists a model of <EM>C</EM>, 
+          i.e., <EM>Ax</EM> is (un)satisfiable iff <EM>C</EM> is (un)satisfiable.
+     <LI> <TT>EquiTautologous</TT> (<TT>ETA</TT>):<BR>
+          Every interpretation is a model of <EM>Ax</EM> iff every interpretation is a model of
+          <EM>C</EM>, 
+          i.e., <EM>Ax</EM> is a tautology iff <EM>C</EM> is a tautology.
+     <LI> <TT>ModelExtending</TT> (<TT>MEX</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and some interpretations are models of 
+          <EM>C</EM>, and all models of <EM>C</EM> are conservative extensions of models of <EM>Ax</EM> 
+          (which also means that all models of <EM>C</EM> are models of <EM>Ax</EM>).
+     <LI> <TT>Satisfiable</TT> (<TT>SAT</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and some models of <EM>Ax</EM> are models of
+          <EM>C</EM>.
+     <LI> <TT>FinitelySatisfiable</TT> (<TT>FSA</TT>):<BR>
+          Some finite interpretations are finite models of <EM>Ax</EM>, and some finite models of
+          <EM>Ax</EM> are finite models of <EM>C</EM>.
+     <LI> <TT>FiniteTheorem</TT> (<TT>FTH</TT>):<BR>
+          All finite models of <EM>Ax</EM> are finite models of <EM>C</EM>.
+     <LI> <TT>Theorem</TT> (<TT>THM</TT>):<BR>
+          All models of <EM>Ax</EM> are models of <EM>C</EM>.
+     <LI> <TT>SatisfiableAxiomsTheorem</TT> (<TT>STH</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and all models of <EM>Ax</EM> are models of
+          <EM>C</EM>.
+     <LI> <TT>Equivalent</TT> (<TT>EQV</TT>):<BR>
+          All models of <EM>Ax</EM> are models of <EM>C</EM>, and all models of <EM>C</EM> are models of
+          <EM>Ax</EM>.
+     <LI> <TT>TautologousConclusion</TT> (<TT>TAC</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and all interpretations are models of
+          <EM>C</EM>.
+     <LI> <TT>WeakerConclusion</TT> (<TT>WEC</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, all models of <EM>Ax</EM> are models of
+          <EM>C</EM>, and some models of <EM>C</EM> are not models of <EM>Ax</EM>.
+     <LI> <TT>EquivalentTheorem</TT> (<TT>ETH</TT>):<BR>
+          Some, but not all, interpretations are models of <EM>Ax</EM>, all models of <EM>Ax</EM> are
+          models of <EM>C</EM>, and all models of <EM>C</EM> are models of <EM>Ax</EM>.
+     <LI> <TT>Tautology</TT> (<TT>TAU</TT>):<BR>
+          All interpretations are models of <EM>Ax</EM>, and all interpretations are models of
+          <EM>C</EM>.
+     <LI> <TT>WeakerTautologousConclusion</TT> (<TT>WTC</TT>):<BR>
+          Some, but not all, interpretations are models of <EM>Ax</EM>, and all interpretations are
+          models of <EM>C</EM>.
+     <LI> <TT>WeakerTheorem</TT> (<TT>WTH</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, all models of <EM>Ax</EM> are models of
+          <EM>C</EM>, some models of <EM>C</EM> are not 
+          models of <EM>Ax</EM>, and some interpretations are not models of <EM>C</EM>.
+     <LI> <TT>FiniteTautology</TT> (<TT>FTT</TT>):<BR>
+          All finite interpretations are models of <EM>Ax</EM>, and all finite interpretations are 
+          models of <EM>C</EM>.
+     <LI> <TT>CounterUnsatisfiabilityPreserving</TT> (<TT>CUP</TT>):<BR>
+          If there does not exist a model of <EM>Ax</EM> then there does not exist a model of
+          ~<EM>C</EM>, i.e., if <EM>Ax</EM> is unsatisfiable then ~<EM>C</EM> is unsatisfiable.
+     <LI> <TT>CounterSatisfiabilityPreserving</TT> (<TT>CSP</TT>):<BR>
+          If there exists a model of <EM>Ax</EM> then there exists a model of ~<EM>C</EM>, 
+          i.e., if <EM>Ax</EM> is satisfiable then ~C is satisfiable.
+     <LI> <TT>CounterTautologyyPreserving</TT> (<TT>CTP</TT>):<BR>
+          If every interpretation is a model of <EM>Ax</EM> then every interpretations is a model
+          of ~<EM>C</EM>, i.e., if <EM>Ax</EM> is a tautology then ~C is a tautology.
+     <LI> <TT>EquiCounterSatisfiable</TT> (<TT>ECS</TT>):<BR>
+          There exists a model of <EM>Ax</EM> iff there exists a model of ~<EM>C</EM>, 
+          i.e., <EM>Ax</EM> is (un)satisfiable iff ~<EM>C</EM> is (un)satisfiable.
+     <LI> <TT>EquiCounterTautologous</TT> (<TT>ECA</TT>):<BR>
+          Every interpretation is a model of <EM>Ax</EM> iff every interpretation is a model of
+          ~<EM>C</EM>, i.e., <EM>Ax</EM> a tautology iff ~<EM>C</EM> is a tautology.
+     <LI> <TT>CounterModelExtending</TT> (<TT>CMX</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and some interpretations are models of 
+          ~<EM>C</EM>, and all models of ~<EM>C</EM> are conservative extensions of models of 
+          <EM>Ax</EM> (which also means that all models of ~<EM>C</EM> are models of <EM>Ax</EM>).
+     <LI> <TT>CounterSatisfiable</TT> (<TT>CSA</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and some models of <EM>Ax</EM> are models of
+          ~<EM>C</EM>.
+     <LI> <TT>FinitelyCounterSatisfiable</TT> (<TT>FCS</TT>):<BR>
+          Some finite interpretations are finite models of <EM>Ax</EM>, and some finite models of
+          <EM>Ax</EM> are finite models of ~<EM>C</EM>.
+     <LI> <TT>FiniteCounterTheorem</TT> (<TT>FCT</TT>):<BR>
+          All finite models of <EM>Ax</EM> are finite models of ~<EM>C</EM>.
+     <LI> <TT>CounterTheorem</TT> (<TT>CTH</TT>):<BR>
+          All models of <EM>Ax</EM> are models of ~<EM>C</EM>.
+     <LI> <TT>SatisfiableAxiomsCounterTheorem</TT> (<TT>SCT</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and all models of <EM>Ax</EM> are models of
+          ~<EM>C</EM>.
+     <LI> <TT>CounterEquivalent</TT> (<TT>CEQ</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, all models of <EM>Ax</EM> are models of
+          ~<EM>C</EM>, and all models of ~<EM>C</EM> are models of <EM>Ax</EM>,
+          i.e., all interpretations are models of <EM>Ax</EM> xor of <EM>C</EM>.
+     <LI> <TT>UnsatisfiableConclusion</TT> (<TT>UNC</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and all interpretations are models of
+          ~<EM>C</EM>, i.e., no interpretations are models of <EM>C</EM>.
+     <LI> <TT>WeakerCounterConclusion</TT> (<TT>WCC</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, and all models of <EM>Ax</EM> are models of
+          ~<EM>C</EM>, and some models of ~<EM>C</EM> are not models of <EM>Ax</EM>.
+     <LI> <TT>EquivalentCounterTheorem</TT> (<TT>ECT</TT>):<BR>
+          Some, but not all, interpretations are models of <EM>Ax</EM>, all models of <EM>Ax</EM> are
+          models of ~<EM>C</EM>, and all models of ~<EM>C</EM> are models of <EM>Ax</EM>.
+     <LI> <TT>Unsatisfiable</TT> (<TT>UNS</TT>):<BR>
+          All interpretations are models of <EM>Ax</EM>, and all interpretations are models of
+          ~<EM>C</EM>, i.e., no interpretations are models of <EM>C</EM>.
+     <LI> <TT>WeakerUnsatisfiableConclusion</TT> (<TT>WUC</TT>):<BR>
+          Some, but not all, interpretations are models of <EM>Ax</EM>, and all interpretations are
+          models of ~<EM>C</EM>.
+     <LI> <TT>WeakerCounterTheorem</TT> (<TT>WCT</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, all models of <EM>Ax</EM> are models of
+          ~<EM>C</EM>, some models of ~<EM>C</EM> are not models of <EM>Ax</EM>, and some
+          interpretations are not models of ~<EM>C</EM>.
+     <LI> <TT>FinitelyUnsatisfiable</TT> (<TT>FUN</TT>):<BR>
+          Some finite interpretations are finite models of <EM>Ax</EM>, and all finite models of 
+          <EM>Ax</EM> are finite models of ~<EM>C</EM>, i.e., no finite models of <EM>Ax</EM> are 
+          finite models of <EM>C</EM>.
+     <LI> <TT>ContradictoryAxioms</TT> (<TT>CAX</TT>):<BR>
+          No interpretations are models of <EM>Ax</EM>.
+     <LI> <TT>SatisfiableConclusionContradictoryAxioms</TT> (<TT>SCA</TT>):<BR>
+          No interpretations are models of <EM>Ax</EM>, and some interpretations are models of
+          <EM>C</EM>.
+     <LI> <TT>SatisfiableCounterConclusionContradictoryAxioms</TT> (<TT>SCC</TT>):<BR>
+          No interpretations are models of <EM>Ax</EM>, and some interpretations are models of
+          ~<EM>C</EM>.
+     <LI> <TT>TautologousConclusionContradictoryAxioms</TT> (<TT>TCA</TT>):<BR>
+          No interpretations are models of <EM>Ax</EM>, and all interpretations are models of
+          <EM>C</EM>.
+     <LI> <TT>WeakerConclusionContradictoryAxioms</TT> (<TT>WCA</TT>):<BR>
+          No interpretations are models of <EM>Ax</EM>, and some, but not all, interpretations are
+          models of <EM>C</EM>.
+     <LI> <TT>UnsatisfiableConclusionContradictoryAxioms</TT> (<TT>UCA</TT>):<BR>
+          No interpretations are models of <EM>Ax</EM>, and all interpretations are models of
+          ~<EM>C</EM>, i.e., no interpretations are models of <EM>C</EM>.
+     <LI> <TT>NoConsequence</TT> (<TT>NOC</TT>):<BR>
+          Some interpretations are models of <EM>Ax</EM>, some models of <EM>Ax</EM> are models of
+          <EM>C</EM>, and some models of <EM>Ax</EM> are models of ~<EM>C</EM>.
+     </UL>
+<LI> <TT>TypeCheckSuccess</TT> (<TT>TSU</TT>):<BR>
+     The logical data has been typed checked successfully.
+     <UL>
+     <LI> <TT>TypeCheckPartial</TT> (<TT>TCP</TT>):<BR>
+          Everything passed type checking, but some of the checking was partial, i.e., some things
+          that passed might not be type correct.
+     <LI> <TT>TypeCheckedComplete</TT> (<TT>TSC</TT>):<BR>
+          Everything passed type checking.
+     </UL>
+<LI> <TT>VerifySuccess</TT> (<TT>VSU</TT>):<BR>
+     The logical solution has been verified successfully.
+     <UL>
+     <LI> <TT>VerifiedGood</TT> (<TT>VSG</TT>):<BR>
+          The solution has been verified as good.
+     <LI> <TT>VerifiedBad</TT> (<TT>VSB</TT>):<BR>
+          The solution has been verified as bad.
+     </UL>
+</UL>
+
+<HR> <!-- ------------------------------------------------------------------------------------- -->
+<H3> The <TT>NoSuccesss</TT> Ontology </H3>
+
+In order to understand and make productive use of a lack of success, it is necessary to precisely 
+specify the reason for and nature of the lack of success. 
+The SZS no-success ontology provides status values for describing the reasons. 
+Note that no-success is not the same as failure: failure means that the software has completed 
+its attempt to process the logical data and could not establish a success ontology value. 
+In contrast, no-success might be because the software is still running, or that it has not yet 
+even started processing the logical data. 
+<P>
+<IMG SRC="NoSuccess.png" WIDTH=60%>
+
+<UL>
+<LI> <TT>NoSuccess</TT> (<TT>NOS</TT>):<BR>
+     The logical data has not been processed successfully (yet).
+<LI> <TT>Unknown</TT> (<TT>UNK</TT>):<BR>
+     A success value for the ATP problem has never been established.
+<LI> <TT>Stopped</TT> (<TT>STP</TT>):<BR>
+     Software attempted to process the data, and stopped without a success status.
+<LI> <TT>InProgress</TT> (<TT>INP</TT>):<BR>
+     Software is still running.
+<LI> <TT>NotTried</TT> (<TT>NTT</TT>):<BR>
+     Software has not tried to process the data.
+<LI> <TT>NotTriedYet</TT> (<TT>NTY</TT>):<BR>
+     Software has not tried to process the data yet, but might in the future.
+<LI> <TT>Error</TT> (<TT>ERR</TT>):<BR>
+     Software stopped due to an error.
+<LI> <TT>Forced</TT> (<TT>FOR</TT>):<BR>
+     Software was forced to stop by an external force.
+<LI> <TT>GaveUp</TT> (<TT>GUP</TT>):<BR>
+     Software gave up of its own accord.
+<LI> <TT>OSError</TT> (<TT>OSE</TT>):<BR>
+     Software stopped due to an operating system error.
+<LI> <TT>InputError</TT> (<TT>INE</TT>):<BR>
+     Software stopped due to an input error.
+<LI> <TT>SyntaxError</TT> (<TT>SYE</TT>):<BR>
+     Software stopped due to an input syntax error.
+<LI> <TT>SemanticError</TT> (<TT>SEE</TT>):<BR>
+     Software stopped due to an input semantic error.
+<LI> <TT>TypeError</TT> (<TT>TYE</TT>):<BR>
+     Software stopped due to an input type error (for typed logical data).
+<LI> <TT>Unsemantic</TT> (<TT>USM</TT>):<BR>
+     The semantics makes no sense (for semantics specifications).
+<LI> <TT>UsageError</TT> (<TT>USE</TT>):<BR>
+     Software stopped due to an ATP system usage error.
+<LI> <TT>User</TT> (<TT>USR</TT>):<BR>
+     Software was forced to stop by the user.
+<LI> <TT>ResourceOut</TT> (<TT>RSO</TT>):<BR>
+     Software stopped because some resource ran out.
+<LI> <TT>Timeout</TT> (<TT>TMO</TT>):<BR>
+     Software stopped because a time limit ran out.
+<LI> <TT>CPUTimeout</TT> (<TT>CTO</TT>):<BR>
+     Software stopped because the CPU time limit ran out.
+<LI> <TT>WCTimeout</TT> (<TT>WTO</TT>):<BR>
+     Software stopped because the wall clock time limit ran out.
+<LI> <TT>MemoryOut</TT> (<TT>MMO</TT>):<BR>
+     Software stopped because the memory limit ran out.
+<LI> <TT>Incomplete</TT> (<TT>INC</TT>):<BR>
+     Software gave up because it's incomplete.
+<LI> <TT>Inappropriate</TT> (<TT>IAP</TT>):<BR>
+     Software gave up because it cannot process this type of data.
+<LI> <TT>Incorrect</TT> (<TT>ICT</TT>):<BR>
+     Software gave an incorrect answer.
+<LI> <TT>Assumed</TT> (<TT>ASS(</TT><EM>U</EM><TT>,</TT><EM>S</EM><TT>)</TT>):<BR>
+     The success ontology value <EM>S</EM> has been assumed because the actual value is unknown 
+     for the no-success ontology reason <EM>U</EM>. <EM>U</EM> is taken from the subontology 
+     starting at <TT>Unknown</TT> in the no-success ontology.
+<LI> <TT>Open</TT> (<TT>OPN</TT>):<BR>
+     A success value for the abstract problem has never been established.
+<LI> <TT>NotVerified</TT> (<TT>NVE</TT>):<BR>
+     The solution output has not been verified.
+<LI> <TT>FailedVerified</TT> (<TT>FVE</TT>):<BR>
+     The solution output failed verification.
+</UL>
+
+<HR> <!-- ------------------------------------------------------------------------------------- -->
+<H3> The <TT>Data</TT> Ontology </H3>
+
+The data ontology provides suitable values for describing the form of logical data. 
+The ontology values are commonly used to describe data provided to justify a success ontology 
+value, e.g., if an ATP system reports the success ontology value <TT>Theorem</TT> it might output 
+a <TT>Proof</TT> to justify that. 
+<P>
+<IMG SRC="Data.png" WIDTH=60%>
+
+<UL>
+<LI> <TT>Data</TT> (<TT>Dat</TT>):<BR>
+     Data output.
+<LI> <TT>LogicalData</TT> (<TT>LDa</TT>):<BR>
+     Logical data.
+<LI> <TT>Solution</TT> (<TT>Sln</TT>):<BR>
+     A solution.
+<LI> <TT>Proof</TT> (<TT>Prf</TT>):<BR>
+     A proof.
+<LI> <TT>Interpretation</TT> (<TT>Int</TT>):<BR>
+     An interpretation.
+<LI> <TT>ListOfFormulae</TT> (<TT>Lof</TT>):<BR>
+     A list of formulae.
+<LI> <TT>Derivation</TT> (<TT>Der</TT>):<BR>
+     A derivation (inference steps, possibly ending in the theorem).
+<LI> <TT>Refutation</TT> (<TT>Ref</TT>):<BR>
+     A refutation (starting with <EM>Ax</EM> U ~C and ending in FALSE).
+<LI> <TT>CNFRefutation</TT> (<TT>CRf</TT>):<BR>
+     A refutation in clause normal form, including, for FOF <EM>Ax</EM> or <EM>C</EM>, the 
+     translation from FOF to CNF (without the FOF to CNF translation it's an 
+     <TT>IncompleteProof</TT>).
+<LI> <TT>Model</TT> (<TT>Mod</TT>):<BR>
+     A model.
+<LI> <TT>DomainInterpretation</TT> (<TT>DIn</TT>):<BR>
+     An interpretation whose domain is not the Herbrand universe.
+<LI> <TT>DomainModel</TT> (<TT>DMo</TT>):<BR>
+     A model whose domain is not the Herbrand universe.
+<LI> <TT>FiniteInterpretation</TT> (<TT>FIn</TT>):<BR>
+     A <TT>DomainInterpretation</TT> with a finite domain.
+<LI> <TT>FiniteModel</TT> (<TT>FMo</TT>):<BR>
+     A <TT>DomainModel</TT> with a finite domain.
+<LI> <TT>InfiniteInterpretation</TT> (<TT>IIn</TT>):<BR>
+     A <TT>DomainInterpretation</TT> with an infinite domain.
+<LI> <TT>InfiniteModel</TT> (<TT>IMo</TT>):<BR>
+     A <TT>DomainInterpretation</TT> with an infinite domain.
+<LI> <TT>HerbrandInterpretation</TT> (<TT>HIn</TT>):<BR>
+     A Herbrand interpretation.
+<LI> <TT>HerbrandModel</TT> (<TT>HMo</TT>):<BR>
+     A Herbrand model.
+<LI> <TT>FormulaHerbrandInterpretation</TT> (<TT>FHi</TT>):<BR>
+     A Herbrand interpretation defined by a set of formulae.
+<LI> <TT>FormulaHerbrandModel</TT> (<TT>FHm</TT>):<BR>
+     A Herbrand model defined by a set of formulae.
+<LI> <TT>Saturation</TT> (<TT>Sat</TT>):<BR>
+     A Herbrand model expressed as a saturated set of formulae.
+<LI> <TT>NotASolution</TT> (<TT>NSo</TT>):<BR>
+     Something that is not a well formed solution.
+<LI> <TT>Assurance</TT> (<TT>Ass</TT>):<BR>
+     Only an assurance of the success ontology value.
+<LI> <TT>IncompleteProof</TT> (<TT>IPr</TT>):<BR>
+     A proof with some part missing.
+<LI> <TT>IncompleteInterpretation</TT> (<TT>IIn</TT>):<BR>
+     An interpretation with some part missing.
+<LI> <TT>NonLogicalData</TT> (<TT>NLd</TT>):<BR>
+     Non-logical output.
+<LI> <TT>Comment</TT> (<TT>Com</TT>):<BR>
+     TPTP format comments (starting with %).
+<LI> <TT>FreeText</TT> (<TT>FTx</TT>):<BR>
+     Anything you want.
+<LI> <TT>Verification</TT> (<TT>Ver</TT>):<BR>
+      Free format output from a solution verifier.
+<LI> <TT>None</TT> (<TT>Non</TT>):<BR>
+     Nothing.
+</UL>
+
+<HR> <!-- ------------------------------------------------------------------------------------- -->
+</BODY>
+</HTML>
