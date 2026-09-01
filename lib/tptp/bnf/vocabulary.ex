@@ -389,6 +389,8 @@ defmodule Tptp.Bnf.Vocabulary do
   def status_value?(word) when is_binary(word), do: false
 
   @reserved_word_values [
+    "$let",
+    "$ite",
     "$box",
     "$dia",
     "$necessary",
@@ -479,19 +481,26 @@ defmodule Tptp.Bnf.Vocabulary do
     "$round",
     "$to_int",
     "$to_rat",
-    "$to_real"
+    "$to_real",
+    "$thf",
+    "$tff",
+    "$fof",
+    "$cnf",
+    "$fot"
   ]
 
   @doc """
-  The 91 values the BNF lists for `<reserved_word>`.
+  The 98 values the BNF lists for `<reserved_word>`.
   """
   @spec reserved_word_values() :: [binary()]
   def reserved_word_values, do: @reserved_word_values
 
   @doc """
-  Whether `word` is one of the 91 `<reserved_word>` values.
+  Whether `word` is one of the 98 `<reserved_word>` values.
   """
   @spec reserved_word?(binary()) :: boolean()
+  def reserved_word?("$let"), do: true
+  def reserved_word?("$ite"), do: true
   def reserved_word?("$box"), do: true
   def reserved_word?("$dia"), do: true
   def reserved_word?("$necessary"), do: true
@@ -583,5 +592,10 @@ defmodule Tptp.Bnf.Vocabulary do
   def reserved_word?("$to_int"), do: true
   def reserved_word?("$to_rat"), do: true
   def reserved_word?("$to_real"), do: true
+  def reserved_word?("$thf"), do: true
+  def reserved_word?("$tff"), do: true
+  def reserved_word?("$fof"), do: true
+  def reserved_word?("$cnf"), do: true
+  def reserved_word?("$fot"), do: true
   def reserved_word?(word) when is_binary(word), do: false
 end

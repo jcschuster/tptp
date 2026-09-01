@@ -23,7 +23,7 @@ end
 5. **Validate** the `:==` semantic layer and the cross-statement conditions.
 6. **Print** a CST back to TPTP: canonical, pretty, or format-preserving.
 7. **Read** the SZS status lines a prover prints, over a generated ontology of the
-   111 published status values.
+   112 published status values.
 
 ## What it does not do
 
@@ -39,6 +39,37 @@ It follows that the CST **cannot distinguish a THF type from a THF term**, and d
 not try. `<thf_unitary_type> ::= <thf_unitary_formula>` makes them the same
 nonterminal; only the `:==` layer says which formulae are legal types. That
 distinction belongs to elaboration, with a signature in hand.
+
+## What it reads
+
+Every problem and axiom file of a complete TPTP v9.3.1 — all four dialects, not a
+subset — through the parser alone, no `include` resolved and no lint rule run:
+
+| Set | Files | Parsed | Failed | Timed out |
+|---|---:|---:|---:|---:|
+| Problems | 26925 | 26921 | 4 | 0 |
+| Axioms | 2433 | 2433 | 0 | 0 |
+| Total | 29358 | 29354 | 4 | 0 |
+
+5.4 GB in about eleven minutes on sixteen workers, with a 60-second per-file budget
+that nothing reached. The toolchain this replaces recorded **628 timeouts and 221
+parse failures** over the TH0/TH1 subset alone; this one has none of the first and
+four of the second over five times as many files.
+
+Those four are `SYN000-2.p`, `SYN000+2.p`, `SYN000_2.p` and `SYN000^2.p` — the
+annotated-formula demonstration written once per dialect — and they fail for one
+reason. Each uses `theory(equality)` as an inference parent. v9.3.1.2 expanded
+`<source> ::= <general_term>` into a list of alternatives and `theory(...)` is not
+among them, so the shipped grammar does not admit it — a gap between the BNF release
+and the library rather than a parser gap, and this parser is generated from the BNF.
+The same kind of gap as the `logic` role and the `$modal_system_KB` modality that
+the lint gate reports on the modal problems.
+
+The 65 problems over 20 MB, all `HWV`, are read by `stream_file!/2` rather than by
+this sweep; the size cap is a property of the report, not of the parser.
+
+`mix tptp.corpus` writes [CORPUS.md](CORPUS.md), which is where those numbers come
+from and what the nightly workflow rewrites.
 
 ## The grammar is generated
 
@@ -68,7 +99,9 @@ mnemonic, and all 34 are.
 
 The SZS `isa` hierarchy is **not** modelled. It is published only as three diagrams,
 so `Tptp.Szs.Ontology` offers the partition the text states and no `parent/1` — see
-its documentation for why a transcription would be the wrong kind of guess.
+its documentation for why a transcription would be the wrong kind of guess, and for
+what a consumer that has to rank two prover answers should use instead of inventing
+a precedence.
 
 Two version numbers, and they are not the same: `Tptp.bnf_version/0` is the TPTP
 BNF the shipped parser was generated from; the package version is semver over the
@@ -88,12 +121,18 @@ mix test --include corpus
 mix test --include network   # re-checks the vendored files against tptp.org
 mix check              # format, compile --warnings-as-errors, credo, test, dialyzer
 mix run bench/parse.exs
+mix tptp.corpus        # sweep a local TPTP library, rewrite CORPUS.md
 ```
 
 CI runs `mix check`'s stages as one job and Dialyzer as another, so the PLT is
 cached on its own key and a lock-file change does not rebuild it. A third workflow
 regenerates the four generated files and fails if the working tree is not clean,
 which is what keeps "generated but committed" from quietly becoming "hand-edited".
+
+A fourth reads the library. On a pull request it sweeps one file in five, which is
+what fits; nightly it sweeps every one of them, because a check that skips four
+files in five is a check that never looks at four fifths of the library. Set
+`$TPTP_CORPUS_FULL=1` to run the corpus tests that way locally.
 
 ### The benchmark ladder
 

@@ -1,0 +1,98 @@
+name: corpus
+
+# The pull-request job reads one library file in five, which is what fits in a
+# pull request. The nightly job reads all of them: a check that skips four files
+# in five is a check that never looks at four fifths of the library, and the only
+# way that stops being true is to run the whole thing somewhere.
+#
+# "All of them" means the complete TPTP, all four dialects — 29,358 files and
+# 5.4 GB. On sixteen local workers that sweep takes eleven minutes; on a two-core
+# runner it is hours, which is why the job budget is most of a day's worth of one.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "lib/**"
+      - "src/**"
+      - "priv/bnf/**"
+      - "test/**"
+      - "mix.lock"
+      - ".github/workflows/corpus.yml"
+
+env:
+  MIX_ENV: test
+  TPTP_ROOT: ${{ github.workspace }}/TPTP
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        id: beam
+        with:
+          elixir-version: "1.20.3"
+          otp-version: "28.0"
+
+      - name: Restore dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            mix-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+
+      # A complete TPTP unpacks to about 10 GB, which is more than a runner wants
+      # to hold and more than the cache is for. Only Problems and Axioms are
+      # extracted, and the 65 problems above the sweep's size cap are deleted
+      # immediately: the sweep would skip them anyway, and they are 3.4 GB of the
+      # 8.5 GB. What is left is around 6 GB, which fits with room to work in.
+      - name: Download the TPTP library
+        run: |
+          df -h /
+          curl -sSfL https://www.tptp.org/TPTP/Distribution/TPTP-v9.3.1.tgz -o TPTP.tgz
+          mkdir -p "$TPTP_ROOT"
+          tar -xzf TPTP.tgz --strip-components=1 -C "$TPTP_ROOT" \
+            --wildcards 'TPTP-v9.3.1/Problems/*' 'TPTP-v9.3.1/Axioms/*'
+          rm TPTP.tgz
+          find "$TPTP_ROOT/Problems" -name '*.p' -size +20000000c -delete
+          df -h /
+
+      - run: mix deps.get
+
+      # The report is regenerated rather than checked against the committed one:
+      # `--check` compares counts, and CI's library is not necessarily the release
+      # the committed report was taken from. The gate is the corpus test suite
+      # below; this step is what produces the artifact to read.
+      - name: Sweep one file in five
+        if: github.event_name == 'pull_request'
+        run: mix tptp.corpus --every 5 --out corpus-thinned.md
+
+      - name: Sweep the whole library
+        if: github.event_name != 'pull_request'
+        run: mix tptp.corpus --out corpus-nightly.md
+
+      - name: The corpus tests, thinned
+        if: github.event_name == 'pull_request'
+        run: mix test --only corpus
+
+      - name: The corpus tests, over the whole library
+        if: github.event_name != 'pull_request'
+        env:
+          TPTP_CORPUS_FULL: "1"
+        run: mix test --only corpus
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-report
+          path: corpus-*.md
+          if-no-files-found: ignore

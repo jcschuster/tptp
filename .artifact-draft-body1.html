@@ -1,0 +1,218 @@
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Report to the TPTP maintainers</div>
+    <h1>SyntaxBNF v9.3.1.2 Findings</h1>
+    <p class="standfirst">Nineteen items found by generating a parser mechanically from the published BNF and running it over every file of TPTP v9.3.1: a release that ships an out-of-date copy of its own grammar, four library files the grammar refuses, two vocabularies the library has outgrown, a block of twenty-six rules nothing can reach, three ambiguities, four points where the prose and the productions disagree, four typos, and three notes on the SZS ontology page.</p>
+    <div class="byline">
+      <span><b>Source</b> SyntaxBNF-v9.3.1.2</span>
+      <span><b>Library</b> TPTP v9.3.1, all 29,358 files</span>
+      <span><b>Method</b> LALR(1) parser generated from the BNF</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Scope and method</h2>
+    <p class="lede">Every rule of <code>SyntaxBNF-v9.3.1.2</code> was translated mechanically into a yecc grammar — no hand-written productions — and the resulting parser was run over a complete TPTP v9.3.1 install. Nothing below is a stylistic objection. Each item is one of four things: a file in the library that the published grammar refuses, a rule in the grammar that nothing can reach, a place where the BNF's prose and its own productions disagree, or a place where two published documents disagree with each other.</p>
+
+    <div class="table-scroll">
+      <table class="scope-table">
+        <thead>
+          <tr><th>Read</th><th>Files</th><th class="num">Count</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Problems</td><td><code>Problems/*/*.p</code>, under 20&nbsp;MB</td><td class="num">26,925</td></tr>
+          <tr><td>Axioms</td><td><code>Axioms/**/*.ax</code>, under 20&nbsp;MB</td><td class="num">2,433</td></tr>
+          <tr><td>Total</td><td>5,428.1&nbsp;MB of TPTP, in 662&nbsp;s</td><td class="num">29,358</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The <code>Problems</code> tree holds 26,990 files, named 9,436 FOF, 8,476 CNF, 5,279 THF and 3,799 TFF; the axiom sets they draw on span the same four. <strong>29,354 of the 29,358 files read parsed</strong>, and nothing timed out — the slowest file took 59.9&nbsp;s of a 60&nbsp;s budget under sixteen-way contention, and the four that failed did so in milliseconds. Those four are F2, and they are one file written four times.</p>
+
+    <p>One exclusion, of a kind: the seventy files a complete TPTP holds above 20&nbsp;MB — sixty-five <code>HWV</code> problems and five axiom sets, 3.4&nbsp;GB between them — which are read by a streaming path rather than this one.</p>
+  </section>
+
+  <section>
+    <h2>Index</h2>
+    <div class="index">
+      <div class="index-group">Defects</div>
+
+      <div class="index-row"><span class="id">F1</span><a href="#f1">The v9.3.1 release ships a v9.3.0.4 <code>SyntaxBNF</code></a><span class="chip defect">Release</span></div>
+      <div class="index-row"><span class="id">F2</span><a href="#f2"><code>&lt;source&gt;</code> no longer admits <code>theory(...)</code>, so <code>SYN000*2.p</code> does not parse</a><span class="chip defect">4 files</span></div>
+      <div class="index-row"><span class="id">F3</span><a href="#f3"><code>logic</code> is missing from the <code>&lt;formula_role&gt;</code> list</a><span class="chip defect">350 files</span></div>
+      <div class="index-row"><span class="id">F4</span><a href="#f4"><code>&lt;ntf_modal_system&gt;</code> is short by five systems</a><span class="chip defect">76 uses</span></div>
+      <div class="index-row"><span class="id">F5</span><a href="#f5">The non-classical logic specifications are unreachable</a><span class="chip defect">26 rules</span></div>
+      <div class="index-row"><span class="id">F6</span><a href="#f6"><code>$let(...)</code> has two derivations in THF and TFF</a><span class="chip defect">Ambiguous</span></div>
+      <div class="index-row"><span class="id">F7</span><a href="#f7"><code>unknown</code> has two derivations in <code>&lt;source&gt;</code></a><span class="chip defect">Ambiguous</span></div>
+      <div class="index-row"><span class="id">F8</span><a href="#f8">Two <code>:==</code> rules each for <code>&lt;defined_proposition&gt;</code> and <code>&lt;defined_predicate&gt;</code></a><span class="chip defect">Conflict</span></div>
+
+      <div class="index-group">Points to clarify</div>
+
+      <div class="index-row"><span class="id">F9</span><a href="#f9">Does a <code>&lt;single_quoted&gt;</code> token include its quotes?</a><span class="chip clarify">Prose</span></div>
+      <div class="index-row"><span class="id">F10</span><a href="#f10"><code>&lt;back_quoted&gt;</code> has no stated meaning at all</a><span class="chip clarify">Prose</span></div>
+      <div class="index-row"><span class="id">F11</span><a href="#f11"><code>''</code> is illegal where <code>""</code> is legal</a><span class="chip clarify">Asymmetry</span></div>
+      <div class="index-row"><span class="id">F12</span><a href="#f12"><code>$ite</code> appears in no defined-word vocabulary</a><span class="chip clarify">Minor</span></div>
+
+      <div class="index-group">Typographical — two of them introduced by the v9.3.1.2 typo pass</div>
+
+      <div class="index-row"><span class="id">F13</span><a href="#f13">Line 78: <code>codatatype"</code> has lost its opening quote</a><span class="chip typo">Regression</span></div>
+      <div class="index-row"><span class="id">F14</span><a href="#f14">Line 614: <code>lower_word&gt;</code> has lost its opening bracket</a><span class="chip typo">Regression</span></div>
+      <div class="index-row"><span class="id">F15</span><a href="#f15">Line 645: three dashes, a lost bracket and a run-on sentence</a><span class="chip typo">Typo</span></div>
+      <div class="index-row"><span class="id">F16</span><a href="#f16">Line 718: three dashes, and “upto” in both places</a><span class="chip typo">Typo</span></div>
+
+      <div class="index-group">SZS ontology</div>
+
+      <div class="index-row"><span class="id">F17</span><a href="#f17"><code>CounterTautologyyPreserving</code>, and <code>NoSuccesss</code></a><span class="chip clarify">Typo</span></div>
+      <div class="index-row"><span class="id">F18</span><a href="#f18"><code>Assumed</code> is the one value whose mnemonic takes arguments</a><span class="chip clarify">Unspecified</span></div>
+      <div class="index-row"><span class="id">F19</span><a href="#f19">The <code>isa</code> hierarchy is published only as three raster images</a><span class="chip clarify">Ontology</span></div>
+    </div>
+  </section>
+
+  <!-- ============ F1 ============ -->
+  <section class="finding" id="f1">
+    <div class="finding-head">
+      <div class="finding-meta">
+        <span class="fid">F1</span><span class="rulekind">release</span><span class="chip defect">Two grammars in circulation</span>
+      </div>
+      <h3>The v9.3.1 release ships a v9.3.0.4 <code>SyntaxBNF</code></h3>
+      <div class="where"><b>TPTP-v9.3.1</b> <code>Documents/SyntaxBNF</code> &middot; against the file served at <code>tptp.org</code></div>
+    </div>
+
+    <p>The distribution carries its own copy of the grammar. That copy's header ends where the served file's header begins, and the two files differ in a rule rather than only in comments.</p>
+
+    <figure>
+      <pre class="bnf">TPTP-v9.3.1/Documents/SyntaxBNF, its last header entry:
+% v9.3.0.4 - Put back &lt;thf_fof_function&gt; for only &lt;defined_functor&gt; and &lt;system_functor&gt;, so that
+%            things like $distinct() can be used in THF. That also needed &lt;thf_arguments&gt;
+
+tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html, its whole header:
+% v9.3.1.1 - Damn, to make ITV work I have to allow &lt;functor&gt;(&lt;thf_arguments&gt;), but that's not for
+%            THF logic. Thus now it's ...
+% v9.3.1.2 - Fixed typos in comments (thanks to Jiazhen)</pre>
+      <figcaption>The shipped file is <code>v9.3.0.4</code>; the served file is <code>v9.3.1.2</code>.</figcaption>
+    </figure>
+
+    <figure>
+      <pre class="bnf">shipped   &lt;thf_fof_function&gt;     ::= &lt;defined_functor&gt;(&lt;thf_arguments&gt;) | &lt;system_functor&gt;(&lt;thf_arguments&gt;)
+
+served    &lt;thf_fof_function&gt;     ::= &lt;defined_functor&gt;(&lt;thf_arguments&gt;) | &lt;system_functor&gt;(&lt;thf_arguments&gt;) |
+                                     <span class="hi">&lt;functor&gt;(&lt;thf_arguments&gt;)</span></pre>
+      <figcaption>The one substantive difference. Everything else in the diff is comment text, including the two typos at F13 and F14.</figcaption>
+    </figure>
+
+    <div class="effect"><b>Effect</b>An implementer who takes the grammar from the tarball and an implementer who takes it from the website build different parsers, and neither has any way to notice. The shipped one rejects the first-order functional style in THF that v9.3.1.1 was written to allow.</div>
+    <div class="effect"><b>Suggested</b>Ship the current file in the release, and put the BNF revision number where a reader will see it — in <code>Documents/ReadMe</code>, or as a line in the file that names the TPTP release it belongs to. Today neither document names the other.</div>
+  </section>
+
+  <!-- ============ F2 ============ -->
+  <section class="finding" id="f2">
+    <div class="finding-head">
+      <div class="finding-meta">
+        <span class="fid">F2</span><span class="rulekind">::=</span><span class="chip defect">Blocks parsing</span>
+      </div>
+      <h3><code>&lt;source&gt;</code> no longer admits <code>theory(...)</code>, so <code>SYN000*2.p</code> does not parse</h3>
+      <div class="where"><b>SyntaxBNF-v9.3.1.2</b> lines 506–514 &middot; <b><code>SYN000-2.p</code>, <code>SYN000+2.p</code>, <code>SYN000_2.p</code>, <code>SYN000^2.p</code></b></div>
+    </div>
+
+    <p>The comment above the rule records that <code>&lt;source&gt;</code> used to be <code>&lt;general_term&gt;</code>. Expanding it into a fixed list of alternatives dropped the ability to write a functional term in source position, and <code>theory(equality)</code> is exactly that.</p>
+
+    <figure>
+      <pre class="bnf">505  %----Formula sources
+506  %----Expanded semantic rules for IDV. It was &lt;source&gt;               ::= &lt;general_term&gt;
+507  &lt;source&gt;               ::= &lt;dag_source&gt; | &lt;internal_source&gt; | &lt;external_source&gt; | unknown |
+508                             [&lt;sources&gt;]
+...
+514  &lt;dag_source&gt;           ::= &lt;name&gt; | &lt;inference_record&gt;
+...
+532  &lt;parent_info&gt;          ::= &lt;source&gt;&lt;parent_details&gt;</pre>
+      <figcaption>A <code>&lt;name&gt;</code> is <code>&lt;atomic_word&gt; | &lt;integer&gt;</code>. There is no route from <code>&lt;source&gt;</code> to <code>&lt;general_function&gt;</code>.</figcaption>
+    </figure>
+
+    <figure>
+      <pre class="bnf">298      inference(magic,[status(thm),assumptions([source_introduced_assumption])],[<span class="hi">theory(equality)</span>,source_unknown]) ).
+302      inference(magic,[status(thm)],[<span class="hi">theory(equality)</span>,source_unknown:[bind(X,$fot(a))]]) ).</pre>
+      <figcaption><code>Problems/SYN/SYN000^2.p</code> — the two statements that fail. Both report a syntax error at the <code>(</code> of <code>theory(</code>. The other three files carry the same pair.</figcaption>
+    </figure>
+
+    <p>Under the pre-expansion rule these parsed as <code>&lt;general_term&gt; → &lt;general_data&gt; → &lt;general_function&gt;</code>. The word <code>theory</code> survives in the BNF only as an <code>&lt;intro_type&gt;</code> value on line 521, which is a different position entirely.</p>
+
+    <div class="effect"><b>Effect</b>Eight statements in four files, and they are the whole of it: across all 29,358 files these are the only occurrences of <code>theory(...)</code> in source position, and these four are the <em>only</em> files in the library the published grammar refuses. They are also <code>SYN000*2</code> — the annotated-formula demonstration, written once in CNF, once in FOF, once in TFF and once in THF. A parser generated from the BNF cannot read the language's own worked examples, in any dialect.</div>
+    <div class="effect"><b>Suggested</b>Restore <code>theory(&lt;theory_name&gt;)</code> as an alternative of <code>&lt;source&gt;</code>, or keep <code>&lt;source&gt; ::= &lt;general_term&gt;</code> as the syntactic rule and express the expansion as <code>:==</code>.</div>
+  </section>
+
+  <!-- ============ F3 ============ -->
+  <section class="finding" id="f3">
+    <div class="finding-head">
+      <div class="finding-meta">
+        <span class="fid">F3</span><span class="rulekind">:==</span><span class="chip defect">350 files</span>
+      </div>
+      <h3><code>logic</code> is missing from the <code>&lt;formula_role&gt;</code> list</h3>
+      <div class="where"><b>SyntaxBNF-v9.3.1.2</b> lines 59–62 &middot; 350 problems across ten domains</div>
+    </div>
+
+    <figure>
+      <pre class="bnf">59  &lt;formula_role&gt;         ::= &lt;lower_word&gt; | &lt;lower_word&gt;-&lt;general_term&gt;
+60  &lt;formula_role&gt;         :== axiom | hypothesis | definition | assumption | lemma | theorem |
+61                             corollary | conjecture | negated_conjecture | plain | type |
+62                             interpretation | unknown</pre>
+      <figcaption>Thirteen values. <code>logic</code> is not among them.</figcaption>
+    </figure>
+
+    <figure>
+      <pre class="bnf">thf(simple_s5,<span class="hi">logic</span>,
+    $alethic_modal ==
+      [ $domains == $constant,
+        $designation == $rigid,
+        $terms == $local,
+        $modalities == $modal_system_S5 ] ).</pre>
+      <figcaption><code>Problems/PHI/PHI002^8.p</code>. The role appears in ten domains — SYO 170, SYP 108, PHI 15, PUZ 13, LCL 12, GRA 12, PLA 10, SYN 4, DAT 4, MSC 2 — 350 problem files in all, plus four <code>PHI00x_1.rm</code> files that this sweep does not read.</figcaption>
+    </figure>
+
+    <p>Counting every role in every annotated formula of the library gives eleven distinct values: <code>axiom</code> 40,516,753, <code>type</code> 4,947,954, <code>negated_conjecture</code> 187,888, <code>hypothesis</code> 77,086, <code>definition</code> 71,175, <code>lemma</code> 41,129, <code>conjecture</code> 17,241, <code>logic</code> 350, and four each of <code>unknown</code>, <code>theorem</code> and <code>assumption</code>. Ten of the eleven are in the <code>:==</code> list.</p>
+
+    <div class="effect"><b>Effect</b>Any tool checking roles against the published list reports 350 conforming library problems as carrying an unknown role. <code>logic</code> is the only role in use anywhere in the library that the <code>:==</code> list does not name.</div>
+    <div class="effect"><b>Suggested</b>Add <code>logic</code> to the <code>&lt;formula_role&gt; :==</code> list. See F5 — the same omission runs deeper.</div>
+  </section>
+
+  <!-- ============ F4 ============ -->
+  <section class="finding" id="f4">
+    <div class="finding-head">
+      <div class="finding-meta">
+        <span class="fid">F4</span><span class="rulekind">:==</span><span class="chip defect">Five systems, 76 uses</span>
+      </div>
+      <h3><code>&lt;ntf_modal_system&gt;</code> is short by five systems</h3>
+      <div class="where"><b>SyntaxBNF-v9.3.1.2</b> lines 345–346 &middot; 76 problems in GRA, LCL, PHI, PLA, SYO and SYP</div>
+    </div>
+
+    <figure>
+      <pre class="bnf">345  &lt;ntf_modal_system&gt;     :== $modal_system_K | $modal_system_M | $modal_system_B | $modal_system_D |
+346                             $modal_system_S4 | $modal_system_S5</pre>
+    </figure>
+
+    <p>Counting only occurrences outside comments, the library uses eleven modal systems where the BNF names six.</p>
+
+    <div class="table-scroll">
+      <table class="scope-table">
+        <thead><tr><th>System</th><th>In the BNF</th><th class="num">Files</th></tr></thead>
+        <tbody>
+          <tr><td><code>$modal_system_K</code></td><td>yes</td><td class="num">112</td></tr>
+          <tr><td><code>$modal_system_S5</code></td><td>yes</td><td class="num">44</td></tr>
+          <tr><td><code>$modal_system_M</code></td><td>yes</td><td class="num">41</td></tr>
+          <tr><td><code>$modal_system_S4</code></td><td>yes</td><td class="num">38</td></tr>
+          <tr><td><code>$modal_system_D</code></td><td>yes</td><td class="num">37</td></tr>
+          <tr><td><code>$modal_system_KB</code></td><td><b>no</b></td><td class="num">26</td></tr>
+          <tr><td><code>$modal_system_K4</code></td><td><b>no</b></td><td class="num">22</td></tr>
+          <tr><td><code>$modal_system_K5</code></td><td><b>no</b></td><td class="num">18</td></tr>
+          <tr><td><code>$modal_system_D4</code></td><td><b>no</b></td><td class="num">6</td></tr>
+          <tr><td><code>$modal_system_K45</code></td><td><b>no</b></td><td class="num">4</td></tr>
+          <tr><td><code>$modal_system_B</code></td><td>yes</td><td class="num">1</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Two further names appear only inside problem headers, so they are never parsed but do suggest the list is short by more than five: <code>$modal_system_S5U</code> in 26 files and <code>$modal_system_T</code> in 17.</p>
+
+    <div class="effect"><b>Effect</b>76 live uses of a modal system the grammar does not define, one per file, spread across six domains — SYP 54, PHI 8, GRA 4, LCL 4, PLA 3 and SYO 3. Meanwhile <code>$modal_system_B</code>, which the list does name, is used once in the entire library.</div>
+    <div class="effect"><b>Suggested</b>Extend the list, or say in the BNF that it is illustrative rather than closed. If the modal-system names are open-ended, that is worth stating explicitly, because every other <code>:==</code> list in the file is closed — and because the other four <code>ntf</code> vocabularies are <em>not</em> short: <code>$domains</code>, <code>$designation</code>, <code>$terms</code>, <code>$modalities</code> and their values (<code>$constant</code>, <code>$varying</code>, <code>$cumulative</code>, <code>$decreasing</code>, <code>$rigid</code>, <code>$flexible</code>, <code>$local</code>, <code>$global</code>) are used some 2,000 times between them and every use is in the BNF.</div>
+  </section>

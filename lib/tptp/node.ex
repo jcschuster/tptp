@@ -34,6 +34,33 @@ defmodule Tptp.Node do
   retains `source`, so nothing dangles. `Tptp.detach/1` is the escape hatch for a
   consumer that wants to keep a statement and drop the file.
 
+  ## `text` is the spelling; `value/1` is the atomic word
+
+  `text` is faithful, and faithfulness is not identity. The BNF is explicit that a
+  `<single_quoted>` is "the enclosed `<atomic_word>` without the quotes", so `cat`
+  and `'cat'` are *the same atomic word* written two ways, and `'it\\'s'` is one
+  word whose fifth byte is an apostrophe. `text` carries the spelling — quotes,
+  escapes and all — because the printer has to write back what was read.
+
+  Anything that identifies a symbol must therefore key on `value/1` rather than on
+  `text`. A table keyed on the spelling splits one symbol in two, and a consumer
+  that builds a signature out of it inherits the split: `p` and `'p'` become two
+  constants that never clash, which is a soundness bug in whatever is built on top
+  rather than a cosmetic one here.
+
+  ## The alternative index is not kept
+
+  The generated grammar numbers a nonterminal's productions, and the parser drops
+  that number: a node records the kind that built it and the children it got, and
+  nothing about which `|` branch was taken. Kind and children recover the branch
+  almost everywhere. Across the 28 nonterminals with more than one node-building
+  alternative there is exactly one pair they do not separate — `<cnf_literal>`,
+  where `~p` and `~(p)` both arrive as a `:cnf_literal` over one `:constant`.
+
+  That is harmless for `shape/1` and for the printer round-trip, which is why the
+  index is not carried; it is written down here so nobody has to rediscover it by
+  finding two source spellings with one shape.
+
   ## Kinds, and what the chain rules leave behind
 
   `kind` is the grammar nonterminal that built the node, or the token category for
@@ -52,6 +79,23 @@ defmodule Tptp.Node do
   arrives as `:defined_constant`, because TFF has separate grammar rules for types
   and terms and THF does not. That is not a gap to paper over — it is the
   distinction the language itself declines to make.
+
+  ## Constructing a tree
+
+  Most nodes come from the parser, and a few do not: a consumer that emits TPTP —
+  a prover backend, a bridge to another tool, a TSTP derivation it wrote itself —
+  builds nodes rather than reading them. `new/3` is the constructor for that, and
+  it defaults `off` and `len` to `0` because a synthesized node has no source to
+  point into and inventing plausible offsets would be a lie a diagnostic would
+  later repeat. So the sub-binary invariant above is a statement about parsed
+  trees; a constructed node says "not from a file" by spanning nothing.
+
+  `Tptp.Printer.Canonical` works from `kind`, `text` and `children` alone, so a
+  constructed tree prints. Whether it prints *correctly* is the round trip:
+  printing it and parsing the result must give a tree with the same `shape/1`. A
+  hand-built tree that fails that check is malformed — a kind that takes three
+  children given two, a leaf whose text does not lex as its kind — and the failure
+  is the same one the printer's own property test makes over the whole library.
   """
 
   alias Tptp.Span
@@ -90,6 +134,75 @@ defmodule Tptp.Node do
   def text(%__MODULE__{} = node, source) when is_binary(source) do
     binary_part(source, node.off, node.len)
   end
+
+  @doc """
+  Build a node that did not come from a file.
+
+  For a consumer emitting TPTP rather than reading it. `off` and `len` are `0`:
+  a synthesized node points into no source, and saying so is better than inventing
+  an offset that a diagnostic would later quote.
+
+  The round trip is the validity check — print it, parse it back, compare `shape/1`:
+
+      iex> alias Tptp.Node
+      iex> tree = Node.new(:fof_and_formula, nil, [Node.new(:constant, "p"), Node.new(:constant, "q")])
+      iex> text = Tptp.Printer.Canonical.to_string(tree)
+      "p & q"
+      iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a, axiom, " <> text <> ").")
+      iex> Node.shape(statement.formula) == Node.shape(tree)
+      true
+  """
+  @spec new(atom(), binary() | nil, [t()]) :: t()
+  def new(kind, text \\ nil, children \\ []) when is_atom(kind) and is_list(children) do
+    %__MODULE__{kind: kind, off: 0, len: 0, text: text, children: children}
+  end
+
+  @doc """
+  The leaf's canonical value: an atomic word rather than its spelling.
+
+  A `<single_quoted>` loses its quotes and its escapes, because the BNF says `cat`
+  and `'cat'` are the same atomic word and `'it\\'s'` is one word containing an
+  apostrophe. Everything else is `text` unchanged, and `nil` stays `nil`.
+
+  This is the key to identify a symbol by. `text` is the key to print.
+
+      iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a, axiom, 'p'('q')).")
+      iex> statement.formula |> Tptp.Node.walk() |> Enum.map(&Tptp.Node.value/1)
+      [nil, "p", "q"]
+
+  Two spellings the BNF keeps apart stay apart. A `<distinct_object>` is not an
+  atomic word — `"cat"` is a different thing from `'cat'` and from `cat` — and a
+  `<back_quoted>`'s body is an `<upper_word>`, which no unquoted atomic word can
+  be, so stripping either delimiter would assert an identity the BNF never states.
+  Both keep their quotes:
+
+      iex> {:ok, statement, []} = Tptp.Parser.statement_from_string(~S|fof(a, axiom, p("cat")).|)
+      iex> statement.formula |> Tptp.Node.select(:distinct_object) |> Enum.map(&Tptp.Node.value/1)
+      [~S|"cat"|]
+  """
+  @spec value(t()) :: binary() | nil
+  def value(%__MODULE__{text: nil}), do: nil
+
+  def value(%__MODULE__{text: <<?\', body::binary>>}) when byte_size(body) > 0 do
+    body |> binary_part(0, byte_size(body) - 1) |> unescape()
+  end
+
+  def value(%__MODULE__{text: text}), do: text
+
+  defp unescape(text) do
+    if :binary.match(text, "\\") == :nomatch do
+      text
+    else
+      text |> unescape([]) |> IO.iodata_to_binary()
+    end
+  end
+
+  defp unescape(<<?\\, c, rest::binary>>, acc) when c == ?\' or c == ?\\ do
+    unescape(rest, [acc, c])
+  end
+
+  defp unescape(<<c, rest::binary>>, acc), do: unescape(rest, [acc, c])
+  defp unescape(<<>>, acc), do: acc
 
   @doc """
   Whether the node has no children.

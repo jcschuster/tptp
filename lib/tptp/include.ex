@@ -50,6 +50,7 @@ defmodule Tptp.Include do
   """
 
   alias Tptp.Diagnostic
+  alias Tptp.Node
   alias Tptp.Resolver
   alias Tptp.Span
   alias Tptp.Statement.Include
@@ -134,7 +135,7 @@ defmodule Tptp.Include do
 
     Enum.filter(statements, fn {_id, statement} ->
       match?(%Tptp.Statement.Annotated{}, statement) and
-        MapSet.member?(wanted, statement.name.text)
+        MapSet.member?(wanted, Node.value(statement.name))
     end)
   end
 
@@ -268,7 +269,7 @@ defmodule Tptp.Include do
   @spec names_under(graph(), Tptp.File.t(), Include.t()) :: [binary()]
   defp names_under(graph, file, include) do
     case Map.fetch(graph.resolutions, {file.id, include.off}) do
-      {:ok, target} -> graph |> expand(target) |> Enum.map(fn {_id, s} -> s.name.text end)
+      {:ok, target} -> graph |> expand(target) |> Enum.map(fn {_id, s} -> Node.value(s.name) end)
       :error -> []
     end
   end

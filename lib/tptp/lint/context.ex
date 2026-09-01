@@ -7,6 +7,12 @@ defmodule Tptp.Lint.Context do
   serve nine rules would be the wrong trade. The traversal carries this alongside
   instead, and it is rebuilt per statement rather than per node.
 
+  `whole` says what the walk is over: a whole `Tptp.Unit`, includes resolved, or a
+  single `Tptp.File` that may be one fragment of a problem. A rule whose question
+  is about the problem rather than about a statement — *is anything being asked
+  here?* — has to decline when this is `false`, because the answer may be sitting
+  in a file that was never read.
+
   `slot` is which part of the statement the walk is in: `:formula`, `:name`,
   `:role`, `:source` or `:info`. It is what lets a rule about symbols ignore the
   annotations, where the same words mean something else entirely — `file` in a
@@ -18,7 +24,7 @@ defmodule Tptp.Lint.Context do
   alias Tptp.Statement
 
   @enforce_keys [:file, :statement, :slot]
-  defstruct [:file, :statement, :slot, :path, depth: 0]
+  defstruct [:file, :statement, :slot, :path, depth: 0, whole: false]
 
   @typedoc "Which part of the statement the walk is currently inside."
   @type slot :: :name | :role | :formula | :source | :info | :file_name | :selection
@@ -29,7 +35,8 @@ defmodule Tptp.Lint.Context do
           statement: Statement.t(),
           slot: slot(),
           path: Path.t() | nil,
-          depth: non_neg_integer()
+          depth: non_neg_integer(),
+          whole: boolean()
         }
 
   @doc """

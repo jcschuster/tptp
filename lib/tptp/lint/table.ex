@@ -14,6 +14,14 @@ defmodule Tptp.Lint.Table do
   syntactic — does it contain a `!>`, how many arrows does its spine have. Anything
   further belongs to a consumer with a signature in hand.
 
+  ## Keyed by canonical value
+
+  Every key here — a symbol, a statement name, a parent — is a
+  `Tptp.Node.value/1`, not a `text`. `'p'` and `p` are one atomic word by the
+  BNF's own statement, so they are one entry, and `name` in a symbol carries the
+  unquoted word. A caller that wants to report the spelling back has the spans to
+  read it from; a caller that wants to identify a symbol wants this.
+
   ## Arities are recorded, not judged
 
   `arities` collects every spine length a symbol was applied at. Inconsistency is
@@ -26,13 +34,20 @@ defmodule Tptp.Lint.Table do
   alias Tptp.Node
   alias Tptp.Span
 
-  defstruct symbols: %{}, names: %{}, parents: [], features: MapSet.new(), counted: MapSet.new()
+  defstruct symbols: %{},
+            names: %{},
+            parents: [],
+            conjectures: [],
+            features: MapSet.new(),
+            counted: MapSet.new()
 
   @typedoc """
   One symbol, as the traversal saw it.
 
-  `declared_as` is `nil` for a symbol that was used but never declared, which is
-  legal in FOF and CNF and a finding in the typed dialects.
+  `name` is the canonical atomic word, so a symbol written `'p'` in one statement
+  and `p` in the next is this one entry. `declared_as` is `nil` for a symbol that
+  was used but never declared, which is legal in FOF and CNF and a finding in the
+  typed dialects.
   """
   @type symbol :: %{
           name: binary(),
@@ -43,11 +58,15 @@ defmodule Tptp.Lint.Table do
           arities: MapSet.t(non_neg_integer())
         }
 
-  @typedoc "Everything the single walk accumulated: symbols, names, parents, dialect features and counts."
+  @typedoc "Which of the two spellings of a conjecture a statement used."
+  @type conjecture :: :conjecture | :negated_conjecture
+
+  @typedoc "Everything the single walk accumulated: symbols, names, parents, conjectures, dialect features and counts."
   @type t :: %__MODULE__{
           symbols: %{binary() => symbol()},
           names: %{binary() => [Span.t()]},
           parents: [{binary(), Span.t()}],
+          conjectures: [{conjecture(), Span.t()}],
           features: MapSet.t(atom()),
           counted: MapSet.t({Span.file_id(), non_neg_integer()})
         }
@@ -99,6 +118,19 @@ defmodule Tptp.Lint.Table do
   end
 
   @doc """
+  Claim a position without recording anything, so nothing else counts it.
+
+  For a subtree whose atoms are labels rather than uses — the term of an
+  `<ntf_index>`, where `#agent` names a modality rather than applying a symbol.
+  `use/5` drops a position it has already seen, so claiming the position first is
+  how a top-down walk with no way to look up says "not this one".
+  """
+  @spec ignore(t(), Span.t()) :: t()
+  def ignore(%__MODULE__{} = table, span) do
+    %{table | counted: MapSet.put(table.counted, {:use, span.file, span.offset})}
+  end
+
+  @doc """
   Record a statement's name, so a second one can be reported against the first.
 
   One position counts once, for the same reason `use/5` says so and a sharper one:
@@ -142,6 +174,31 @@ defmodule Tptp.Lint.Table do
   end
 
   @doc """
+  Record a conjecture, in whichever of the two spellings it was written.
+
+  `conjecture` and `negated_conjecture` are kept apart because they do not count
+  the same way: one conjecture negated into clause normal form becomes many
+  `negated_conjecture` clauses, so counting those would call every CNF problem in
+  the library over-specified.
+
+  One position counts once, for the reason `use/5` gives.
+  """
+  @spec conjecture(t(), conjecture(), Span.t()) :: t()
+  def conjecture(%__MODULE__{} = table, form, span) do
+    position = {:conjecture, span.file, span.offset}
+
+    if MapSet.member?(table.counted, position) do
+      table
+    else
+      %{
+        table
+        | conjectures: [{form, span} | table.conjectures],
+          counted: MapSet.put(table.counted, position)
+      }
+    end
+  end
+
+  @doc """
   Record a dialect feature the traversal saw.
   """
   @spec feature(t(), atom()) :: t()
@@ -168,7 +225,8 @@ defmodule Tptp.Lint.Table do
       | symbols:
           Map.new(table.symbols, fn {k, v} -> {k, %{v | used_at: Enum.reverse(v.used_at)}} end),
         names: Map.new(table.names, fn {k, v} -> {k, Enum.reverse(v)} end),
-        parents: Enum.reverse(table.parents)
+        parents: Enum.reverse(table.parents),
+        conjectures: Enum.reverse(table.conjectures)
     }
   end
 

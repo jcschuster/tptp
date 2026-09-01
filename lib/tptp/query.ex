@@ -64,6 +64,15 @@ defmodule Tptp.Query do
 
   The same table `Tptp.Lint` builds, for a consumer that wants the declarations and
   the observed arities and none of the opinions.
+
+  Keyed by `Tptp.Node.value/1` — the atomic word — rather than by the spelling, so
+  `'p'` and `p` are the one symbol the BNF says they are. A consumer building a
+  signature out of this inherits that identity, which is the point: two constants
+  that should have clashed and did not is a soundness bug one layer up.
+
+      iex> {:ok, file, []} = Tptp.from_string("tff(t, type, 'p': $i > $o). tff(a, axiom, p(x)).")
+      iex> file |> Tptp.Query.symbols() |> Map.keys() |> Enum.sort()
+      ["p", "x"]
   """
   @spec symbols(Tptp.File.t() | Tptp.Unit.t()) :: %{binary() => Table.symbol()}
   def symbols(subject), do: subject |> table() |> Map.fetch!(:symbols)

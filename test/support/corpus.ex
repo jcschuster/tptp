@@ -5,42 +5,64 @@ defmodule Tptp.Test.Corpus do
   Those tests are excluded by default so that a contributor without the library
   can still run `mix test`. Point `$TPTP_ROOT` at a checkout to enable them, or
   rely on the conventional `/opt/TPTP`.
-  """
 
-  @conventional "/opt/TPTP"
+  ## Two sweeps, and which one is running
+
+  A corpus test declares how far it thins the library for a pull request, where
+  the whole point is to finish. `$TPTP_CORPUS_FULL=1` overrides every one of those
+  to sweep the library entire, and that is what the nightly workflow sets: a check
+  that skips four files in five is a check that never looks at four fifths of the
+  library, and the only way that stops being a problem is to run the whole thing
+  somewhere.
+
+  `:max_bytes` is not thinning and is not overridden. It excludes the seventy files
+  a complete TPTP holds above 20 MB — five axiom sets and sixty-five `HWV` problems,
+  3.4 GB between them — which the streaming gate reads on purpose and in full.
+
+  File selection itself is `Mix.Tasks.Tptp.Corpus`, so the committed report and
+  these tests are describing the same set of files rather than two that drifted.
+
+  ## The files this parser refuses
+
+  `Mix.Tasks.Tptp.Corpus.known_failures/0` lists the library files that do not
+  parse, each chased down to a gap between the vendored BNF release and the library
+  that ships beside it. `files/1` leaves them out, because a sweep asserting "every
+  file parses" cannot also carry an exception in its result, and
+  `Tptp.CorpusTest` asserts separately that each of them still fails. An exception
+  that stopped being needed would fail that test rather than sit here.
+  """
 
   @doc """
   The library root, or `nil` when there is none to test against.
   """
   @spec root() :: Path.t() | nil
-  def root do
-    candidate = System.get_env("TPTP_ROOT") || System.get_env("TPTP") || @conventional
-    if File.dir?(candidate), do: candidate
-  end
+  defdelegate root(), to: Mix.Tasks.Tptp.Corpus
 
   @doc """
-  Problem and axiom files, optionally thinned and size-capped.
+  Problem and axiom files, thinned for a pull request unless the full sweep is on.
 
-  `:every` takes one file in n, which keeps a full-coverage sweep affordable in
-  CI. `:max_bytes` skips the handful of enormous axiom files, which belong in the
-  streaming benchmark rather than in a correctness sweep.
+  `:every` takes one file in n and is ignored when `$TPTP_CORPUS_FULL=1`.
+  `:max_bytes` skips the enormous axiom files and always applies.
   """
   @spec files(keyword()) :: [Path.t()]
   def files(options \\ []) do
-    case root() do
-      nil ->
-        []
-
-      root ->
-        every = Keyword.get(options, :every, 1)
-        max_bytes = Keyword.get(options, :max_bytes, 20_000_000)
-
-        (Path.wildcard(Path.join([root, "Problems", "*", "*.p"])) ++
-           Path.wildcard(Path.join([root, "Axioms", "*.ax"])) ++
-           Path.wildcard(Path.join([root, "Axioms", "*", "*.ax"])))
-        |> Enum.sort()
-        |> Enum.take_every(every)
-        |> Enum.filter(&(File.stat!(&1).size <= max_bytes))
-    end
+    options
+    |> Keyword.put(:every, every(options))
+    |> Mix.Tasks.Tptp.Corpus.files()
+    |> Enum.reject(&Map.has_key?(known_failures(), Path.basename(&1)))
   end
+
+  @doc """
+  The library files this parser refuses, and why, keyed by base name.
+  """
+  @spec known_failures() :: %{binary() => binary()}
+  defdelegate known_failures(), to: Mix.Tasks.Tptp.Corpus
+
+  @doc """
+  Whether the nightly full sweep is on.
+  """
+  @spec full?() :: boolean()
+  def full?, do: System.get_env("TPTP_CORPUS_FULL") in ["1", "true"]
+
+  defp every(options), do: if(full?(), do: 1, else: Keyword.get(options, :every, 1))
 end

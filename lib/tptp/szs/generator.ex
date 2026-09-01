@@ -129,6 +129,30 @@ defmodule Tptp.Szs.Generator do
     `Success`. If a machine-readable ontology is published, this module gains the
     hierarchy in one regeneration.
 
+    ## What to do when there is no ordering
+
+    There is no `compare/2` and no precedence table, for the same reason there is
+    no `parent/1`: the page publishes none. A consumer reading prover output still
+    has to choose between two answers, though, and a consumer that invents its own
+    ranking is how a precedence inversion gets written — a `Timeout` from the
+    system that ran longest quietly outranking a `Theorem`. Two things published
+    here are enough for that choice, and are what a consumer should use instead:
+
+      * **`success?/1`.** A `Success` value is an answer; a `NoSuccess` value is
+        the absence of one. Prefer `Success`. That is the whole of the ordering the
+        text supports, and it is the one that matters — nothing in `NoSuccess` is
+        ever a better answer than anything in `Success`.
+      * **`subontology/1`.** Within `Success`, this says which group of the page a
+        value sits in, so two answers can be told apart as the same kind of claim
+        or different kinds without any guess about which is stronger.
+
+    One further rule is about provenance rather than about the ontology, and it
+    belongs in the same decision: an explicit `% SZS status` line is the system
+    saying what it concluded, while a prover-specific output pattern is a reader
+    inferring it. Prefer the line. `Tptp.Szs.status/1` returns `:none` when a run
+    printed none, which is the signal to fall back to a pattern — and the only
+    time to.
+
     ## Case is meaningful
 
     `SAT` is `Satisfiable`; `Sat` is `Saturation`. `from_mnemonic/1` is case
@@ -136,6 +160,25 @@ defmodule Tptp.Szs.Generator do
     a TPTP `status(...)` annotation has its own entry point, `from_status_value/1`,
     which searches only the success ontology — the only place `<status_value>` draws
     from, as the generator checks on every run.
+
+    `Ass` and `ASS` are a second pair, and a sharper one: `Ass` is `Assurance` in
+    the data ontology, `ASS` is `Assumed` in the no-success ontology.
+
+    ## `Assumed` carries arguments this module does not model
+
+    The page writes every mnemonic as three letters except one. `Assumed` is
+    `ASS(U,S)`: the success value `S` was assumed because the real answer is
+    unknown for the no-success reason `U`, with `U` drawn from the subontology
+    under `Unknown`. `mnemonic(:assumed)` is `"ASS"` and `from_mnemonic/1` answers
+    to `"ASS"` alone, because a pair of arguments is not a member of a closed set of
+    atoms and pretending otherwise would put a parser in a lookup table.
+
+    A consumer reading a status line has to do the splitting itself: take the text
+    up to the first `(`, look that up here, and read the arguments — themselves two
+    mnemonics — with a second and third call. Nothing on the page says how the form
+    is written in a `% SZS status` line, and the TPTP BNF cannot express it at all:
+    `<status_value>` is a list of plain words, so `status(ass(...))` has no
+    derivation. Treat `ASS(...)` as a form to recognise rather than one to emit.
     """
   end
 

@@ -27,8 +27,9 @@ defmodule Tptp.Lint.Rule do
   ## Severity is a default, not a decree
 
   `c:severity/0` is what the rule thinks; the caller overrides per code. A rule
-  that fires on conforming library files must be a warning, and there is a corpus
-  test that says so.
+  that fires on conforming library files must not report an error, and there is a
+  corpus test that says so. `:info` is for a rule whose finding is a fact about the
+  file rather than a complaint about it.
   """
 
   alias Tptp.Diagnostic

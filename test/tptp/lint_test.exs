@@ -39,7 +39,9 @@ defmodule Tptp.LintTest do
       {Tptp.Lint.Rules.Parent, "TPTP0504", "fof(a, axiom, p, inference(r, [], [ghost])).",
        "fof(ghost, axiom, q). fof(a, axiom, p, inference(r, [], [ghost]))."},
       {Tptp.Lint.Rules.Arity, "TPTP0505", "fof(a, axiom, p(x)). fof(b, axiom, p(x, y)).",
-       "fof(a, axiom, p(x)). fof(b, axiom, p(y))."}
+       "fof(a, axiom, p(x)). fof(b, axiom, p(y))."},
+      {Tptp.Lint.Rules.Conjecture, "TPTP0506", "fof(g1, conjecture, p). fof(g2, conjecture, q).",
+       "fof(g, conjecture, p)."}
     ]
 
     for {rule, code, positive, negative} <- @cases do
@@ -90,6 +92,24 @@ defmodule Tptp.LintTest do
       codes = Enum.map(Lint.rules(), & &1.code())
 
       assert codes == Enum.uniq(codes)
+    end
+  end
+
+  describe "a typing below the top of a statement" do
+    @only [only: [Tptp.Lint.Rules.AtomTyping]]
+
+    test "a $let binding is a typing nested on purpose" do
+      assert codes("thf(a, axiom, $let(ff: $int > $rat, ff @ X := g @ X, p @ ff)).", @only) == []
+
+      assert codes("thf(a, axiom, $let([f: $int, g: $rat], [f := c, g := d], p @ f)).", @only) ==
+               []
+
+      assert codes("tff(a, axiom, $let(ff: $int, ff := c, p(ff))).", @only) == []
+    end
+
+    test "a declaration in brackets is the same declaration" do
+      assert codes("thf(a, type, (f: $i)).", @only) == []
+      assert codes("tff(a, type, (f: $i)).", @only) == []
     end
   end
 
@@ -199,10 +219,124 @@ defmodule Tptp.LintTest do
       assert Map.has_key?(table.symbols, "p")
     end
 
+    test "a modality index names a modality, not a symbol" do
+      table = table("thf(a, axiom, {$necessary(#agent)} @ p).")
+
+      refute Map.has_key?(table.symbols, "agent")
+      assert Map.has_key?(table.symbols, "p")
+    end
+
+    test "a compound modality index is a label all the way down" do
+      table = table("thf(a, axiom, {$necessary(#f(b))} @ p).")
+
+      refute Map.has_key?(table.symbols, "f")
+      refute Map.has_key?(table.symbols, "b")
+    end
+
     test "parents are collected from the source slot" do
       table = table("fof(a, axiom, p, inference(r, [], [b, c])).")
 
       assert table.parents |> Enum.map(&elem(&1, 0)) |> Enum.sort() == ["b", "c"]
+    end
+  end
+
+  describe "a quoted atom is the same atomic word as its unquoted spelling" do
+    test "one symbol, not two" do
+      table = table("tff(t, type, 'p': $i > $o). tff(a, axiom, p(x)).")
+
+      assert Map.has_key?(table.symbols, "p")
+      refute Map.has_key?(table.symbols, "'p'")
+    end
+
+    test "the declaration satisfies the use" do
+      source = "tff(t, type, 'p': $i > $o). tff(c, type, x: $i). tff(a, axiom, p(x))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == []
+    end
+
+    test "an arity clash across the two spellings is found" do
+      source = "fof(a, axiom, p(x)). fof(b, axiom, 'p'(x, y))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Arity]) == ["TPTP0505"]
+    end
+
+    test "two statements named the same word two ways are duplicates" do
+      source = "fof(a, axiom, p). fof('a', axiom, q)."
+
+      assert codes(source, only: [Tptp.Lint.Rules.DuplicateName]) == ["TPTP0503"]
+    end
+
+    test "a parent named with quotes finds its statement" do
+      source = "fof(a, axiom, p). fof(b, plain, q, inference(r, [], ['a']))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Parent]) == []
+    end
+
+    test "escapes are resolved, so the word is the bytes it denotes" do
+      table = table(~S|fof(a, axiom, 'it\'s').|)
+
+      assert Map.has_key?(table.symbols, "it's")
+    end
+
+    test "a distinct object is not the atom of the same letters" do
+      table = table(~S|fof(a, axiom, p("cat") = 'cat').|)
+
+      assert Map.has_key?(table.symbols, "cat")
+      refute Map.has_key?(table.symbols, ~S|"cat"|)
+    end
+  end
+
+  describe "conjectures" do
+    test "a unit that asks nothing is reported once, at the top of the root file" do
+      {:ok, unit, []} = Tptp.Unit.from_string("fof(a, axiom, p).")
+      [diagnostic] = Lint.run_unit(unit)
+
+      assert diagnostic.code == "TPTP0506"
+      assert diagnostic.severity == :info
+      assert diagnostic.span.offset == 0
+    end
+
+    test "a file is not a problem, so run/2 declines to say it asks nothing" do
+      assert codes("fof(a, axiom, p).") == []
+    end
+
+    test "a conjecture reached through an include counts" do
+      resolver = {Tptp.Resolver.Map, files: %{"goal.ax" => "fof(g, conjecture, p)."}}
+
+      {:ok, unit, []} =
+        Tptp.Unit.from_string("fof(a, axiom, p). include('goal.ax').", resolver: resolver)
+
+      assert Lint.run_unit(unit) == []
+    end
+
+    test "many negated_conjecture clauses are one conjecture, not many" do
+      source = """
+      cnf(a, axiom, p).
+      cnf(n1, negated_conjecture, ~q).
+      cnf(n2, negated_conjecture, ~r).
+      """
+
+      assert codes(source) == []
+
+      {:ok, unit, []} = Tptp.Unit.from_string(source)
+      assert Lint.run_unit(unit) == []
+    end
+
+    test "two conjectures are reported against the first" do
+      [diagnostic] =
+        found("fof(g1, conjecture, p). fof(g2, conjecture, q).",
+          only: [Tptp.Lint.Rules.Conjecture]
+        )
+
+      assert diagnostic.message =~ "2 conjectures"
+      assert [{span, "first conjecture here"}] = diagnostic.related
+      assert span.offset == 8
+    end
+
+    test "an empty unit asks nothing and is not worth saying so" do
+      {:ok, unit, []} = Tptp.Unit.from_string("")
+
+      assert Lint.run_unit(unit) == []
     end
   end
 
@@ -248,7 +382,10 @@ defmodule Tptp.LintTest do
          }}
 
       {:ok, unit, []} =
-        Tptp.Unit.from_string("include('sig.ax'). tff(a, axiom, p(c)).", resolver: resolver)
+        Tptp.Unit.from_string(
+          "include('sig.ax'). tff(a, axiom, p(c)). tff(g, conjecture, p(c)).",
+          resolver: resolver
+        )
 
       assert Lint.run_unit(unit) == []
     end
@@ -269,7 +406,10 @@ defmodule Tptp.LintTest do
          }}
 
       {:ok, unit, []} =
-        Tptp.Unit.from_string("include('left.ax'). include('right.ax').", resolver: resolver)
+        Tptp.Unit.from_string(
+          "include('left.ax'). include('right.ax'). fof(g, conjecture, p).",
+          resolver: resolver
+        )
 
       assert Lint.run_unit(unit) == []
     end

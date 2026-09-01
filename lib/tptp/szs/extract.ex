@@ -14,8 +14,25 @@ defmodule Tptp.Szs.Extract do
   its markup. That markup is regular enough to parse strictly rather than
   heuristically: every value is one `<LI> <TT>Name</TT> (<TT>Mnc</TT>):<BR>` line
   followed by its description, and nothing else in the three ontology sections has
-  that shape. A page that stops matching produces no values rather than wrong ones,
-  and the generator refuses to write a suspiciously short table.
+  that shape.
+
+  ## Every listed value is recovered, or the read fails
+
+  A pattern that stops matching one entry is the dangerous failure, because the
+  result is a table that is right about everything it contains and silently short
+  by one — which is exactly what happened. `Assumed` is written
+  `(<TT>ASS(</TT><EM>U</EM><TT>,</TT><EM>S</EM><TT>)</TT>)`, the only mnemonic on
+  the page that takes arguments, and a pattern demanding three letters between
+  `<TT>` and `</TT>` skipped it. The generator's floor on the total did not notice,
+  and could not: 111 is not a suspicious number.
+
+  So the count is checked against the page rather than against a constant. Every
+  `<LI> <TT>Name</TT>` in a section must come back as a value, and a name that does
+  not raises with its own spelling in the message. The mnemonic pattern is now
+  whatever stands between the parentheses, of which the leading three letters are
+  the code — `ASS` for `ASS(U,S)` — so the arguments no longer cost the value its
+  place in the table. What they are is in the value's own description, which is the
+  page's sentence about them.
 
   ## What is recovered, and what is not
 
@@ -53,7 +70,9 @@ defmodule Tptp.Szs.Extract do
     {~r{<H3>\s*The\s*<TT>Data</TT>\s*Ontology\s*</H3>}i, :data, "Data"}
   ]
 
-  @entry ~r"<LI>\s*<TT>([A-Za-z0-9]+)</TT>\s*\(<TT>([A-Za-z0-9]{3})</TT>\)\s*:\s*<BR>(.*?)(?=<LI>|</UL>|<H3>|\z)"is
+  @entry ~r"<LI>\s*<TT>([A-Za-z0-9]+)</TT>\s*\((.*?)\)\s*:\s*<BR>(.*?)(?=<LI>|</UL>|<H3>|\z)"is
+
+  @candidate ~r"<LI>\s*<TT>([A-Za-z0-9]+)</TT>"i
 
   @doc """
   Read every status value out of the page at `path`.
@@ -96,14 +115,32 @@ defmodule Tptp.Szs.Extract do
 
   @spec entries(binary(), atom(), binary()) :: [value()]
   defp entries(section, ontology, root) do
-    @entry
-    |> Regex.scan(section, return: :index)
-    |> Enum.map_reduce(root, fn captures, carried ->
-      value = entry(section, captures, ontology, root, carried)
+    values =
+      @entry
+      |> Regex.scan(section, return: :index)
+      |> Enum.map_reduce(root, fn captures, carried ->
+        value = entry(section, captures, ontology, root, carried)
 
-      {value, value.subontology}
-    end)
-    |> elem(0)
+        {value, value.subontology}
+      end)
+      |> elem(0)
+
+    complete!(section, values, ontology)
+  end
+
+  @spec complete!(binary(), [value()], atom()) :: [value()]
+  defp complete!(section, values, ontology) do
+    listed = for [_whole, name] <- Regex.scan(@candidate, section), do: name
+    recovered = Enum.map(values, & &1.name)
+
+    case listed -- recovered do
+      [] ->
+        values
+
+      missing ->
+        raise "the SZS #{ontology} section lists #{Enum.join(missing, ", ")}, " <>
+                "which #{__MODULE__} did not recover; the page has changed shape"
+    end
   end
 
   @spec entry(binary(), [{integer(), integer()}], atom(), binary(), binary()) :: value()
@@ -112,11 +149,19 @@ defmodule Tptp.Szs.Extract do
 
     %{
       name: name,
-      mnemonic: slice(section, mnemonic),
+      mnemonic: section |> slice(mnemonic) |> mnemonic!(name),
       description: section |> slice(description) |> text(),
       ontology: ontology,
       subontology: subontology(section, whole, ontology, root, carried, name)
     }
+  end
+
+  @spec mnemonic!(binary(), binary()) :: binary()
+  defp mnemonic!(fragment, name) do
+    case fragment |> text() |> String.split("(", parts: 2) do
+      [<<code::binary-size(3)>> | _arguments] -> code
+      _otherwise -> raise "#{name} has no three-letter SZS mnemonic: #{inspect(text(fragment))}"
+    end
   end
 
   @spec subontology(binary(), {integer(), integer()}, atom(), binary(), binary(), binary()) ::

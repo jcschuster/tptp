@@ -117,8 +117,16 @@ defmodule Tptp.Bnf.GeneratorTest do
                "ntf_modal_axiom" => 6,
                "ntf_modal_system" => 6,
                "status_value" => 34,
-               "reserved_word" => 91
+               "reserved_word" => 98
              }
+    end
+
+    test "a $-word applied in a rule is still a reserved word", %{entries: entries} do
+      reserved = entries["reserved_word"]
+
+      assert "$ite" in reserved
+      assert "$let" in reserved
+      assert "$domains" in reserved
     end
 
     test "strips the braces the BNF writes around the modal connectives", %{entries: entries} do

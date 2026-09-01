@@ -89,6 +89,49 @@ defmodule Tptp.SzsTest do
       assert Ontology.name(:counter_tautologyy_preserving) == "CounterTautologyyPreserving"
       assert Ontology.from_status_value("ctp") == {:ok, :counter_tautologyy_preserving}
     end
+
+    test "the one value whose mnemonic takes arguments is here, under its bare code" do
+      assert Ontology.from_string("Assumed") == {:ok, :assumed}
+      assert Ontology.mnemonic(:assumed) == "ASS"
+      assert Ontology.from_mnemonic("ASS") == {:ok, :assumed}
+      assert Ontology.ontology(:assumed) == :no_success
+      assert Ontology.describe(:assumed) =~ "has been assumed"
+    end
+
+    test "ASS and Ass are two values, and case is what tells them apart" do
+      assert Ontology.from_mnemonic("ASS") == {:ok, :assumed}
+      assert Ontology.from_mnemonic("Ass") == {:ok, :assurance}
+      assert Ontology.ontology(:assurance) == :data
+    end
+  end
+
+  describe "reading the page" do
+    test "every value the page lists is recovered" do
+      markup = File.read!(Path.join(["priv", "szs", Ontology.vendored()]))
+
+      listed =
+        ~r{<LI>\s*<TT>([A-Za-z0-9]+)</TT>}i |> Regex.scan(markup) |> Enum.map(&Enum.at(&1, 1))
+
+      recovered = Enum.map(Ontology.values(), &Ontology.name/1)
+
+      assert listed -- recovered == []
+    end
+
+    test "a listed value the pattern cannot read raises rather than going missing" do
+      markup =
+        "<H3> The <TT>Success</TT> Ontology </H3>" <>
+          "<H3> The <TT>NoSuccess</TT> Ontology </H3>" <>
+          "<H3> The <TT>Data</TT> Ontology </H3>" <>
+          "<UL><LI> <TT>Proof</TT> (<TT>Prf</TT>):<BR>A proof." <>
+          "<LI> <TT>Puzzling</TT> (<TT>PZL(</TT><EM>Q</EM><TT>)</TT>):<BR>Unclear.</UL>"
+
+      assert [%{name: "Proof"}, %{name: "Puzzling", mnemonic: "PZL"}] =
+               Tptp.Szs.Extract.parse!(markup)
+
+      broken = String.replace(markup, "(<TT>Prf</TT>)", "")
+
+      assert_raise RuntimeError, ~r/Proof/, fn -> Tptp.Szs.Extract.parse!(broken) end
+    end
   end
 
   describe "reading a status line" do

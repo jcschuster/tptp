@@ -21,6 +21,25 @@ defmodule Tptp.Lint.Collect do
   not: `file` in a `<source>` is a keyword, `status(thm)` is a label, and a rule
   that counted them would report the whole TSTP vocabulary as undeclared.
 
+  An `<ntf_index>` is the other place a word looks like a symbol and is not.
+  `{$necessary(#agent)}` names a modality; `agent` is that modality's label, not a
+  constant of the problem's signature, and `SYN000^7.p` — the reference example for
+  the syntax — declares no type for it. So the whole subtree under an `ntf_index`
+  is claimed before the walk reaches it, and none of it is counted.
+
+  ## Symbols are keyed by their canonical value, not their spelling
+
+  `'p'` and `p` are one symbol — the BNF says a `<single_quoted>` is the enclosed
+  atomic word without its quotes — so every key handed to `Tptp.Lint.Table` comes
+  from `Tptp.Node.value/1` rather than from `text`. Keying on the spelling splits
+  `tff(t, type, 'p': $i > $o). tff(a, axiom, p(x)).` into two entries, which is a
+  false undeclared-symbol finding, a missed arity clash and a missed duplicate
+  name all at once, and hands the same split to anything built on
+  `Tptp.Query.symbols/1`. The same goes for statement names and for the names an
+  inference record gives as parents: `<name> ::= <atomic_word> | <integer>`, so a
+  statement named `a` really is the statement a later `inference(r, [], ['a'])`
+  refers to.
+
   ## Arity is the spine length, counted where the application node is
 
   `f(a, b)` is a `fof_plain_term` with a functor and an argument list, so the arity
@@ -104,6 +123,7 @@ defmodule Tptp.Lint.Collect do
     |> note_language(context)
     |> note_feature(node)
     |> note_statement(node, context)
+    |> note_conjecture(node, context)
     |> note_symbol(node, context)
     |> note_parent(node, context)
   end
@@ -126,19 +146,40 @@ defmodule Tptp.Lint.Collect do
 
   defp note_statement(table, %Node{} = node, %Context{slot: :name, depth: 0} = context) do
     case context.statement do
-      %Annotated{} -> Table.name(table, node.text || "", Context.span(context, node))
+      %Annotated{} -> Table.name(table, Node.value(node) || "", Context.span(context, node))
       _include -> table
     end
   end
 
   defp note_statement(table, _node, _context), do: table
 
+  defp note_conjecture(table, %Node{} = node, %Context{slot: :role, depth: 0} = context) do
+    case Node.value(node) do
+      "conjecture" ->
+        Table.conjecture(table, :conjecture, Context.span(context, node))
+
+      "negated_conjecture" ->
+        Table.conjecture(table, :negated_conjecture, Context.span(context, node))
+
+      _other ->
+        table
+    end
+  end
+
+  defp note_conjecture(table, _node, _context), do: table
+
   defp note_symbol(table, %Node{kind: kind} = node, %Context{slot: :formula} = context)
        when kind in @symbol_kinds do
     if declaring?(context, node) do
-      Table.declare(table, node.text, kind, declared_type(context), Context.span(context, node))
+      Table.declare(
+        table,
+        Node.value(node),
+        kind,
+        declared_type(context),
+        Context.span(context, node)
+      )
     else
-      Table.use(table, node.text, kind, 0, Context.span(context, node))
+      Table.use(table, Node.value(node), kind, 0, Context.span(context, node))
     end
   end
 
@@ -147,11 +188,17 @@ defmodule Tptp.Lint.Collect do
     case node.children do
       [%Node{kind: head_kind, text: name} = head | rest]
       when is_binary(name) and head_kind != :variable ->
-        Table.use(table, name, head.kind, arity(rest), Context.span(context, head))
+        Table.use(table, Node.value(head), head.kind, arity(rest), Context.span(context, head))
 
       _otherwise ->
         table
     end
+  end
+
+  defp note_symbol(table, %Node{kind: :ntf_index} = node, %Context{slot: :formula} = context) do
+    node
+    |> Node.walk()
+    |> Enum.reduce(table, &Table.ignore(&2, Context.span(context, &1)))
   end
 
   defp note_symbol(
@@ -162,7 +209,7 @@ defmodule Tptp.Lint.Collect do
     case spine(node) do
       {%Node{kind: head_kind, text: name} = head, count}
       when is_binary(name) and head_kind != :variable ->
-        Table.use(table, name, head.kind, count, Context.span(context, head))
+        Table.use(table, Node.value(head), head.kind, count, Context.span(context, head))
 
       _otherwise ->
         table
@@ -172,7 +219,7 @@ defmodule Tptp.Lint.Collect do
   defp note_symbol(table, _node, _context), do: table
 
   defp note_parent(table, %Node{kind: :name} = node, %Context{slot: :source} = context) do
-    Table.parent(table, node.text || "", Context.span(context, node))
+    Table.parent(table, Node.value(node) || "", Context.span(context, node))
   end
 
   defp note_parent(table, _node, _context), do: table

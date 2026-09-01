@@ -282,7 +282,7 @@ defmodule Tptp.Bnf.Generator do
   end
 
   @doc """
-  Every `$`-prefixed literal the BNF mentions, in any rule and any position.
+  Every `$`-prefixed word the BNF mentions, in any rule and any position.
 
   The closed vocabularies above only catch rules whose alternatives are *nothing
   but* literals, and several reserved words are not written that way:
@@ -290,6 +290,12 @@ defmodule Tptp.Bnf.Generator do
   beside two other symbols, so it is a word the language knows that no closed list
   contains. Linting `$`-words against the closed lists alone reports those as
   unknown, which they are not.
+
+  Nor is a `$`-word always a literal run of its own. A rule that applies one writes
+  the bracket into the same run — `<txf_conditional> :== $ite(<tff_logic_formula>,…)`
+  is the literal `$ite(` — so the word is scanned out of the run rather than
+  matched against it. Taking the run whole missed `$ite` and the six `$`-keywords,
+  and reported `$ite` as undefined on the one library file that uses it.
   """
   @spec reserved_words([Rule.t()]) :: [binary()]
   def reserved_words(rules) do
@@ -297,10 +303,7 @@ defmodule Tptp.Bnf.Generator do
         is_list(rule.alternatives),
         alternative <- rule.alternatives,
         {:literal, text} <- alternative,
-        word = plain_word(text),
-        is_binary(word),
-        String.starts_with?(word, "$"),
-        not String.starts_with?(word, "$$"),
+        word <- Regex.scan(~r/\$[A-Za-z_][A-Za-z_0-9]*/, text) |> List.flatten(),
         uniq: true,
         do: word
   end

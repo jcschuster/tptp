@@ -3,17 +3,25 @@ defmodule Tptp.LintCorpusTest do
   Gate 6: the lint rules against the real TPTP library.
 
   The assertion that matters is the plan's: **no rule fires at error severity on a
-  conforming library file.** A lint rule is only worth having if its findings mean
+  conforming library file.** On a pull request this reads one file in eleven and one
+  problem in seventeen; `$TPTP_CORPUS_FULL=1` reads all of them, which is what the
+  nightly workflow sets and where every count below was taken. A lint rule is only worth having if its findings mean
   something, and a rule that calls the library wrong is wrong itself. Every finding
   below is a warning, and each of the two that survive was chased down to a real
   fact about TPTP rather than left as noise:
 
-    * `TPTP0401` fires once, on `PHI003^8.p`, which uses a `logic` role that the
-      vendored BNF's `:==` list does not mention. A gap between the grammar version
-      and the library.
+    * `TPTP0401` fires on the modal problems that carry a `logic` role, which the
+      vendored BNF's `:==` list of the thirteen roles does not mention. A gap
+      between the grammar version and the library.
     * `TPTP0503` fires on the machine-generated ITP axiom sets, which repeat
       declarations across files, so a problem pulling in thirty of them defines one
       name thirty times. Ambiguous, and true.
+    * `TPTP0402` fires on the modal problems that specify `$modal_system_KB`, which
+      the vendored BNF's `<ntf_modal_system>` list — `K`, `M`, `B`, `D`, `S4`, `S5`
+      — does not include. The same gap as `TPTP0401`'s, in the other direction.
+    * `TPTP0506` fires at `:info` on the problems that state no conjecture. That is
+      not a finding about the file being wrong — a satisfiability problem asks
+      nothing on purpose — it is the count a consumer would otherwise make itself.
 
   `TPTP0501` fires freely on an axiom file linted *alone*, because its declarations
   are in a file it does not include; that is why the gate lints units.
@@ -80,7 +88,7 @@ defmodule Tptp.LintCorpusTest do
     IO.puts("\n  #{length(problems)} problems linted as units: #{inspect(counts)}")
 
     for {code, _count} <- counts do
-      assert code in ["TPTP0401", "TPTP0503"],
+      assert code in ["TPTP0401", "TPTP0402", "TPTP0503", "TPTP0506"],
              "#{code} fires on the library; either the rule or our reading of TPTP is wrong"
     end
   end

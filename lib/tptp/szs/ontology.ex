@@ -3,10 +3,10 @@ defmodule Tptp.Szs.Ontology do
   The SZS status values, generated from the vendored ontology page.
 
   Do not edit: `mix tptp.gen` writes this from `priv/szs/SZSOntology-2026-08-31.html`,
-  fetched from <https://tptp.org/UserDocs/SZSOntology>. 111 values in three ontologies:
+  fetched from <https://tptp.org/UserDocs/SZSOntology>. 112 values in three ontologies:
 
     * `:success` — 53 values
-    * `:no_success` — 28 values
+    * `:no_success` — 29 values
     * `:data` — 30 values
 
   Every atom here is created at compile time, so `from_string/1` and its siblings
@@ -27,6 +27,30 @@ defmodule Tptp.Szs.Ontology do
   `Success`. If a machine-readable ontology is published, this module gains the
   hierarchy in one regeneration.
 
+  ## What to do when there is no ordering
+
+  There is no `compare/2` and no precedence table, for the same reason there is
+  no `parent/1`: the page publishes none. A consumer reading prover output still
+  has to choose between two answers, though, and a consumer that invents its own
+  ranking is how a precedence inversion gets written — a `Timeout` from the
+  system that ran longest quietly outranking a `Theorem`. Two things published
+  here are enough for that choice, and are what a consumer should use instead:
+
+    * **`success?/1`.** A `Success` value is an answer; a `NoSuccess` value is
+      the absence of one. Prefer `Success`. That is the whole of the ordering the
+      text supports, and it is the one that matters — nothing in `NoSuccess` is
+      ever a better answer than anything in `Success`.
+    * **`subontology/1`.** Within `Success`, this says which group of the page a
+      value sits in, so two answers can be told apart as the same kind of claim
+      or different kinds without any guess about which is stronger.
+
+  One further rule is about provenance rather than about the ontology, and it
+  belongs in the same decision: an explicit `% SZS status` line is the system
+  saying what it concluded, while a prover-specific output pattern is a reader
+  inferring it. Prefer the line. `Tptp.Szs.status/1` returns `:none` when a run
+  printed none, which is the signal to fall back to a pattern — and the only
+  time to.
+
   ## Case is meaningful
 
   `SAT` is `Satisfiable`; `Sat` is `Saturation`. `from_mnemonic/1` is case
@@ -34,9 +58,28 @@ defmodule Tptp.Szs.Ontology do
   a TPTP `status(...)` annotation has its own entry point, `from_status_value/1`,
   which searches only the success ontology — the only place `<status_value>` draws
   from, as the generator checks on every run.
+
+  `Ass` and `ASS` are a second pair, and a sharper one: `Ass` is `Assurance` in
+  the data ontology, `ASS` is `Assumed` in the no-success ontology.
+
+  ## `Assumed` carries arguments this module does not model
+
+  The page writes every mnemonic as three letters except one. `Assumed` is
+  `ASS(U,S)`: the success value `S` was assumed because the real answer is
+  unknown for the no-success reason `U`, with `U` drawn from the subontology
+  under `Unknown`. `mnemonic(:assumed)` is `"ASS"` and `from_mnemonic/1` answers
+  to `"ASS"` alone, because a pair of arguments is not a member of a closed set of
+  atoms and pretending otherwise would put a parser in a lookup table.
+
+  A consumer reading a status line has to do the splitting itself: take the text
+  up to the first `(`, look that up here, and read the arguments — themselves two
+  mnemonics — with a second and third call. Nothing on the page says how the form
+  is written in a `% SZS status` line, and the TPTP BNF cannot express it at all:
+  `<status_value>` is a list of plain words, so `status(ass(...))` has no
+  derivation. Treat `ASS(...)` as a form to recognise rather than one to emit.
   """
 
-  @typedoc "One SZS status value. A closed set of 111 compile-time atoms."
+  @typedoc "One SZS status value. A closed set of 112 compile-time atoms."
   @type t ::
           :success
           | :semantic_success
@@ -116,6 +159,7 @@ defmodule Tptp.Szs.Ontology do
           | :incomplete
           | :inappropriate
           | :incorrect
+          | :assumed
           | :open
           | :not_verified
           | :failed_verified
@@ -249,6 +293,7 @@ defmodule Tptp.Szs.Ontology do
       :incomplete,
       :inappropriate,
       :incorrect,
+      :assumed,
       :open,
       :not_verified,
       :failed_verified,
@@ -286,7 +331,7 @@ defmodule Tptp.Szs.Ontology do
 
   @doc "How many status values there are."
   @spec count() :: pos_integer()
-  def count, do: 111
+  def count, do: 112
 
   @doc "Where the ontology was fetched from."
   @spec source() :: binary()
@@ -410,6 +455,7 @@ defmodule Tptp.Szs.Ontology do
   def from_string("Incomplete"), do: {:ok, :incomplete}
   def from_string("Inappropriate"), do: {:ok, :inappropriate}
   def from_string("Incorrect"), do: {:ok, :incorrect}
+  def from_string("Assumed"), do: {:ok, :assumed}
   def from_string("Open"), do: {:ok, :open}
   def from_string("NotVerified"), do: {:ok, :not_verified}
   def from_string("FailedVerified"), do: {:ok, :failed_verified}
@@ -540,6 +586,7 @@ defmodule Tptp.Szs.Ontology do
   def name(:incomplete), do: "Incomplete"
   def name(:inappropriate), do: "Inappropriate"
   def name(:incorrect), do: "Incorrect"
+  def name(:assumed), do: "Assumed"
   def name(:open), do: "Open"
   def name(:not_verified), do: "NotVerified"
   def name(:failed_verified), do: "FailedVerified"
@@ -589,6 +636,7 @@ defmodule Tptp.Szs.Ontology do
       :error
   """
   @spec from_mnemonic(binary()) :: {:ok, t()} | {:ambiguous, [t()]} | :error
+  def from_mnemonic("ASS"), do: {:ok, :assumed}
   def from_mnemonic("Ass"), do: {:ok, :assurance}
   def from_mnemonic("CAX"), do: {:ok, :contradictory_axioms}
   def from_mnemonic("CEQ"), do: {:ok, :counter_equivalent}
@@ -856,6 +904,7 @@ defmodule Tptp.Szs.Ontology do
   def mnemonic(:incomplete), do: "INC"
   def mnemonic(:inappropriate), do: "IAP"
   def mnemonic(:incorrect), do: "ICT"
+  def mnemonic(:assumed), do: "ASS"
   def mnemonic(:open), do: "OPN"
   def mnemonic(:not_verified), do: "NVE"
   def mnemonic(:failed_verified), do: "FVE"
@@ -1105,6 +1154,11 @@ defmodule Tptp.Szs.Ontology do
     do: "Software gave up because it cannot process this type of data."
 
   def describe(:incorrect), do: "Software gave an incorrect answer."
+
+  def describe(:assumed),
+    do:
+      "The success ontology value S has been assumed because the actual value is unknown for the no-success ontology reason U. U is taken from the subontology starting at Unknown in the no-success ontology."
+
   def describe(:open), do: "A success value for the abstract problem has never been established."
   def describe(:not_verified), do: "The solution output has not been verified."
   def describe(:failed_verified), do: "The solution output failed verification."
@@ -1236,6 +1290,7 @@ defmodule Tptp.Szs.Ontology do
   def ontology(:incomplete), do: :no_success
   def ontology(:inappropriate), do: :no_success
   def ontology(:incorrect), do: :no_success
+  def ontology(:assumed), do: :no_success
   def ontology(:open), do: :no_success
   def ontology(:not_verified), do: :no_success
   def ontology(:failed_verified), do: :no_success
@@ -1357,6 +1412,7 @@ defmodule Tptp.Szs.Ontology do
   def subontology(:incomplete), do: :no_success
   def subontology(:inappropriate), do: :no_success
   def subontology(:incorrect), do: :no_success
+  def subontology(:assumed), do: :no_success
   def subontology(:open), do: :no_success
   def subontology(:not_verified), do: :no_success
   def subontology(:failed_verified), do: :no_success
@@ -1478,6 +1534,7 @@ defmodule Tptp.Szs.Ontology do
   def value?(:incomplete), do: true
   def value?(:inappropriate), do: true
   def value?(:incorrect), do: true
+  def value?(:assumed), do: true
   def value?(:open), do: true
   def value?(:not_verified), do: true
   def value?(:failed_verified), do: true

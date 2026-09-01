@@ -46,9 +46,11 @@ defmodule Tptp.Lint do
   ## Severities
 
   A rule's severity is its own opinion; `:severity` overrides it per code and
-  `:only`/`:except` select which rules run at all. Every shipped rule that can fire
-  on a conforming TPTP library file does so as a warning, and there is a corpus test
-  that will fail if that stops being true.
+  `:only`/`:except` select which rules run at all. No shipped rule reports an error
+  on a conforming TPTP library file, and there is a corpus test that will fail if
+  that stops being true. One rule is `:info` rather than a warning —
+  `Tptp.Lint.Rules.Conjecture` counts what a file asks, which is a fact about the
+  problem rather than a complaint about it — and every other is a warning.
   """
 
   alias Tptp.Diagnostic
@@ -67,7 +69,8 @@ defmodule Tptp.Lint do
     Tptp.Lint.Rules.Declaration,
     Tptp.Lint.Rules.DuplicateName,
     Tptp.Lint.Rules.Parent,
-    Tptp.Lint.Rules.Arity
+    Tptp.Lint.Rules.Arity,
+    Tptp.Lint.Rules.Conjecture
   ]
 
   @typedoc """
@@ -103,7 +106,7 @@ defmodule Tptp.Lint do
   """
   @spec run(Tptp.File.t(), [option()]) :: [Diagnostic.t()]
   def run(%Tptp.File{} = file, options \\ []) do
-    lint(statements(file), %{file.id => file}, options)
+    lint(statements(file), %{file.id => file}, options, false)
   end
 
   @doc """
@@ -115,7 +118,7 @@ defmodule Tptp.Lint do
   """
   @spec run_unit(Tptp.Unit.t(), [option()]) :: [Diagnostic.t()]
   def run_unit(%Tptp.Unit{} = unit, options \\ []) do
-    lint(statements(unit), unit.files, options)
+    lint(statements(unit), unit.files, options, true)
   end
 
   @doc """
@@ -127,7 +130,9 @@ defmodule Tptp.Lint do
   """
   @spec table(Tptp.File.t() | Tptp.Unit.t()) :: Table.t()
   def table(subject) do
-    {_found, table} = traverse(statements(subject), files(subject), [])
+    {_found, table} =
+      traverse(statements(subject), files(subject), [], match?(%Tptp.Unit{}, subject))
+
     Table.finish(table)
   end
 
@@ -141,34 +146,37 @@ defmodule Tptp.Lint do
   defp files(%Tptp.File{} = file), do: %{file.id => file}
   defp files(%Tptp.Unit{} = unit), do: unit.files
 
-  @spec lint([{Tptp.Span.file_id(), Statement.t()}], map(), [option()]) :: [Diagnostic.t()]
-  defp lint(statements, files, options) do
+  @spec lint([{Tptp.Span.file_id(), Statement.t()}], map(), [option()], boolean()) ::
+          [Diagnostic.t()]
+  defp lint(statements, files, options, whole) do
     enabled = enabled(options)
     visiting = Enum.filter(enabled, &implements?(&1, :visit, 3))
     reviewing = Enum.filter(enabled, &implements?(&1, :review, 2))
 
-    {found, table} = traverse(statements, files, visiting)
+    {found, table} = traverse(statements, files, visiting, whole)
     table = Table.finish(table)
 
-    reviewed =
-      Enum.flat_map(reviewing, fn rule ->
-        rule.review(table, %Context{file: 0, statement: nil, slot: :formula})
-      end)
+    context = %Context{file: root(statements), statement: nil, slot: :formula, whole: whole}
+    reviewed = Enum.flat_map(reviewing, fn rule -> rule.review(table, context) end)
 
     (Enum.reverse(found) ++ reviewed)
     |> adjust(options)
     |> Diagnostic.sort()
   end
 
-  @spec traverse([{Tptp.Span.file_id(), Statement.t()}], map(), [module()]) ::
+  defp root([{id, _statement} | _rest]), do: id
+  defp root([]), do: 0
+
+  @spec traverse([{Tptp.Span.file_id(), Statement.t()}], map(), [module()], boolean()) ::
           {[Diagnostic.t()], Table.t()}
-  defp traverse(statements, files, visiting) do
+  defp traverse(statements, files, visiting, whole) do
     Enum.reduce(statements, {[], %Table{}}, fn {id, statement}, {found, table} ->
       context = %Context{
         file: id,
         statement: statement,
         slot: :formula,
-        path: files[id] && files[id].path
+        path: files[id] && files[id].path,
+        whole: whole
       }
 
       walk_statement(statement, context, visiting, found, table)

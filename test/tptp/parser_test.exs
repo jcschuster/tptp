@@ -317,6 +317,82 @@ defmodule Tptp.ParserTest do
     end
   end
 
+  describe "canonical values" do
+    test "a quoted atom and its unquoted spelling are one word" do
+      assert Node.value(formula("fof(a, axiom, 'cat').")) == "cat"
+      assert Node.value(formula("fof(a, axiom, cat).")) == "cat"
+    end
+
+    test "escapes inside a quoted atom are resolved" do
+      assert Node.value(formula(~S|fof(a, axiom, 'it\'s').|)) == "it's"
+      assert Node.value(formula(~S|fof(a, axiom, 'a\\b').|)) == "a\\b"
+    end
+
+    test "an empty quoted atom is the empty word" do
+      {:ok, statement, [_warning]} = Parser.statement_from_string("fof(a, axiom, '').")
+
+      assert Node.value(statement.formula) == ""
+    end
+
+    test "text is left alone, so the printer still round-trips" do
+      assert formula("fof(a, axiom, 'cat').").text == "'cat'"
+    end
+
+    test "a distinct object is not an atomic word and keeps its quotes" do
+      [object] = formula(~S|fof(a, axiom, p("cat")).|) |> Node.select(:distinct_object)
+
+      assert Node.value(object) == ~S|"cat"|
+    end
+
+    test "a back-quoted word keeps its quote, which no other spelling produces" do
+      [word] =
+        formula("fof(a, axiom, p(`Cat)).") |> Node.walk() |> Enum.filter(&(&1.text == "`Cat"))
+
+      assert Node.value(word) == "`Cat"
+    end
+
+    test "a leaf with no text has no value" do
+      assert Node.value(formula("fof(a, axiom, ~p).")) == nil
+    end
+  end
+
+  describe "building a tree by hand" do
+    test "new/3 spans nothing, because it came from nowhere" do
+      node = Node.new(:constant, "p")
+
+      assert %Node{kind: :constant, off: 0, len: 0, text: "p", children: []} = node
+    end
+
+    test "a constructed tree prints and reparses to the same shape" do
+      tree =
+        Node.new(:fof_or_formula, nil, [
+          Node.new(:fof_plain_term, nil, [
+            Node.new(:functor, "f"),
+            Node.new(:fof_arguments, nil, [Node.new(:constant, "a"), Node.new(:constant, "b")])
+          ]),
+          Node.new(:constant, "q")
+        ])
+
+      printed = Tptp.Printer.Canonical.to_string(tree)
+
+      assert printed == "f(a, b) | q"
+      assert Node.shape(formula("fof(a, axiom, " <> printed <> ").")) == Node.shape(tree)
+    end
+
+    test "the round trip is what catches a tree built wrong" do
+      wrapped =
+        Node.new(:fof_plain_term, nil, [
+          Node.new(:functor, "f"),
+          Node.new(:fof_arguments, nil, [Node.new(:constant, "a")])
+        ])
+
+      printed = Tptp.Printer.Canonical.to_string(wrapped)
+
+      assert printed == "f(a)"
+      refute Node.shape(formula("fof(a, axiom, " <> printed <> ").")) == Node.shape(wrapped)
+    end
+  end
+
   describe "detaching and comparing" do
     test "shape/1 ignores position" do
       one = formula("fof(a, axiom, p(b) & q).")

@@ -9,6 +9,22 @@ defmodule Tptp.Lint.Rules.AtomTyping do
 
   Both are warnings. A tool reading the file will ignore the statement either way,
   and refusing to parse it would help nobody.
+
+  ## There is no rule about a nested typing, because there is nothing to report
+
+  A typing below the top of a statement looks like it should be a finding, and it
+  cannot be one: the grammar reaches `<thf_atom_typing>` from exactly three places
+  and all three are legitimate. `<thf_formula> ::= … | <thf_atom_typing>` is the
+  declaration itself; `<thf_let_types> ::= <thf_atom_typing> | [<thf_atom_typing_list>]`
+  is a `$let` binding, which is a typing nested inside a formula on purpose; and
+  `<thf_atom_typing> ::= (<thf_atom_typing>)` is the same typing in brackets. TFF
+  and TCF are the same three.
+
+  A rule that reported nested typings therefore reported `$let` bindings and
+  `thf(a, type, (f: $i)).`, and nothing else — it fired eleven times on
+  `SYN000^2.p`, all of them wrong. Depth is not what separates a meaningful typing
+  from a meaningless one; nothing does, because the grammar admits no meaningless
+  one.
   """
 
   @behaviour Tptp.Lint.Rule
@@ -54,22 +70,6 @@ defmodule Tptp.Lint.Rules.AtomTyping do
 
       _otherwise ->
         []
-    end
-  end
-
-  def visit(%Node{kind: kind} = node, %Context{slot: :formula} = context, _table)
-      when kind in @typings do
-    if context.depth == 0 do
-      []
-    else
-      [
-        complain(
-          context,
-          node,
-          "a typing is only meaningful at the top of a statement",
-          "`name: type` nested inside a formula declares nothing"
-        )
-      ]
     end
   end
 

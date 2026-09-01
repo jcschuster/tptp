@@ -13,6 +13,13 @@ defmodule TptpCorpusTest do
   points into, and it costs one copy — so counting it would measure the trade
   rather than test it. What must stay flat is everything else.
 
+  ## How much of the library this reads
+
+  Each sweep below declares how far it thins the library for a pull request, where
+  the run has to finish. `$TPTP_CORPUS_FULL=1` overrides every one of them to read
+  the library entire, and the nightly workflow sets it. `mix tptp.corpus` writes
+  the same sweep down as a committed report, which is where the number lives.
+
   Excluded by default. Run with `mix test --include corpus`.
   """
 
@@ -33,7 +40,7 @@ defmodule TptpCorpusTest do
 
   test "every library file reads with no error-severity diagnostic" do
     noisy =
-      Corpus.files(every: 5, max_bytes: 3_000_000)
+      Corpus.files(every: 5)
       |> Task.async_stream(
         fn path ->
           case Tptp.from_file(path) do
@@ -54,6 +61,16 @@ defmodule TptpCorpusTest do
       |> Enum.reject(&(&1 == :ok))
 
     assert noisy == []
+  end
+
+  test "the files this parser refuses still refuse to parse" do
+    for {name, why} <- Corpus.known_failures() do
+      [path] = Path.wildcard(Path.join([Corpus.root(), "**", name]))
+      {:ok, file, _diagnostics} = Tptp.from_file(path)
+
+      assert Tptp.File.any_errors?(file),
+             "#{name} parses now. Drop it from known_failures/0 — it was excluded because it #{why}"
+    end
   end
 
   test "streaming and reading eagerly agree, statement for statement" do
