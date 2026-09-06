@@ -26,6 +26,13 @@ defmodule Tptp.LintCorpusTest do
   `TPTP0501` fires freely on an axiom file linted *alone*, because its declarations
   are in a file it does not include; that is why the gate lints units.
 
+  `TPTP0505`, the arity rule, fires at `:warning` on eleven files that really do
+  declare one symbol at two arities and use it both ways: `SWX075`/`SWX076`
+  (`color`) and `SWX091`–`SWX098` (`sqrt`) are SystemOnTPTP verification problems
+  whose `completed_definition` axioms redeclare the symbol, and `SYN000_4` is the
+  reference example that demonstrates overloading on purpose. `@known_arity_clashes`
+  is that list; the rule is right about every one of them.
+
   Excluded by default. Run with `mix test --include corpus`.
   """
 
@@ -112,7 +119,14 @@ defmodule Tptp.LintCorpusTest do
     assert noisy == []
   end
 
-  test "the arity rule finds nothing in the library", %{files: files} do
+  @known_arity_clashes ~w(
+    SWX075_1.p SWX076_1.p
+    SWX091_1.p SWX092_1.p SWX093_1.p SWX094_1.p SWX095_1.p
+    SWX096_1.p SWX097_1.p SWX098_1.p
+    SYN000_4.p
+  )
+
+  test "the arity rule finds nothing the library does not really contain", %{files: files} do
     found =
       files
       |> stream(fn path ->
@@ -120,10 +134,10 @@ defmodule Tptp.LintCorpusTest do
 
         case Lint.run(file, only: [Tptp.Lint.Rules.Arity]) do
           [] -> :ok
-          found -> {path, Enum.map(found, & &1.message)}
+          found -> {Path.basename(path), Enum.map(found, & &1.message)}
         end
       end)
-      |> Enum.reject(&(&1 == :ok))
+      |> Enum.reject(&(&1 == :ok or elem(&1, 0) in @known_arity_clashes))
 
     assert found == []
   end

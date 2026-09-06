@@ -432,4 +432,34 @@ defmodule Tptp.LintTest do
       assert span.offset == 4
     end
   end
+
+  describe "scan/2" do
+    @source "tff(t, type, p: $i > $o). tff(a, axiom, p(x)). fof(b, wibble, q). fof(b, axiom, r)."
+
+    test "returns the diagnostics run/2 returns and the table table/1 returns" do
+      {:ok, file, []} = Tptp.from_string(@source)
+      {diagnostics, table} = Lint.scan(file)
+
+      assert diagnostics == Lint.run(file)
+      assert table == Lint.table(file)
+      assert %Tptp.Lint.Table{} = table
+    end
+
+    test "only: [] builds the table and runs no rule" do
+      {:ok, file, []} = Tptp.from_string("fof(a, wibble, p). fof(a, axiom, q).")
+      {diagnostics, table} = Lint.scan(file, only: [])
+
+      assert diagnostics == []
+      assert Map.has_key?(table.symbols, "p")
+    end
+
+    test "passes options through the way run/2 does" do
+      {:ok, file, []} = Tptp.from_string(@source)
+
+      assert {[], _table} = Lint.scan(file, only: [Tptp.Lint.Rules.Arity])
+
+      {diagnostics, _} = Lint.scan(file, severity: %{"TPTP0401" => :error})
+      assert Enum.find(diagnostics, &(&1.code == "TPTP0401")).severity == :error
+    end
+  end
 end

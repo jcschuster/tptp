@@ -23,6 +23,7 @@ defmodule Tptp.Diagnostic do
   | `TPTP05xx` | cross-statement — `Tptp.Lint` |
   | `TPTP06xx` | include — `Tptp.Include` |
   | `TPTP07xx` | dialect — `Tptp.Lint` |
+  | `TPTP08xx` | analyzer infrastructure — `Tptp.Analyzer` |
 
   `related` is what separates a useful diagnostic from a useless one: it carries
   the "first declared here" span alongside the "declared again here" one.

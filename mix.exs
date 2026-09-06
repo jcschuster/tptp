@@ -89,7 +89,7 @@ defmodule Tptp.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
       files: ~w(lib src/tptp_parser.yrl priv/bnf priv/szs mix.exs README.md LICENSE NOTICE
-           CHANGELOG.md CORPUS.md examples .formatter.exs)
+           CHANGELOG.md CORPUS.md CENSUS.md examples .formatter.exs)
     ]
   end
 
@@ -98,7 +98,7 @@ defmodule Tptp.MixProject do
       main: "readme",
       source_url: @source_url,
       source_ref: "v#{@version}",
-      extras: ["README.md", "CORPUS.md", "CHANGELOG.md", "NOTICE", "LICENSE"],
+      extras: ["README.md", "CORPUS.md", "CENSUS.md", "CHANGELOG.md", "NOTICE", "LICENSE"],
       groups_for_modules: [
         "Reading a file": [
           Tptp,
@@ -109,6 +109,10 @@ defmodule Tptp.MixProject do
           Tptp.Statement.Include,
           Tptp.Node,
           Tptp.Query
+        ],
+        Analysis: [
+          Tptp.Analysis,
+          Tptp.Analyzer
         ],
         Stages: [
           Tptp.Lexer,

@@ -50,6 +50,7 @@ defmodule Tptp do
   | `Tptp.Parser` | tokens to a `%Tptp.Node{}` CST |
   | `Tptp.Include` | the include graph, with cycle detection |
   | `Tptp.Lint` | the `:==` semantic layer and the cross-statement conditions |
+  | `Tptp.Analysis` | file, diagnostics, table and dialect from one traversal, via `analyze/2` |
   | `Tptp.Printer.Canonical` | back to bytes |
 
   ## Versions
@@ -208,6 +209,43 @@ defmodule Tptp do
   @spec stream_file!(Path.t(), [option()]) :: Enumerable.t()
   def stream_file!(path, options \\ []) when is_list(options) do
     path |> File.read!() |> stream_string!(options)
+  end
+
+  @doc """
+  Parse if needed, lint once, and return a `Tptp.Analysis`.
+
+  From a binary this parses first; from a `Tptp.File` or `Tptp.Unit` it lints one
+  already parsed. There is no failure case — a binary that does not parse yields
+  an `Analysis` whose diagnostics explain why.
+
+  `options` are the union of `t:option/0` and `t:Tptp.Lint.option/0`; each stage
+  takes the keys it recognises.
+
+      iex> analysis = Tptp.analyze("fof(a, axiom, p). fof(a, axiom, q).")
+      iex> Enum.map(analysis.diagnostics, & &1.code)
+      ["TPTP0503"]
+  """
+  @spec analyze(binary() | Tptp.File.t() | Tptp.Unit.t(), keyword()) :: Tptp.Analysis.t()
+  def analyze(subject, options \\ [])
+
+  def analyze(source, options) when is_binary(source) do
+    {:ok, file, _diagnostics} = from_string(source, options)
+    analyze(file, options)
+  end
+
+  def analyze(%Tptp.File{} = file, options), do: analysis(file, file.diagnostics, options)
+  def analyze(%Tptp.Unit{} = unit, options), do: analysis(unit, unit.diagnostics, options)
+
+  @spec analysis(Tptp.File.t() | Tptp.Unit.t(), [Diagnostic.t()], keyword()) :: Tptp.Analysis.t()
+  defp analysis(subject, own, options) do
+    {found, table} = Tptp.Lint.scan(subject, options)
+
+    %Tptp.Analysis{
+      file: subject,
+      diagnostics: Diagnostic.sort(own ++ found),
+      table: table,
+      line_index: nil
+    }
   end
 
   @doc """

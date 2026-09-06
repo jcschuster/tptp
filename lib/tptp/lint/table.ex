@@ -213,6 +213,14 @@ defmodule Tptp.Lint.Table do
   def feature?(%__MODULE__{} = table, feature), do: MapSet.member?(table.features, feature)
 
   @doc """
+  Every dialect feature the traversal saw, as a list.
+
+  `Tptp.Query.from_features/1` turns this into a dialect.
+  """
+  @spec features(t()) :: [atom()]
+  def features(%__MODULE__{features: features}), do: MapSet.to_list(features)
+
+  @doc """
   Put every accumulated list back into reading order.
 
   The traversal prepends, because prepending is what a list is for; this is the one

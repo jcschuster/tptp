@@ -51,7 +51,16 @@ defmodule Tptp.Lint do
   that stops being true. One rule is `:info` rather than a warning —
   `Tptp.Lint.Rules.Conjecture` counts what a file asks, which is a fact about the
   problem rather than a complaint about it — and every other is a warning.
+
+  ## As an analyzer
+
+  `Tptp.Lint` implements `Tptp.Analyzer` as `:tptp_lint`, dialect-agnostic. The
+  callback runs the walk under whatever options it is handed; an editor that only
+  wants the default rule set reads `analysis.diagnostics` from `Tptp.analyze/2`
+  instead of dispatching through `Tptp.Analyzer.run_all/3`.
   """
+
+  @behaviour Tptp.Analyzer
 
   alias Tptp.Diagnostic
   alias Tptp.Lint.Context
@@ -91,11 +100,30 @@ defmodule Tptp.Lint do
           | {:severity, %{binary() => Diagnostic.severity()}}
           | {:suppress, [binary()]}
 
+  @typedoc """
+  The diagnostics a lint pass produced and the table it built, from one traversal.
+  """
+  @type scan :: {[Diagnostic.t()], Table.t()}
+
   @doc """
   Every rule this library ships, in the order they are offered each node.
   """
   @spec rules() :: [module()]
   def rules, do: @rules
+
+  @impl Tptp.Analyzer
+  def id, do: :tptp_lint
+
+  @impl Tptp.Analyzer
+  def label, do: "TPTP lint"
+
+  @impl Tptp.Analyzer
+  def dialects, do: :any
+
+  @impl Tptp.Analyzer
+  def analyze(%Tptp.Analysis{} = analysis, options) do
+    analysis.file |> scan(options) |> elem(0)
+  end
 
   @doc """
   Lint one file.
@@ -106,7 +134,7 @@ defmodule Tptp.Lint do
   """
   @spec run(Tptp.File.t(), [option()]) :: [Diagnostic.t()]
   def run(%Tptp.File{} = file, options \\ []) do
-    lint(statements(file), %{file.id => file}, options, false)
+    file |> scan(options) |> elem(0)
   end
 
   @doc """
@@ -118,7 +146,40 @@ defmodule Tptp.Lint do
   """
   @spec run_unit(Tptp.Unit.t(), [option()]) :: [Diagnostic.t()]
   def run_unit(%Tptp.Unit{} = unit, options \\ []) do
-    lint(statements(unit), unit.files, options, true)
+    unit |> scan(options) |> elem(0)
+  end
+
+  @doc """
+  One traversal, both halves kept.
+
+  Every enabled rule is offered every node, and the symbol table and dialect
+  features accumulate in the same pass; the diagnostics and the finished table
+  are returned together rather than one being recomputed later.
+
+  `run/2`, `run_unit/2` and `table/1` are projections of this. Pass `only: []` to
+  build the table without running a rule — that is what `table/1` does.
+  """
+  @spec scan(Tptp.File.t() | Tptp.Unit.t(), [option()]) :: scan()
+  def scan(subject, options \\ []) do
+    whole = match?(%Tptp.Unit{}, subject)
+    statements = statements(subject)
+
+    enabled = enabled(options)
+    visiting = Enum.filter(enabled, &implements?(&1, :visit, 3))
+    reviewing = Enum.filter(enabled, &implements?(&1, :review, 2))
+
+    {found, table} = traverse(statements, files(subject), visiting, whole)
+    table = Table.finish(table)
+
+    context = %Context{file: root(statements), statement: nil, slot: :formula, whole: whole}
+    reviewed = Enum.flat_map(reviewing, fn rule -> rule.review(table, context) end)
+
+    diagnostics =
+      (Enum.reverse(found) ++ reviewed)
+      |> adjust(options)
+      |> Diagnostic.sort()
+
+    {diagnostics, table}
   end
 
   @doc """
@@ -130,10 +191,7 @@ defmodule Tptp.Lint do
   """
   @spec table(Tptp.File.t() | Tptp.Unit.t()) :: Table.t()
   def table(subject) do
-    {_found, table} =
-      traverse(statements(subject), files(subject), [], match?(%Tptp.Unit{}, subject))
-
-    Table.finish(table)
+    subject |> scan(only: []) |> elem(1)
   end
 
   @doc """
@@ -145,24 +203,6 @@ defmodule Tptp.Lint do
 
   defp files(%Tptp.File{} = file), do: %{file.id => file}
   defp files(%Tptp.Unit{} = unit), do: unit.files
-
-  @spec lint([{Tptp.Span.file_id(), Statement.t()}], map(), [option()], boolean()) ::
-          [Diagnostic.t()]
-  defp lint(statements, files, options, whole) do
-    enabled = enabled(options)
-    visiting = Enum.filter(enabled, &implements?(&1, :visit, 3))
-    reviewing = Enum.filter(enabled, &implements?(&1, :review, 2))
-
-    {found, table} = traverse(statements, files, visiting, whole)
-    table = Table.finish(table)
-
-    context = %Context{file: root(statements), statement: nil, slot: :formula, whole: whole}
-    reviewed = Enum.flat_map(reviewing, fn rule -> rule.review(table, context) end)
-
-    (Enum.reverse(found) ++ reviewed)
-    |> adjust(options)
-    |> Diagnostic.sort()
-  end
 
   defp root([{id, _statement} | _rest]), do: id
   defp root([]), do: 0

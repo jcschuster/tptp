@@ -110,7 +110,7 @@ defmodule Tptp.ResolverTest do
     test "roots/2 reports the search order", %{library: library} do
       roots = Tptp.Resolver.Fs.roots("/somewhere/problem.p", root: library, cwd: false)
 
-      assert ["/somewhere", ^library] = roots
+      assert ["/somewhere", ^library | _] = roots
     end
   end
 

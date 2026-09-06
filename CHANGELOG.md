@@ -10,6 +10,20 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+### Added
+
+- `Tptp.analyze/2` and `Tptp.Analysis`: the file, its diagnostics, the symbol
+  table and the dialect from a single traversal, with an opt-in line index for
+  turning span offsets into line and column once rather than once per diagnostic.
+- `Tptp.Analyzer`, a behaviour for a named diagnostic producer over a
+  `Tptp.Analysis`, with `run_all/3` dispatching by dialect and containing a
+  raising analyzer as a `TPTP0800` diagnostic. `Tptp.Lint` implements it as
+  `:tptp_lint`.
+- `Tptp.Lint.scan/2`, the one traversal `run/2`, `run_unit/2` and `table/1` are
+  now projections of — the symbol table is no longer rebuilt by a second walk.
+- `mix tptp.census` and `CENSUS.md`: where the library uses applied type
+  constructors, and in which dialects.
+
 ## [0.1.0]
 
 First release. Generated from TPTP BNF v9.3.1.2 and the SZS ontology as published on
