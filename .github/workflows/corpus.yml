@@ -6,7 +6,7 @@ name: corpus
 # way that stops being true is to run the whole thing somewhere.
 #
 # "All of them" means the complete TPTP, all four dialects — 29,358 files and
-# 5.4 GB. On sixteen local workers that sweep takes eleven minutes; on a two-core
+# 5.4 GB. On sixteen local workers that sweep takes nine minutes; on a two-core
 # runner it is hours, which is why the job budget is most of a day's worth of one.
 
 on:
@@ -52,8 +52,8 @@ jobs:
       # A complete TPTP unpacks to about 10 GB, which is more than a runner wants
       # to hold and more than the cache is for. Only Problems and Axioms are
       # extracted, and the 65 problems above the sweep's size cap are deleted
-      # immediately: the sweep would skip them anyway, and they are 3.4 GB of the
-      # 8.5 GB. What is left is around 6 GB, which fits with room to work in.
+      # immediately: the sweep would skip them anyway, and they are 3.7 GB of the
+      # 10.1 GB. What is left is around 6 GB, which fits with room to work in.
       - name: Download the TPTP library
         run: |
           df -h /

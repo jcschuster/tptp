@@ -1,19 +1,19 @@
 defmodule Tptp.Lint.Rules.DuplicateName do
   @moduledoc """
-  Two statements with the same name.
+  Two statements sharing a name.
 
-  Names identify formulae — an inference record names its parents by them — so two
-  statements sharing one makes a derivation ambiguous and a selection unpredictable.
+  Names identify formulae, and an inference record refers to its parents by name,
+  so a shared name renders a derivation ambiguous and a formula selection
+  indeterminate.
 
-  A warning rather than an error, and genuinely noisy on parts of the TPTP library:
-  the machine-generated ITP axiom sets repeat declarations across files, so a
-  problem pulling in thirty of them really does define one name thirty times. That
-  is a true finding about an ambiguous derivation, not a false one — but it is a
-  finding a caller may well want to `:suppress`.
+  A warning rather than an error, and noisy over parts of the TPTP library: the
+  machine-generated ITP axiom sets repeat declarations across files, so a problem
+  including thirty of them defines one name thirty times. The finding is correct —
+  the derivation is ambiguous — but a caller may reasonably `:suppress` it.
 
-  One diagnostic per name rather than one per repeat. Thirty-two copies of a name
-  is one problem, and `related` carries every other occurrence, so the count is
-  visible without thirty-one separate lines saying the same thing.
+  One diagnostic is emitted per name rather than per occurrence. `related` carries
+  the remaining occurrences, so the count is available without a diagnostic for
+  each.
   """
 
   @behaviour Tptp.Lint.Rule

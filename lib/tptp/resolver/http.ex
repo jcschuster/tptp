@@ -2,9 +2,9 @@ defmodule Tptp.Resolver.Http do
   @moduledoc """
   Fetches from tptp.org over HTTPS, through a local cache.
 
-  For a machine without the TPTP distribution installed. It is never a default and
-  never composed in by accident: reaching the network is the caller's decision, so
-  it has to be written down.
+  For use where the TPTP distribution is not installed locally. It is never a
+  default and is never composed implicitly, network access being a decision for the
+  caller.
 
       Tptp.Unit.from_name("Problems/PUZ/PUZ001+1.p", resolver: Tptp.Resolver.Http)
 
@@ -15,7 +15,7 @@ defmodule Tptp.Resolver.Http do
 
   ## The SeeTPTP mapping
 
-  tptp.org serves the library through a CGI script that wants the name taken apart
+  tptp.org serves the library through a CGI script taking the components of a name
   rather than a path:
 
       Axioms/SET007+0.ax   ->  ?Category=Axioms&File=SET007+0.ax
@@ -23,50 +23,48 @@ defmodule Tptp.Resolver.Http do
       Problems/PUZ/PUZ001+1.p  ->  ?Category=Problems&Domain=PUZ&File=PUZ001+1.p
       PUZ001+1.p           ->  ?Category=Problems&Domain=PUZ&File=PUZ001+1.p
 
-  A bare problem name takes its domain from the leading three letters, which is how
-  TPTP names are built. `url/2` is public so the mapping can be tested and read
-  without a network.
+  A bare problem name takes its domain from the leading three letters, following
+  the TPTP naming convention. `url/2` is public so that the mapping can be read and
+  tested without network access.
 
-  Note the `+` in `SET007+0.ax`: it is part of the name, and form-encoding turns it
-  into a space unless every parameter is escaped. They are.
+  The `+` in `SET007+0.ax` is part of the name, and form encoding converts it to a
+  space unless the parameter is escaped. Every parameter is escaped.
 
   ## SeeTPTP answers with a web page, not a file
 
-  Every successful response is an HTML page with the file inside a `<pre>` block,
-  and the block is not the file either: SeeTPTP injects an `<A NAME="...">` anchor
-  before every formula so that each can be linked to. `contents/1` recovers the
-  file, and is public so that it can be read and tested without a network.
+  Every successful response is an HTML page containing the file within a `<pre>`
+  block, and the block is not the file: SeeTPTP inserts an `<A NAME="...">` anchor
+  before each formula. `contents/1` recovers the file and is public so that it can
+  be read and tested without network access.
 
-  Two steps, in this order and not the other:
+  Two steps, in this order:
 
-    1. **Strip the markup.** Every `<` that belongs to TPTP arrives as `&lt;` — the
-       page escapes `<` but leaves `>` and `&` alone — so a literal `<` in the block
-       is always injected markup and never `<=>`, `<~>` or `<<`. That is what makes
-       removing `<[^>]*>` safe here when it would be reckless anywhere else.
-    2. **Undo the entities.** Only now does `&lt;` become `<` again, which is why it
-       cannot be mistaken for a tag by step 1.
+    1. **Remove the markup.** Every `<` belonging to the TPTP source arrives as
+       `&lt;`, the page escaping `<` while leaving `>` and `&` unescaped, so a
+       literal `<` within the block is inserted markup rather than `<=>`, `<~>` or
+       `<<`. This is what renders removing `<[^>]*>` sound in this context.
+    2. **Resolve the entities.** `&lt;` becomes `<` only at this point, so it cannot
+       be treated as a tag by the first step.
 
-  Doing it the other way round would silently delete every equivalence in the file.
+  The reverse order would delete every equivalence in the file.
 
-  A page with no `<pre>` block is SeeTPTP's error page and is reported as one; a body
-  that is not HTML at all is passed through untouched, which is what a plain file
-  server behind `:base_url` gets.
+  A page containing no `<pre>` block is SeeTPTP's error page and is reported as
+  such. A body that is not HTML is passed through unmodified, which is what a plain
+  file server behind `:base_url` returns.
 
   ## Caching
 
   Every response is written to `:cache_dir` under a digest of its URL, and a hit is
-  served from disk without asking the network. A corpus run therefore costs one
-  request per file, once, ever. `~/.cache/tptp` by default, or set `:cache_dir` to
-  `false` to disable.
+  served from disk without network access, so a corpus run costs one request per
+  file. The default is `~/.cache/tptp`; set `:cache_dir` to `false` to disable
+  caching.
 
   ## `:inets` and `:ssl` are started here, not by the application
 
-  They are deliberately absent from this library's `extra_applications`. Listing
-  them would start two OTP applications in every consumer, including the ones whose
-  resolver is `Tptp.Resolver.None` and which never open a socket — which is at odds
-  with `None` being the default in the first place. So `started/0` brings them up on
-  the path that is about to make a request. A cache hit never reaches it, so a warm
-  cache costs nothing either.
+  Both are absent from this library's `extra_applications`. Listing them would
+  start two OTP applications in every consumer, including those whose resolver is
+  `Tptp.Resolver.None` and which open no socket. `started/0` starts them on the path
+  about to issue a request; a cache hit does not reach it.
 
   ### Why that needs more than `ensure_all_started/1`
 

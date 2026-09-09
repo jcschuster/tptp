@@ -1,4 +1,6 @@
 defmodule Tptp.Bench do
+  alias Tptp.Printer.Canonical
+
   @moduledoc """
   The benchmark ladder: throughput *and* allocation, at five sizes.
 
@@ -148,7 +150,7 @@ defmodule Tptp.Bench do
   defp print(source) do
     {:ok, file, _diagnostics} = Tptp.from_string(source)
 
-    file |> Tptp.Printer.Canonical.to_iodata() |> IO.iodata_length()
+    file |> Canonical.to_iodata() |> IO.iodata_length()
   end
 
   defp huge(root, options) do

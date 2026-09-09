@@ -1,30 +1,30 @@
 defmodule Tptp.Lint.Rules.AtomTyping do
   @moduledoc """
-  A `type`-role statement that does not declare a type, or a typing that is not one.
+  A `type`-role statement that does not declare a type, or a typing under another
+  role.
 
-  `tff(f, type, ...)` exists to declare a symbol, and the grammar cannot insist on
-  it: `<tff_formula> ::= <tff_logic_formula> | <tff_atom_typing>` admits either
-  under any role. So `tff(a, type, p(X)).` parses and means nothing, and
-  `tff(a, axiom, f: $i).` parses and means nothing else.
+  `tff(f, type, ...)` declares a symbol, and the grammar cannot require this:
+  `<tff_formula> ::= <tff_logic_formula> | <tff_atom_typing>` admits either under
+  any role. `tff(a, type, p(X)).` and `tff(a, axiom, f: $i).` therefore both parse
+  and neither declares anything.
 
-  Both are warnings. A tool reading the file will ignore the statement either way,
-  and refusing to parse it would help nobody.
+  Both are warnings. A consumer will disregard the statement in either case, and
+  refusing to parse it serves no purpose.
 
-  ## There is no rule about a nested typing, because there is nothing to report
+  ## Nested typings are not reported
 
-  A typing below the top of a statement looks like it should be a finding, and it
-  cannot be one: the grammar reaches `<thf_atom_typing>` from exactly three places
-  and all three are legitimate. `<thf_formula> ::= … | <thf_atom_typing>` is the
-  declaration itself; `<thf_let_types> ::= <thf_atom_typing> | [<thf_atom_typing_list>]`
-  is a `$let` binding, which is a typing nested inside a formula on purpose; and
-  `<thf_atom_typing> ::= (<thf_atom_typing>)` is the same typing in brackets. TFF
-  and TCF are the same three.
+  A typing below the top of a statement appears reportable and is not. The grammar
+  reaches `<thf_atom_typing>` from three positions, each of them legitimate:
+  `<thf_formula> ::= … | <thf_atom_typing>` is the declaration itself;
+  `<thf_let_types> ::= <thf_atom_typing> | [<thf_atom_typing_list>]` is a `$let`
+  binding, which is a typing nested within a formula by construction; and
+  `<thf_atom_typing> ::= (<thf_atom_typing>)` is the same typing parenthesised. TFF
+  and TCF provide the same three.
 
-  A rule that reported nested typings therefore reported `$let` bindings and
-  `thf(a, type, (f: $i)).`, and nothing else — it fired eleven times on
-  `SYN000^2.p`, all of them wrong. Depth is not what separates a meaningful typing
-  from a meaningless one; nothing does, because the grammar admits no meaningless
-  one.
+  A rule reporting nested typings therefore reports `$let` bindings and
+  `thf(a, type, (f: $i)).` and nothing else; it produced eleven findings on
+  `SYN000^2.p`, none of them correct. Depth does not separate a meaningful typing
+  from a meaningless one, and no criterion does, since the grammar admits none.
   """
 
   @behaviour Tptp.Lint.Rule

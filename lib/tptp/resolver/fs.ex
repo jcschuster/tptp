@@ -9,10 +9,10 @@ defmodule Tptp.Resolver.Fs do
   3. `$TPTP`, the older variable the TPTP tools have always used;
   4. `:cwd`, or the current working directory.
 
-  `$TPTP_ROOT` is the documented environment knob, and `:root` is the local
-  override for it — a caller pointing at a vendored copy, a fixture directory or a
-  second library should not have to set an environment variable to do it, and
-  certainly should not have to mutate one for the whole VM.
+  `$TPTP_ROOT` is the documented environment variable and `:root` is the local
+  override, so that a caller directing resolution at a vendored copy, a fixture
+  directory or a second library need not set an environment variable for the whole
+  VM.
 
       Tptp.Unit.from_file("PUZ001+1.p", resolver: Tptp.Resolver.Fs)
       Tptp.Unit.from_file("PUZ001+1.p", resolver: {Tptp.Resolver.Fs, root: "/opt/TPTP"})
@@ -22,9 +22,9 @@ defmodule Tptp.Resolver.Fs do
 
       {Tptp.Resolver.Fs, root: ["priv/my_axioms", "/opt/TPTP"]}
 
-  Passing `:root` suppresses neither `$TPTP` nor the cwd; it inserts ahead of them.
-  To search nothing but what you named, pass `cwd: false` and leave the environment
-  variables unset — or use `Tptp.Resolver.Map`, which is usually what a test wants.
+  `:root` does not suppress `$TPTP` or the working directory; it is inserted ahead
+  of them. To search only the named directories, pass `cwd: false` and leave the
+  environment variables unset, or use `Tptp.Resolver.Map`.
 
   `$TPTP` is honoured after `:root` because a machine with the TPTP distribution
   installed usually already has it set, and failing to find `Axioms/SET007+0.ax` on
@@ -32,17 +32,16 @@ defmodule Tptp.Resolver.Fs do
 
   ## Confinement
 
-  An include name comes from a file that may not be trusted, so it must be a
-  relative path that does not climb — see `Tptp.Resolver.safe?/1`. Checking the
-  name rather than the joined result is what makes the rule easy to state and hard
-  to get around: no absolute paths, no `..`, ever, regardless of which candidate
-  directory it would have landed in.
+  An include name originates in a file that may not be trusted, so it must be a
+  relative path that does not ascend; see `Tptp.Resolver.safe?/1`. The name is
+  checked rather than the joined result, which makes the condition independent of
+  the candidate directory: no absolute paths and no `..`, in any position.
 
-  ## Paths are canonicalised
+  ## Canonicalisation
 
-  The path handed back is expanded, so two routes to one file — `Axioms/a.ax` from
-  the root and `a.ax` from the `Axioms` directory — memoise to the same entry and
-  a diamond in the include graph is read once.
+  The returned path is expanded, so two routes to one file — `Axioms/a.ax` from the
+  root and `a.ax` from the `Axioms` directory — memoise to the same entry and a
+  diamond in the include graph is read once.
   """
 
   @behaviour Tptp.Resolver

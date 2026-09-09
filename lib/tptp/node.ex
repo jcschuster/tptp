@@ -1,101 +1,96 @@
 defmodule Tptp.Node do
   @moduledoc """
-  One node of the concrete syntax tree.
+  A node of the concrete syntax tree.
 
-  ## What a node is, and what it deliberately is not
+  ## Content
 
-  A node is a faithful record of what the grammar matched, and nothing more. It
-  carries no type, no arity, no scope, no notion that `$i` is a type and `a` is a
-  term. That boundary is the point: the TPTP grammar cannot distinguish a THF type
-  from a THF term, so neither can this tree, and pretending otherwise would mean
-  guessing. Consumers that need types elaborate them themselves.
+  A node records what the grammar matched and nothing further. It carries no type,
+  no arity and no scope information, and does not classify `$i` as a type or `a` as
+  a term. The grammar itself does not distinguish a THF type from a THF term, so
+  the tree does not either; consumers requiring types elaborate them against a
+  signature of their own.
 
-  ## Offsets, not spans
+  ## Positions
 
-  `off` and `len` are bare byte offsets. The file id belongs to the file, not to
-  each of its millions of nodes, so `span/2` builds a `Tptp.Span` on demand when a
-  diagnostic needs one. Carrying a span struct per node would roughly double the
-  size of a tree to repeat one number.
+  `off` and `len` are byte offsets into the source. The file identifier is a
+  property of the file rather than of each of its nodes, so `span/2` constructs a
+  `Tptp.Span` on demand. Storing a span per node would approximately double the
+  size of a tree in order to repeat a single value.
 
-  A node's span covers exactly the source it was built from, its own brackets
-  included — `[a, b]` spans the brackets, `f(a)` spans the closing paren. The
-  generated grammar hands the parser the delimiters it drops from `children` for
-  precisely this reason, so "is this comment inside this node?" has an answer.
+  A node's span covers the source it was built from including its own delimiters:
+  `[a, b]` spans the brackets and `f(a)` spans the closing parenthesis. The
+  generated grammar supplies the parser with the delimiters it omits from
+  `children` for this purpose, which makes containment queries — whether a given
+  comment falls inside a node — well defined.
 
-  ## `text` is set on leaves, and is a sub-binary
+  ## `text`
 
-  A leaf that carries text — a word, a number, a quoted atom — has `text` set to a
-  sub-binary of the file, not a copy. Leaves whose spelling is fixed by their kind
-  (`:vline`, `:iff`, `:big_forall`) have `text: nil`, because the kind already says
-  what the bytes are. So the invariant is: when `text` is not `nil`, it equals
-  `binary_part(source, off, len)`.
+  A leaf carrying text — a word, a number, a quoted atom — has `text` set to a
+  sub-binary of the source rather than a copy. Leaves whose spelling is determined
+  by their kind, such as `:vline`, `:iff` and `:big_forall`, have `text: nil`. The
+  invariant is that a non-`nil` `text` equals `binary_part(source, off, len)`.
 
-  Sub-binaries keep the whole file alive, which is what `Tptp.File` is for — it
-  retains `source`, so nothing dangles. `Tptp.detach/1` is the escape hatch for a
-  consumer that wants to keep a statement and drop the file.
+  Sub-binaries keep the source reachable. `Tptp.File` retains it for that reason;
+  `Tptp.detach/1` produces a copy owning its own binaries.
 
-  ## `text` is the spelling; `value/1` is the atomic word
+  ## `text` and `value/1`
 
-  `text` is faithful, and faithfulness is not identity. The BNF is explicit that a
-  `<single_quoted>` is "the enclosed `<atomic_word>` without the quotes", so `cat`
-  and `'cat'` are *the same atomic word* written two ways, and `'it\\'s'` is one
-  word whose fifth byte is an apostrophe. `text` carries the spelling — quotes,
-  escapes and all — because the printer has to write back what was read.
+  `text` is the spelling as written. It is not the identity of the symbol. The BNF
+  defines a `<single_quoted>` as the enclosed `<atomic_word>` without the quotes,
+  so `cat` and `'cat'` denote the same atomic word, and `'it\'s'` is one word whose
+  fifth byte is an apostrophe. `text` retains quotes and escapes because the
+  printer must reproduce the input.
 
-  Anything that identifies a symbol must therefore key on `value/1` rather than on
-  `text`. A table keyed on the spelling splits one symbol in two, and a consumer
-  that builds a signature out of it inherits the split: `p` and `'p'` become two
-  constants that never clash, which is a soundness bug in whatever is built on top
-  rather than a cosmetic one here.
+  Symbol identity must therefore be taken from `value/1`. A table keyed on `text`
+  separates one symbol into two entries, and a signature derived from it inherits
+  that separation: `p` and `'p'` become distinct constants that never unify, which
+  is unsound in whatever is built above.
 
-  ## The alternative index is not kept
+  ## Production indices
 
-  The generated grammar numbers a nonterminal's productions, and the parser drops
-  that number: a node records the kind that built it and the children it got, and
-  nothing about which `|` branch was taken. Kind and children recover the branch
-  almost everywhere. Across the 28 nonterminals with more than one node-building
-  alternative there is exactly one pair they do not separate — `<cnf_literal>`,
-  where `~p` and `~(p)` both arrive as a `:cnf_literal` over one `:constant`.
+  The generated grammar numbers the alternatives of each nonterminal. The parser
+  discards that number: a node records the kind that produced it and its children,
+  not which alternative was taken. Kind and children determine the alternative
+  except in one case. Of the 28 nonterminals with more than one node-building
+  alternative, only `<cnf_literal>` has two alternatives that agree on both, `~p`
+  and `~(p)` each yielding a `:cnf_literal` over a single `:constant`.
 
-  That is harmless for `shape/1` and for the printer round-trip, which is why the
-  index is not carried; it is written down here so nobody has to rediscover it by
-  finding two source spellings with one shape.
+  This does not affect `shape/1` or the printer round trip, which is why the index
+  is not retained.
 
-  ## Kinds, and what the chain rules leave behind
+  ## Kinds
 
-  `kind` is the grammar nonterminal that built the node, or the token category for
-  a leaf. The generator splices away chain rules — `<functor> ::= <atomic_word>`
-  and the like — but the *significant* ones are collapsed onto their leaf instead
-  of being dropped, so the leaf keeps what the chain said about it:
+  `kind` is the grammar nonterminal that produced the node, or the token category
+  for a leaf. The generator splices out chain rules such as `<functor> ::=
+  <atomic_word>`, except for the significant ones listed in
+  `Tptp.Bnf.Generator.significant/0`, which are collapsed onto their leaf so that
+  the leaf retains the role the chain assigned it:
 
-      f in f(a)          ->  %Node{kind: :functor,  text: "f"}
-      f in p(f)          ->  %Node{kind: :constant, text: "f"}
+      f in f(a)           ->  %Node{kind: :functor,  text: "f"}
+      f in p(f)           ->  %Node{kind: :constant, text: "f"}
       $i in tff(_,type,_) ->  %Node{kind: :defined_type, text: "$i"}
 
-  That is symbol-role information at zero extra nodes, and it is what lets a lint
-  rule tell a constant from a functor without walking back up the tree.
+  This records the role of a symbol without additional nodes, and allows a lint
+  rule to distinguish a constant from a functor without inspecting ancestors.
 
-  The third line is deliberately a TFF example. The same `$i` in a THF statement
-  arrives as `:defined_constant`, because TFF has separate grammar rules for types
-  and terms and THF does not. That is not a gap to paper over — it is the
-  distinction the language itself declines to make.
+  The third example is TFF. In a THF statement the same `$i` arrives as
+  `:defined_constant`, since TFF has separate productions for types and terms and
+  THF does not. This reflects a distinction the language does not draw.
 
-  ## Constructing a tree
+  ## Construction
 
-  Most nodes come from the parser, and a few do not: a consumer that emits TPTP —
-  a prover backend, a bridge to another tool, a TSTP derivation it wrote itself —
-  builds nodes rather than reading them. `new/3` is the constructor for that, and
-  it defaults `off` and `len` to `0` because a synthesized node has no source to
-  point into and inventing plausible offsets would be a lie a diagnostic would
-  later repeat. So the sub-binary invariant above is a statement about parsed
-  trees; a constructed node says "not from a file" by spanning nothing.
+  Nodes are ordinarily produced by the parser. Consumers that emit TPTP — a prover
+  backend, a translation to another format, a derivation in TSTP — construct them
+  instead. `new/3` defaults `off` and `len` to `0`, since a synthesised node
+  corresponds to no source position and supplying a plausible one would produce
+  diagnostics pointing at unrelated text. The sub-binary invariant above therefore
+  describes parsed trees only.
 
-  `Tptp.Printer.Canonical` works from `kind`, `text` and `children` alone, so a
-  constructed tree prints. Whether it prints *correctly* is the round trip:
-  printing it and parsing the result must give a tree with the same `shape/1`. A
-  hand-built tree that fails that check is malformed — a kind that takes three
-  children given two, a leaf whose text does not lex as its kind — and the failure
-  is the same one the printer's own property test makes over the whole library.
+  `Tptp.Printer.Canonical` operates on `kind`, `text` and `children` alone, so a
+  constructed tree prints. Its well-formedness is established by the round trip:
+  printing the tree and parsing the result must yield a tree with the same
+  `shape/1`. Failure indicates a malformed tree, typically a kind given the wrong
+  number of children or a leaf whose text does not lex as its kind.
   """
 
   alias Tptp.Span
@@ -119,16 +114,16 @@ defmodule Tptp.Node do
         }
 
   @doc """
-  The node's extent, as a span in the file it was read from.
+  Returns the node's extent as a span in the given file.
   """
   @spec span(t(), Span.file_id()) :: Span.t()
   def span(%__MODULE__{} = node, file \\ 0), do: Span.new(file, node.off, node.len)
 
   @doc """
-  The bytes the node covers, brackets included.
+  Returns the bytes the node covers, delimiters included.
 
-  A sub-binary, not a copy. For a leaf this is `text`; for an interior node it is
-  the source the whole subtree came from.
+  A sub-binary rather than a copy. For a leaf this is `text`; for an interior node
+  it is the source of the entire subtree.
   """
   @spec text(t(), binary()) :: binary()
   def text(%__MODULE__{} = node, source) when is_binary(source) do
@@ -136,13 +131,14 @@ defmodule Tptp.Node do
   end
 
   @doc """
-  Build a node that did not come from a file.
+  Constructs a node with no corresponding source position.
 
-  For a consumer emitting TPTP rather than reading it. `off` and `len` are `0`:
-  a synthesized node points into no source, and saying so is better than inventing
-  an offset that a diagnostic would later quote.
+  For consumers emitting TPTP rather than reading it. `off` and `len` are `0`,
+  since a synthesised node indexes no source and a fabricated offset would be
+  reported by any diagnostic referring to it.
 
-  The round trip is the validity check — print it, parse it back, compare `shape/1`:
+  Well-formedness is established by the round trip: print the tree, parse the
+  result, and compare `shape/1`.
 
       iex> alias Tptp.Node
       iex> tree = Node.new(:fof_and_formula, nil, [Node.new(:constant, "p"), Node.new(:constant, "q")])
@@ -158,23 +154,23 @@ defmodule Tptp.Node do
   end
 
   @doc """
-  The leaf's canonical value: an atomic word rather than its spelling.
+  Returns the leaf's canonical value: the atomic word rather than its spelling.
 
-  A `<single_quoted>` loses its quotes and its escapes, because the BNF says `cat`
-  and `'cat'` are the same atomic word and `'it\\'s'` is one word containing an
-  apostrophe. Everything else is `text` unchanged, and `nil` stays `nil`.
+  A `<single_quoted>` has its quotes and escapes removed, since the BNF defines
+  `cat` and `'cat'` as the same atomic word and `'it\\'s'` as one word containing
+  an apostrophe. Any other leaf returns `text` unchanged, and `nil` returns `nil`.
 
-  This is the key to identify a symbol by. `text` is the key to print.
+  Use this value to identify a symbol, and `text` to print it.
 
       iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a, axiom, 'p'('q')).")
       iex> statement.formula |> Tptp.Node.walk() |> Enum.map(&Tptp.Node.value/1)
       [nil, "p", "q"]
 
-  Two spellings the BNF keeps apart stay apart. A `<distinct_object>` is not an
-  atomic word — `"cat"` is a different thing from `'cat'` and from `cat` — and a
-  `<back_quoted>`'s body is an `<upper_word>`, which no unquoted atomic word can
-  be, so stripping either delimiter would assert an identity the BNF never states.
-  Both keep their quotes:
+  Distinctions the BNF draws are preserved. A `<distinct_object>` is not an atomic
+  word, so `"cat"` denotes neither `'cat'` nor `cat`; and the body of a
+  `<back_quoted>` is an `<upper_word>`, which no unquoted atomic word may be.
+  Removing either delimiter would assert an identity the BNF does not state, so
+  both retain their quotes:
 
       iex> {:ok, statement, []} = Tptp.Parser.statement_from_string(~S|fof(a, axiom, p("cat")).|)
       iex> statement.formula |> Tptp.Node.select(:distinct_object) |> Enum.map(&Tptp.Node.value/1)
@@ -205,7 +201,7 @@ defmodule Tptp.Node do
   defp unescape(<<>>, acc), do: acc
 
   @doc """
-  Whether the node has no children.
+  Returns whether the node has no children.
 
       iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a,axiom,p).")
       iex> Tptp.Node.leaf?(statement.formula)
@@ -216,10 +212,10 @@ defmodule Tptp.Node do
   def leaf?(%__MODULE__{}), do: false
 
   @doc """
-  Every node of the subtree, parents before children, left to right.
+  Returns the nodes of the subtree in pre-order, left to right.
 
-  Lazy, so `Enum.find/2` over a large formula stops at the first hit rather than
-  building the whole list.
+  Lazy: `Enum.find/2` over a large formula halts at the first match rather than
+  materialising the full list.
 
       iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a,axiom,p(X) & q).")
       iex> statement.formula |> Tptp.Node.walk() |> Enum.map(& &1.kind)
@@ -234,11 +230,10 @@ defmodule Tptp.Node do
   defp next([%__MODULE__{children: children} = node | rest]), do: {[node], children ++ rest}
 
   @doc """
-  Fold over the subtree, parents before children.
+  Folds over the subtree in pre-order.
 
-  The eager counterpart to `walk/1`, and the one to reach for when the fold visits
-  every node anyway — it avoids the stream's per-element overhead, which is the
-  difference that shows up when `Tptp.Lint` walks a 455 MB file.
+  The eager counterpart to `walk/1`. Prefer it where the fold visits every node,
+  as it avoids the per-element overhead of the stream.
   """
   @spec reduce(t(), acc, (t(), acc -> acc)) :: acc when acc: var
   def reduce(%__MODULE__{} = node, acc, fun) when is_function(fun, 2) do
@@ -246,7 +241,7 @@ defmodule Tptp.Node do
   end
 
   @doc """
-  Every node of `kind`, in reading order.
+  Returns the nodes of the given kind, in source order.
 
       iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a,axiom,![X]: p(X)).")
       iex> statement.formula |> Tptp.Node.select(:variable) |> Enum.map(& &1.text)
@@ -263,10 +258,10 @@ defmodule Tptp.Node do
   end
 
   @doc """
-  The innermost node whose span contains `offset`, or `nil`.
+  Returns the innermost node whose span contains `offset`, or `nil`.
 
-  What an editor asks when the cursor moves. Descends rather than searching, so it
-  costs the depth of the tree rather than its size.
+  Descends the tree rather than searching it, so the cost is proportional to depth
+  rather than to size.
   """
   @spec at(t(), non_neg_integer()) :: t() | nil
   def at(%__MODULE__{} = node, offset) when is_integer(offset) do
@@ -276,10 +271,10 @@ defmodule Tptp.Node do
   end
 
   @doc """
-  The subtree with every offset erased, for comparing shape rather than position.
+  Returns the subtree with positions removed, for comparison by structure.
 
-  This is what the printer round-trip property compares: `from_string(print(tree))`
-  must have the same shape as `tree`, but every offset in it will differ.
+  Used by the printer round-trip property: `from_string(print(tree))` must have the
+  same shape as `tree`, though every offset in it differs.
 
       iex> {:ok, one, []} = Tptp.Parser.statement_from_string("fof(a,axiom,p).")
       iex> {:ok, two, []} = Tptp.Parser.statement_from_string("fof( a , axiom , p ).")
@@ -292,12 +287,11 @@ defmodule Tptp.Node do
   end
 
   @doc """
-  A deep copy of the subtree, with every `text` detached from the source binary.
+  Returns a deep copy of the subtree with each `text` detached from the source.
 
-  Every leaf's `text` is a sub-binary of the file it was read from, so holding one
-  leaf holds the whole file. That is the right trade while the file is in hand and
-  the wrong one for a consumer that keeps a handful of statements from a 455 MB
-  axiom set. This copies each leaf's bytes so the file can be collected.
+  Every leaf's `text` is ordinarily a sub-binary of the source, so retaining one
+  leaf retains the whole file. Copying each leaf's bytes allows the source to be
+  collected. Use it when keeping a small number of statements from a large file.
   """
   @spec detach(t()) :: t()
   def detach(%__MODULE__{} = node) do
@@ -306,5 +300,34 @@ defmodule Tptp.Node do
       | text: node.text && :binary.copy(node.text),
         children: Enum.map(node.children, &detach/1)
     }
+  end
+
+  defimpl Inspect do
+    @moduledoc false
+    import Inspect.Algebra
+
+    # The derived implementation prints the entire subtree, which may be arbitrarily
+    # large. This prints the node's kind, its spelling if it is a leaf, its number of
+    # children and its extent. Use `Tptp.Node.walk/1` or `shape/1` to inspect the
+    # subtree, or `inspect(node, structs: false)` for the underlying map.
+    @impl true
+    def inspect(node, opts) do
+      concat([
+        "#Tptp.Node<",
+        to_doc(node.kind, opts),
+        text(node.text, opts),
+        children(node.children),
+        " ",
+        "#{node.off}..#{node.off + node.len}",
+        ">"
+      ])
+    end
+
+    defp text(nil, _opts), do: empty()
+    defp text(text, opts), do: concat(" ", to_doc(text, opts))
+
+    defp children([]), do: empty()
+    defp children([_one]), do: ", 1 child"
+    defp children(list), do: ", #{length(list)} children"
   end
 end

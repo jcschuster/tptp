@@ -1,17 +1,28 @@
 defmodule Tptp.Lint.Rules.Role do
   @moduledoc """
-  A formula role outside the thirteen the `:==` layer names.
+  A formula role outside those named by the `:==` conditions.
 
   `<formula_role> ::= <lower_word>` in the grammar, so `fof(a, wibble, p).` parses.
-  `<formula_role> :== axiom | hypothesis | ...` is what says it should not have.
-  A warning rather than an error: the role is metadata, the formula is still a
-  formula, and a consumer that only cares about the terms is unaffected.
+  The corresponding `:==` rule is what restricts the role to a fixed set. A warning
+  rather than an error: the role is metadata, the formula remains a formula, and a
+  consumer concerned only with the terms is unaffected.
 
-  It does find real things. Across the TPTP library it fires exactly once, on
-  `PHI003^8.p`, which writes `thf(simple_s5, logic, ...)` — the non-classical
-  extension uses a `logic` role that the vendored BNF's `:==` list does not
-  mention. That is a gap between the grammar version and the library rather than a
-  mistake in the file, and reporting it is the right thing for a warning to do.
+  ## Coverage over the TPTP library
+
+  This rule reports nothing on TPTP v9.3.1, and previously reported 354 files.
+  Each of those carried a `logic` role, as in `thf(simple_s5, logic, ...)`, by which
+  the non-classical extension introduces its semantics. The vendored BNF's `:==`
+  rule lists thirteen roles and omits `logic`; the prose of the TPTP language page
+  lists fourteen and includes it, several paragraphs above the rule. The role is
+  therefore defined by TPTP and absent from the grammar, and a diagnostic reporting
+  it attributed a defect in the grammar to the file.
+
+  `Tptp.Bnf.Generator` corrects the vocabulary against the page defining the value,
+  under a build check that fails once the BNF lists it. See
+  [TPTP-DEFECTS.md](TPTP-DEFECTS.md), entry `TPTP-1`, for both citations.
+
+  What remains is the rule applied to an actual misspelling: `fof(a, axim, p).` is
+  well-formed TPTP and semantically incorrect.
   """
 
   @behaviour Tptp.Lint.Rule

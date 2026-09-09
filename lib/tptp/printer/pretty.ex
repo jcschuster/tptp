@@ -10,7 +10,7 @@ defmodule Tptp.Printer.Pretty do
       iex> Tptp.Printer.Pretty.to_string(statement, width: 12)
       "fof(\\n  a,\\n  axiom,\\n  p\\n  & q\\n)."
 
-  which is to say, at a width of twelve columns:
+  At a width of twelve columns:
 
       fof(
         a,
@@ -19,60 +19,60 @@ defmodule Tptp.Printer.Pretty do
         & q
       ).
 
-  ## The contract, and how it is met
+  ## Contract
 
-  **The tokens are exactly the canonical printer's tokens.** Same sequence, same
-  spelling, in the same order; only the white space between them differs. That is
-  not a property this module tries to preserve — it is the input it starts from. It
-  asks `Tptp.Printer.Canonical` for the token list and then decides only where the
-  line breaks go, so the round-trip guarantee is inherited rather than re-earned,
-  and a change to the grammar cannot make the two printers disagree.
+  The token sequence is that of `Tptp.Printer.Canonical`: the same tokens, in the
+  same order, with the same spellings, differing only in the white space between
+  them. This is not preserved by construction but inherited: this module obtains
+  the token list from the canonical printer and determines only where line breaks
+  occur, so a change to the grammar cannot cause the two printers to diverge.
 
-  Line breaking is `Inspect.Algebra`, the Wadler/Lindig algebra in the standard
-  library. No dependency, and the layout is optimal rather than greedy: a group is
-  flattened when its *whole* contents fit, so `p(a, b, c)` does not break its first
-  argument only to discover the third would have fitted anyway.
+  Line breaking uses `Inspect.Algebra`, the Wadler–Lindig algebra in the standard
+  library, which introduces no dependency and produces an optimal rather than
+  greedy layout: a group is flattened when its entire contents fit, so
+  `p(a, b, c)` does not break its first argument before establishing that the
+  third would not have fitted.
 
-  ## The structure is the brackets
+  ## Structure
 
-  Everything below is derived from one observation: the token stream of a statement
-  has balanced `(`, `[` and `{`. `[.]`, `<.>`, `{.}` and `(.)` are single tokens by
-  the time the lexer is done, quoted atoms and distinct objects are single tokens
-  too, and the grammar guarantees the rest. So bracket matching over the flat token
-  list recovers the nesting, and no second traversal of the CST is needed.
+  The token stream of a statement has balanced `(`, `[` and `{`. `[.]`, `<.>`,
+  `{.}` and `(.)` are single tokens after lexing, as are quoted atoms and distinct
+  objects, and the grammar guarantees the remainder. Bracket matching over the flat
+  token list therefore recovers the nesting without a second traversal of the tree.
 
-  Each bracket region becomes one group with a two-space indent. Whether it breaks
-  is decided for it alone, so an argument that does not fit does not force its
-  siblings apart. The internal `item` type is that recovery: a bare token, or an
-  opener with its contents and its closer. The closer is `nil` only for brackets
-  that do not balance, which the grammar makes unreachable and which is handled
-  anyway rather than crashing a printer.
+  Each bracket region becomes one group with a two-space indent, and whether it
+  breaks is determined independently, so an argument that does not fit does not
+  separate its siblings. The internal `item` type represents this recovery: either
+  a token, or an opener with its contents and its closer. The closer is `nil` only
+  for unbalanced brackets, which the grammar makes unreachable and which are
+  handled rather than raising.
 
-  ## Where the breaks are allowed
+  ## Permitted break positions
 
-    * **After a comma.** One element per line when a list has to break.
-    * **Before a binary connective**, never after — so a broken chain reads
+    * **After a comma**, giving one element per line where a list breaks.
+    * **Before a binary connective**, never after, so that a broken chain reads
 
           p(X)
           & q(X)
           & r(X)
 
-      with the connective starting the line, which is where TPTP output has always
-      put it and where it is easiest to scan a long conjunction for the operator
-      that differs. `@` is included, so a long THF application spine breaks the
-      same way; so is `>`, so a long type signature does.
-    * **Just inside a bracket**, which is what lets a region open up at all.
+      with the connective at the start of the line, which is the convention in
+      TPTP output and which allows a long conjunction to be scanned for the
+      operator that differs. `@` is included, so a long THF application spine
+      breaks in the same way, as is `>`, for a long type signature.
+    * **Immediately inside a bracket**, which permits a region to open.
 
-  Nowhere else. In particular there is no break inside a quoted atom or a distinct
-  object, because those are one token and this module never looks inside a token.
+  No other position. In particular no break occurs inside a quoted atom or a
+  distinct object, each being a single token, and this module does not examine the
+  interior of a token.
 
-  ## White space is always safe
+  ## Safety of white space
 
-  Every junction that may break may also carry a space, and every junction that may
-  not break still gets the spacing `Tptp.Printer.Spacing` prescribes. Adding white
-  space between two TPTP tokens can never merge or split them — the maximal-munch
-  cases that could (`~` beside `|`) are the ones `Spacing` already separates — so
-  breaking is never the thing that changes what a file means.
+  Every position at which a break may occur may also carry a space, and every
+  position at which it may not still receives the spacing prescribed by
+  `Tptp.Printer.Spacing`. White space between two TPTP tokens can neither merge nor
+  divide them: the longest-match cases that could, such as `~` adjacent to `|`, are
+  those `Spacing` already separates.
   """
 
   alias Inspect.Algebra

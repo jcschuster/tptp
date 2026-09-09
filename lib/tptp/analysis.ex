@@ -1,23 +1,23 @@
 defmodule Tptp.Analysis do
   @moduledoc """
-  Everything the editor path asks for on one keystroke, from one traversal.
+  The file, its diagnostics, the symbol table and the dialect, from one traversal.
 
-  A debounced edit wants the file, every diagnostic, the symbol table and the
-  dialect together. `Tptp.analyze/2` builds all of it in a single walk and returns
-  it here; `Tptp.Lint.run/2` and `Tptp.Lint.table/1` would have walked twice.
+  An editor integration requires all four on each edit. `Tptp.analyze/2` produces
+  them in a single traversal and returns them here; obtaining them through
+  `Tptp.Lint.run/2` and `Tptp.Lint.table/1` would require two.
 
-  A file that does not parse still comes back as an `Analysis` — with a short
-  statement list and the diagnostics that say why — because an editor has to
-  render markers for a buffer it cannot parse.
+  Input that does not parse still yields an `Analysis`, with a shortened statement
+  list and the diagnostics recording the failure, since an editor must render
+  markers for a buffer it cannot parse.
 
-  ## The line index is opt-in
+  ## Line index
 
-  `line_index` is `nil` until `with_line_index/1` fills it. Turning byte offsets
-  into line and column costs one scan of the source; an analysis that is never
-  rendered should not pay for it, and one that renders thirty markers should pay
-  once. `line_column/2` works either way, so the only reason to call
-  `with_line_index/1` is to hoist that scan out of a loop — the move
-  `Tptp.File.format_diagnostics/1` already makes.
+  `line_index` is `nil` until `with_line_index/1` populates it. Converting byte
+  offsets to line and column requires one scan of the source, which an analysis
+  that is never rendered should not incur and one rendering many positions should
+  incur once. `line_column/2` operates in either state, so `with_line_index/1` is
+  required only to hoist the scan out of a loop, as
+  `Tptp.File.format_diagnostics/1` does.
 
       analysis = source |> Tptp.analyze() |> Tptp.Analysis.with_line_index()
 
@@ -27,6 +27,8 @@ defmodule Tptp.Analysis do
       end
   """
 
+  alias Tptp.Lint.Table
+  alias Tptp.Query
   alias Tptp.Span
 
   @enforce_keys [:file, :diagnostics, :table]
@@ -54,7 +56,7 @@ defmodule Tptp.Analysis do
   """
   @spec dialect(t()) :: Tptp.Query.dialect()
   def dialect(%__MODULE__{table: table}) do
-    table |> Tptp.Lint.Table.features() |> Tptp.Query.from_features()
+    table |> Table.features() |> Query.from_features()
   end
 
   @doc """
@@ -89,4 +91,33 @@ defmodule Tptp.Analysis do
   @spec source_of(t()) :: binary()
   defp source_of(%__MODULE__{file: %Tptp.File{source: source}}), do: source
   defp source_of(%__MODULE__{file: %Tptp.Unit{} = unit}), do: unit.files[unit.root].source
+
+  defimpl Inspect do
+    @moduledoc false
+    import Inspect.Algebra
+
+    # An analysis holds the file, the symbol table and optionally a line index over the
+    # whole source. Printing the dialect here would be wrong even though it reads well:
+    # it is a fold over the table, and `inspect/1` is called from places — a logger, a
+    # crash report — that must not start doing work.
+    @impl true
+    def inspect(analysis, opts) do
+      concat([
+        "#Tptp.Analysis<",
+        to_doc(analysis.file, opts),
+        ", ",
+        count(length(analysis.diagnostics), "diagnostic"),
+        ", ",
+        count(map_size(analysis.table.symbols), "symbol"),
+        indexed(analysis.line_index),
+        ">"
+      ])
+    end
+
+    defp count(1, noun), do: "1 #{noun}"
+    defp count(n, noun), do: "#{n} #{noun}s"
+
+    defp indexed(nil), do: ""
+    defp indexed(_index), do: ", line index"
+  end
 end

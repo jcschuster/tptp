@@ -1,44 +1,43 @@
 defmodule Tptp.Szs do
   @moduledoc """
-  Reads and writes the SZS result lines that ATP systems print around their output.
+  Reads and writes the SZS result lines that ATP systems emit around their output.
 
       iex> Tptp.Szs.status("% SZS status Theorem for PUZ001+1\\n")
       {:ok, :theorem, "PUZ001+1", nil}
 
-  ## What the standard says, and why a parser is worth having
+  ## The convention
 
-  A system reports its result on one comment line:
+  A system reports its result on a single comment line:
 
       % SZS status <value> for <problem>
       % SZS status <value> for <problem> : <free text>
 
-  and delimits any output it offers to justify that result:
+  and delimits any output offered in support of that result:
 
       % SZS output start <dataform> for <problem>
-      ... the derivation, model or whatever it is ...
+      ...
       % SZS output end <dataform> for <problem>
 
-  Two things make this worth a module rather than a regular expression at each call
-  site. The status value is a closed vocabulary — `Tptp.Szs.Ontology` — so a
-  misspelling can be reported rather than propagated as a plausible-looking atom.
-  And the lines arrive interleaved with everything else a prover writes to standard
-  output, including its own banner, its own comments, and sometimes several
-  candidate answers, so finding *the* status means scanning rather than matching.
+  Two properties make this worth a module rather than a regular expression at each
+  call site. The status value is drawn from a closed vocabulary,
+  `Tptp.Szs.Ontology`, so a misspelling can be reported rather than propagated. And
+  the lines are interleaved with the remainder of a prover's output, including its
+  banner, its own comments and possibly several candidate answers, so locating the
+  status requires scanning rather than matching.
 
-  ## Where the status is taken from
+  ## Selection
 
-  `status/1` returns the **last** status line in the output. A system that refines
-  its answer prints the refinement afterwards, and a system that gives up after
-  trying prints `GaveUp` last; in both cases the final word is the one it stands
-  behind. `statuses/1` returns all of them in order for a caller that wants to see
-  the sequence.
+  `status/1` returns the last status line in the output. A system refining its
+  answer emits the refinement afterwards, and a system abandoning the attempt emits
+  `GaveUp` last; in both cases the final line is the result the system asserts.
+  `statuses/1` returns all of them in order.
 
-  ## No atom is created from prover output
+  ## Atom creation
 
   Every status and dataform name resolves through the generated tables in
-  `Tptp.Szs.Ontology`, whose atoms all exist at compile time. Prover output is
-  untrusted input like any other file this library reads, and an unrecognised value
-  comes back as `{:error, word}` with the word as a binary — never as a new atom.
+  `Tptp.Szs.Ontology`, whose atoms exist at compile time. Prover output is
+  untrusted input, and an unrecognised value is returned as `{:error, word}` with
+  the word as a binary rather than converted to an atom.
   """
 
   alias Tptp.Szs.Ontology
@@ -66,7 +65,7 @@ defmodule Tptp.Szs do
   The vendored SZS ontology page.
 
   Raises unless exactly one is present, the way `Tptp.Bnf.vendored_path!/0` does,
-  because two would mean a regeneration read a file nobody chose.
+  because two would mean a regeneration read a file no system chose.
   """
   @spec vendored_path!() :: Path.t()
   def vendored_path! do

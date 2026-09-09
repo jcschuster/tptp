@@ -2,29 +2,27 @@ defmodule Tptp.Szs.Extract do
   @moduledoc """
   Reads the vendored SZS ontology page into a list of status values.
 
-  `mix tptp.gen` runs this and writes `Tptp.Szs.Ontology`; nothing at runtime calls
-  it. It is here rather than in `lib/mix/tasks/` so it can be tested directly and so
-  its reading of the page is documented where the reading happens.
+  `mix tptp.gen` invokes this and writes `Tptp.Szs.Ontology`; nothing calls it at
+  runtime. It resides here rather than under `lib/mix/tasks/` so that it can be
+  tested directly and its reading of the page documented alongside it.
 
-  ## Why a web page and not a data file
+  ## Source format
 
-  There is no machine-readable SZS ontology to fetch. The BNF ships as a file and is
-  vendored as one; the ontology exists as
-  <https://tptp.org/UserDocs/SZSOntology>, and everything below is recovered from
-  its markup. That markup is regular enough to parse strictly rather than
-  heuristically: every value is one `<LI> <TT>Name</TT> (<TT>Mnc</TT>):<BR>` line
-  followed by its description, and nothing else in the three ontology sections has
-  that shape.
+  No machine-readable SZS ontology is published. The BNF is distributed as a file
+  and vendored as one; the ontology exists only as
+  <https://tptp.org/UserDocs/SZSOntology>, and the values are recovered from its
+  markup. That markup is regular enough to parse strictly: every value is a single
+  `<LI> <TT>Name</TT> (<TT>Mnc</TT>):<BR>` line followed by its description, and
+  nothing else in the three ontology sections has that form.
 
-  ## Every listed value is recovered, or the read fails
+  ## Completeness
 
-  A pattern that stops matching one entry is the dangerous failure, because the
-  result is a table that is right about everything it contains and silently short
-  by one — which is exactly what happened. `Assumed` is written
+  A pattern that ceases to match one entry is the failure mode of concern, since
+  the result is a table correct in what it contains and short by one entry. This
+  occurred: `Assumed` is written
   `(<TT>ASS(</TT><EM>U</EM><TT>,</TT><EM>S</EM><TT>)</TT>)`, the only mnemonic on
-  the page that takes arguments, and a pattern demanding three letters between
-  `<TT>` and `</TT>` skipped it. The generator's floor on the total did not notice,
-  and could not: 111 is not a suspicious number.
+  the page taking arguments, and a pattern requiring three letters between `<TT>`
+  and `</TT>` did not match it. A lower bound on the total does not detect this.
 
   So the count is checked against the page rather than against a constant. Every
   `<LI> <TT>Name</TT>` in a section must come back as a value, and a name that does
@@ -34,7 +32,7 @@ defmodule Tptp.Szs.Extract do
   place in the table. What they are is in the value's own description, which is the
   page's sentence about them.
 
-  ## What is recovered, and what is not
+  ## Recovered fields
 
   Recovered: every value's `OneWord` name, its three-letter mnemonic, its
   description, which of the three ontologies it belongs to, and — from the nesting

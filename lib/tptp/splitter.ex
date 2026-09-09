@@ -1,66 +1,64 @@
 defmodule Tptp.Splitter do
   @moduledoc """
-  Turns a byte stream into `Tptp.Input` records: one statement, one language, one
-  token list whose keywords have been resolved.
+  Divides a token stream into `Tptp.Input` records: one statement, one language,
+  one token list with keywords resolved.
 
-  ## What this stage is for
+  ## Responsibility
 
-  `Tptp.Lexer` already ends a statement at a bracket-depth-zero `.`, because it has
-  to track depth anyway to know which dots those are. What is left, and what this
-  module owns, is everything about a statement that only its *position* can settle:
+  `Tptp.Lexer` already terminates a statement at a `.` occurring at bracket depth
+  zero, since it tracks depth in order to identify those. What remains, and what
+  this module owns, is everything determined by a token's position:
 
     * **Keyword resolution.** The lexer emits `lower_word` for `fof`, `inference`
-      and `file`, because `fof(fof, axiom, p).` and `fof(a, file, p).` are both
-      legal TPTP and both would break if a keyword reading were forced by spelling
-      alone. Only position disambiguates, and only this module sees position.
-    * **The language.** Token zero names it, so it is knowable without parsing.
-    * **Tier-2 diagnostics.** An input whose first token is not a language keyword
-      is reported here, with a message naming what was found and what was expected,
-      and is passed on unparsed rather than dragged through the grammar for a worse
-      error.
+      and `file`, since `fof(fof, axiom, p).` and `fof(a, file, p).` are both well
+      formed and a spelling-based rule would reject them. Only position
+      disambiguates, and only this module observes position.
+    * **Language identification.** The first token names the language, so it is
+      available without parsing.
+    * **Statement-structure diagnostics.** An input whose first token is not a
+      language keyword is reported here, with a message naming both the token found
+      and those expected, and passed on unparsed rather than submitted to the
+      grammar for a less specific error.
 
-  Splitting on tokens rather than bytes is the whole point: `'foo.bar'`, `1.5`,
-  `% a comment.` and `<.>` all contain a `.` that does not end a statement, and a
-  byte-level split gets every one of them wrong.
+  Division on tokens rather than bytes is required: `'foo.bar'`, `1.5`,
+  `% a comment.` and `<.>` each contain a `.` that does not terminate a statement.
 
-  ## The three promotions
+  ## Promotions
 
   A `lower_word` at position zero becomes `kw_thf`, `kw_tff`, `kw_tcf`, `kw_fof`,
-  `kw_cnf`, `kw_tpi` or `kw_include` on spelling alone. There is no ambiguity to
-  guard against: position zero of a `<TPTP_input>` is always one of those seven.
+  `kw_cnf`, `kw_tpi` or `kw_include` on spelling alone, since position zero of a
+  `<TPTP_input>` admits only those seven.
 
   `inference`, `introduced` and `file` become `kw_inference`, `kw_introduced` and
-  `kw_file` **only when the next token is `(`**, because those are the only shapes
-  the grammar admits — `inference_record`, `internal_source` and `file_source` all
-  apply the keyword immediately. Anywhere else the word stays a `lower_word`, and
-  `atomic_word` in the grammar accepts the promoted categories anyway, so a formula
-  genuinely named `inference` still parses.
+  `kw_file` only when the following token is `(`, since `<inference_record>`,
+  `<internal_source>` and `<file_source>` each apply the keyword immediately.
+  Elsewhere the word remains a `lower_word`, and `<atomic_word>` in the grammar
+  admits the promoted categories, so a formula named `inference` parses.
 
   `$thf`, `$tff`, `$fof`, `$cnf`, `$fot` and `$let` become `dw_*` under the same
-  `(`-follows rule, for the same reason: `<formula_data>` and `<thf_let>` always
-  apply them, and everywhere else they are ordinary `<dollar_word>`s.
+  condition and for the same reason: `<formula_data>` and `<thf_let>` always apply
+  them, and elsewhere they are ordinary `<dollar_word>`s.
 
-  ## Where recovery stops, and why it is not patched over
+  ## Limits of recovery
 
-  A statement ends at a `.` the lexer sees at bracket depth zero, so an input that
-  leaves a bracket open — an unterminated quoted atom swallowing its own `)`, say —
-  keeps the depth above zero, and the dots that follow are read as parts of a term
-  rather than terminators. The next statements are absorbed into the broken one
-  until the depth returns to zero. `test/fixtures/regression/cascade.p` pins this.
+  A statement terminates at a `.` observed at bracket depth zero. Input that leaves
+  a bracket open — an unterminated quoted atom consuming its own `)`, for instance
+  — keeps the depth above zero, so subsequent `.` characters are read as parts of a
+  term rather than as terminators, and following statements are absorbed into the
+  unterminated one. `test/fixtures/regression/cascade.p` covers this.
 
-  It would be easy to resynchronise on a `.` at end of line before a line starting
-  with a language keyword, and that would be wrong: it is a guess about layout, and
-  a formula may legally be laid out that way. Splitting stays exact. What the
-  library owes the caller instead is a diagnostic pointing at the *cause* rather
-  than at the wreckage, and the first diagnostic on such an input is the
-  unterminated quote, at the column where it opened.
+  Resynchronising on a `.` at end of line preceding a line beginning with a
+  language keyword would recover in most cases and is not done, since it is an
+  assumption about layout and a formula may legally be laid out that way. Division
+  remains exact. The obligation this module accepts instead is to report the cause
+  rather than its consequences: the first diagnostic on such input is the
+  unterminated quote, at the position where it opened.
 
   ## Streaming
 
   `stream_inputs/2` is the primitive and holds one statement at a time; `inputs/2`
-  is the eager convenience over it. Each `Tptp.Input` carries its own diagnostics,
-  so nothing is lost by taking the streaming path — which matters, because a 455 MB
-  axiom file has no eager path.
+  is the eager form. Each `Tptp.Input` carries its own diagnostics, so nothing is
+  lost by taking the streaming path.
   """
 
   alias Tptp.Diagnostic

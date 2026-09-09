@@ -45,6 +45,26 @@ defmodule Tptp.Test.Analyzers do
     def analyze(%Tptp.Analysis{}, _options), do: []
   end
 
+  defmodule ExactlyTf0 do
+    @moduledoc """
+    Wants TF0 and means it. `{:exactly, ...}` declines the containment reasoning, so
+    a FOF file — which *is* within TF0 — is still skipped.
+    """
+    @behaviour Tptp.Analyzer
+
+    @impl true
+    def id, do: :test_exactly_tf0
+
+    @impl true
+    def label, do: "test: exactly TF0"
+
+    @impl true
+    def dialects, do: {:exactly, [:tf0]}
+
+    @impl true
+    def analyze(%Tptp.Analysis{}, _options), do: []
+  end
+
   defmodule Boom do
     @moduledoc "Always raises, so `run_all/3` has something to contain."
     @behaviour Tptp.Analyzer

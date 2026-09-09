@@ -28,7 +28,7 @@ defmodule TptpCorpusTest do
   alias Tptp.Test.Corpus
 
   @moduletag :corpus
-  @moduletag timeout: 900_000
+  @moduletag timeout: Corpus.timeout()
 
   setup_all do
     if Corpus.root() == nil do
@@ -41,7 +41,7 @@ defmodule TptpCorpusTest do
   test "every library file reads with no error-severity diagnostic" do
     noisy =
       Corpus.files(every: 5)
-      |> Task.async_stream(
+      |> Corpus.values(
         fn path ->
           case Tptp.from_file(path) do
             {:ok, file, _diagnostics} ->
@@ -53,11 +53,8 @@ defmodule TptpCorpusTest do
               {path, Enum.map(diagnostics, & &1.code)}
           end
         end,
-        max_concurrency: System.schedulers_online(),
-        timeout: 600_000,
-        ordered: false
+        timeout: 600_000
       )
-      |> Enum.map(fn {:ok, result} -> result end)
       |> Enum.reject(&(&1 == :ok))
 
     assert noisy == []
@@ -76,7 +73,7 @@ defmodule TptpCorpusTest do
   test "streaming and reading eagerly agree, statement for statement" do
     disagreed =
       Corpus.files(every: 37, max_bytes: 1_000_000)
-      |> Task.async_stream(
+      |> Corpus.values(
         fn path ->
           source = File.read!(path)
           {:ok, file, _diagnostics} = Tptp.from_string(source)
@@ -91,11 +88,8 @@ defmodule TptpCorpusTest do
 
           if streamed == file.statements, do: :ok, else: {path, :disagreement}
         end,
-        max_concurrency: System.schedulers_online(),
-        timeout: 600_000,
-        ordered: false
+        timeout: 600_000
       )
-      |> Enum.map(fn {:ok, result} -> result end)
       |> Enum.reject(&(&1 == :ok))
 
     assert disagreed == []

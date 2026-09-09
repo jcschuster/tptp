@@ -4,7 +4,7 @@ defmodule Tptp.PrinterCorpusTest do
 
   The plan calls this the one that has to be green before any consumer rebases, and
   it is, because a printer is the only stage that can quietly change what a file
-  means. Four properties, over every file the corpus offers:
+  means. Five properties, over every file the corpus offers:
 
     * **The fixpoint.** `from_string(print(tree))` has the same shape as `tree`,
       statement for statement. Shape is `Tptp.Node.shape/1` — kinds, texts and
@@ -37,7 +37,7 @@ defmodule Tptp.PrinterCorpusTest do
   alias Tptp.Test.Corpus
 
   @moduletag :corpus
-  @moduletag timeout: 900_000
+  @moduletag timeout: Corpus.timeout()
 
   setup_all do
     files = Corpus.files(every: 3, max_bytes: 2_000_000)
@@ -179,13 +179,5 @@ defmodule Tptp.PrinterCorpusTest do
         do: {node.kind, length(node.children)}
   end
 
-  defp stream(files, fun) do
-    files
-    |> Task.async_stream(fun,
-      max_concurrency: System.schedulers_online(),
-      timeout: 900_000,
-      ordered: false
-    )
-    |> Enum.map(fn {:ok, result} -> result end)
-  end
+  defp stream(files, fun), do: Corpus.values(files, fun, timeout: 900_000)
 end

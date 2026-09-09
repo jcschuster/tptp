@@ -1,49 +1,48 @@
 defmodule Tptp.Parser do
   @moduledoc """
-  Turns one statement's tokens into a `Tptp.Statement`.
+  Parses the tokens of one statement into a `Tptp.Statement`.
 
-  The grammar itself is generated: `mix tptp.gen` translates the `::=` rules of the
-  vendored BNF into `src/tptp_parser.yrl`, and `yecc` compiles that to an LALR(1)
-  parser. This module drives it and converts what it hands back.
+  The grammar is generated: `mix tptp.gen` translates the `::=` rules of the
+  vendored BNF into `src/tptp_parser.yrl`, which `yecc` compiles to an LALR(1)
+  parser. This module drives that parser and converts its output.
 
-  ## One statement at a time
+  ## Statement granularity
 
-  `yecc` has no error recovery: a parser generated from a whole-file grammar stops
-  at the first bad byte and reports nothing about the rest. Parsing per statement
-  makes recovery structural rather than clever — a statement that fails to parse
-  becomes a diagnostic and the file carries on. It also bounds the blast radius on
-  hostile input, gives the editor path an incremental unit (find the statement
-  containing offset *n*, reparse it, splice), and makes statements a parallelism
-  unit.
+  `yecc` provides no error recovery, so a parser generated from a whole-file
+  grammar halts at the first ill-formed byte and reports nothing about the
+  remainder. Parsing per statement makes recovery structural: a statement that
+  fails to parse becomes a diagnostic and the file continues. It also bounds the
+  effect of malformed input to a single statement, provides an incremental unit for
+  editor use — locate the statement containing an offset, reparse it, splice the
+  result — and makes statements a unit of parallelism.
 
-  ## The post-pass
+  ## Conversion
 
-  The generated actions build three shapes — `{'$node', kind, alt, children, open,
-  close}`, `{'$leaf', category, alt, token}` and raw tokens spliced through from
-  chain rules — and a single bottom-up walk turns them into `Tptp.Node`:
+  The generated actions construct three forms — `{'$node', kind, alt, children,
+  open, close}`, `{'$leaf', category, alt, token}` and tokens spliced through from
+  chain rules — which a single bottom-up traversal converts into `Tptp.Node`:
 
-    * **Spans are composed**, not carried by the actions, which keeps every action
-      one template. `open` and `close` are the production's delimiters, which the
-      generator drops from `children` and hands over separately, so a node's span
-      covers its own brackets.
-    * **Leaf text is materialised** with `binary_part/3` — a sub-binary, no copy.
-    * **Significant chain rules collapse onto their leaf.** When one of the
+    * **Spans are composed** rather than carried by the actions, which keeps every
+      action a single template. `open` and `close` are the production's delimiters,
+      which the generator omits from `children` and supplies separately, so a
+      node's span covers its own delimiters.
+    * **Leaf text is materialised** with `binary_part/3`, producing a sub-binary
+      rather than a copy.
+    * **Significant chain rules are collapsed onto their leaf.** Where one of the
       role-naming nonterminals in `Tptp.Bnf.Generator.significant/0` wraps a single
-      text-carrying leaf, the node becomes that leaf and keeps the outer kind, so
-      `f` in `p(f)` arrives as `:constant` and `f` in `f(a)` as `:functor` at no
-      cost in nodes. The set is curated, not "any single child": `<tff_arguments>
-      ::= <tff_term>` is the same shape, but its child is an argument rather than
-      a rename, and collapsing it would erase what the argument was.
+      text-carrying leaf, the node becomes that leaf and retains the outer kind, so
+      `f` in `p(f)` arrives as `:constant` and `f` in `f(a)` as `:functor` without
+      additional nodes. The set is enumerated rather than derived: `<tff_arguments>
+      ::= <tff_term>` has the same shape, but its child is an argument rather than a
+      renaming, and collapsing it would replace the argument's kind.
 
-  ## Polymorphic constants
+  ## Higher-order constructs
 
-  Nothing here elaborates, saturates, uncurries or instantiates anything. `f @ $i @
-  a` keeps its full left-nested apply spine with `$i` present as an ordinary
-  argument carrying its own kind and span; `!!`, `??`, `@@+`, `@@-` and `@=` arrive
-  as their own leaf kinds; `!>` and `?*` schemes are kept verbatim. Guide §14 puts
-  every bit of that in `holtk`, and the CST cannot help there anyway — the TPTP
-  grammar does not distinguish a THF type from a THF term, so neither can this
-  tree.
+  No elaboration, saturation, uncurrying or instantiation is performed. `f @ $i @ a`
+  retains its left-nested application spine with `$i` present as an argument
+  carrying its own kind and span; `!!`, `??`, `@@+`, `@@-` and `@=` arrive as
+  distinct leaf kinds; `!>` and `?*` schemes are recorded verbatim. The grammar does
+  not distinguish a THF type from a THF term, and neither does the resulting tree.
   """
 
   alias Tptp.Diagnostic

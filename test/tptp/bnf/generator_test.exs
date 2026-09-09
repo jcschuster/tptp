@@ -105,12 +105,15 @@ defmodule Tptp.Bnf.GeneratorTest do
     end
 
     test "extracts every closed :== word list at the size the BNF states", %{entries: entries} do
+      # `formula_role` is 13 in the BNF and 14 here: `logic` comes from the prose of
+      # the TPTP language page, which lists it as a role a few paragraphs above the
+      # `:==` rule that leaves it out. See `Tptp.Bnf.Generator.vocabularies/1`.
       assert Map.new(entries, fn {name, words} -> {name, length(words)} end) == %{
                "defined_functor" => 18,
                "defined_predicate" => 7,
                "defined_proposition" => 2,
                "defined_type" => 8,
-               "formula_role" => 13,
+               "formula_role" => 14,
                "intro_type" => 4,
                "ntf_connective_name" => 10,
                "ntf_logic_name" => 6,
@@ -119,6 +122,19 @@ defmodule Tptp.Bnf.GeneratorTest do
                "status_value" => 34,
                "reserved_word" => 98
              }
+    end
+
+    test "a documented value the BNF omits is added, and only that one", %{entries: entries} do
+      roles = entries["formula_role"]
+
+      assert "logic" in roles, "the TPTP language page lists `logic` among the roles"
+      assert "axiom" in roles
+      refute "wibble" in roles
+
+      # Nothing else is corrected: every other `:==` list is exactly what the BNF says.
+      assert entries["intro_type"] == ~w(definition tautology assumption theory)
+      assert length(entries["ntf_modal_system"]) == 6
+      refute "$modal_system_KB" in entries["ntf_modal_system"]
     end
 
     test "a $-word applied in a rule is still a reserved word", %{entries: entries} do

@@ -1,52 +1,51 @@
 defmodule Tptp.Include do
   @moduledoc """
-  Follows `include` directives, building the file graph a `Tptp.Unit` is made of.
+  Resolves `include` directives, constructing the file graph underlying a
+  `Tptp.Unit`.
 
-  ## Memoised by resolved path, not by name
+  ## Memoisation
 
-  Two files can reach one axiom set by different names — `Axioms/SET007+0.ax` from
-  the library root and `SET007+0.ax` from beside it — and a graph that read it twice
-  would double the work and then report every one of its formulae as duplicated.
-  The resolver hands back a canonical path precisely so this table can key on it, so
-  a diamond is read once.
+  Memoisation is keyed on the resolved path rather than the name, since two files
+  may reach one axiom set under different names — `Axioms/SET007+0.ax` from the
+  library root and `SET007+0.ax` from beside it. A graph reading it twice would
+  duplicate the work and report every formula in it as a duplicate. The resolver
+  returns a canonical path for this purpose, so a diamond is read once.
 
-  Reading once is not the same as *appearing* once. An `include` means textual
-  inclusion, so `Tptp.Unit.statements/1` expands each directive where it stands and
-  the same file's statements can appear twice under two directives. That is what
-  the language says, and a consumer that wants the set rather than the sequence can
-  take one.
+  Being read once is distinct from occurring once. An `include` denotes textual
+  inclusion, so `Tptp.Unit.statements/1` expands each directive in position and the
+  statements of one file may occur twice under two directives. Consumers requiring
+  the set rather than the sequence can derive it.
 
   ## Cycles
 
-  A file that includes itself, directly or through a chain, is cut at the edge that
-  would close the loop: the edge resolves to nothing, `TPTP0602` names every file on
-  the cycle, and the walk continues. So the resolved graph is always a DAG and
-  expansion always terminates.
+  A file including itself, directly or transitively, is cut at the edge closing the
+  cycle: that edge resolves to nothing, `TPTP0602` names every file on the cycle,
+  and the traversal continues. The resolved graph is therefore acyclic and
+  expansion terminates.
 
   ## Depth
 
-  Bounded by `:max_depth`, 64 by default. Not because deep graphs are wrong but
-  because a resolver returning surprising paths can otherwise turn a typo into an
-  unbounded walk, and a limit that reports itself is friendlier than one that does
-  not exist.
+  Bounded by `:max_depth`, 64 by default. The bound exists because a resolver
+  returning unexpected paths can otherwise convert a misspelling into an unbounded
+  traversal.
 
-  ## Siblings are parsed in parallel
+  ## Concurrency
 
-  The median problem in the TPTP library includes two files and resolves in about
-  1.5 ms, which is the case that made a sequential walk look obviously right. The
-  worst is `ITP022^4.p`: 144 sibling includes, 59 MB of axioms, and resolving them
-  one after another takes 6.7 s of which 56 ms is I/O. Parsing dominates, so
-  parsing is what runs in parallel.
+  Sibling includes are parsed in parallel. The median problem in the TPTP library
+  includes two files and resolves in approximately 1.5 ms; the largest,
+  `ITP022^4.p`, includes 144 siblings totalling 59 MB and requires 6.7 s
+  sequentially, of which 56 ms is I/O. Parsing dominates and is therefore what is
+  parallelised.
 
-  The awkward part of a concurrent graph walk is the memo table, and it is avoided
-  rather than coordinated. Each level goes in three passes: resolve every sibling
-  (sequential, and it is only I/O), work out which of them are genuinely new and
-  pre-assign their file ids in source order, then parse those in parallel. Nothing
-  is shared during the parallel pass, and because the ids were assigned before it,
-  the result does not depend on the order the tasks finish — the same input builds
-  the same graph, every time.
+  The memoisation table is not shared during the parallel phase. Each level
+  proceeds in three passes: resolve every sibling, which is I/O and runs
+  sequentially; determine which are new and assign their file identifiers in source
+  order; then parse those in parallel. Since identifiers are assigned beforehand,
+  the resulting graph does not depend on task completion order, and the same input
+  produces the same graph.
 
-  `:max_concurrency` bounds it; set it to `1` for a strictly sequential walk.
+  `:max_concurrency` bounds the parallel phase; set it to `1` for a sequential
+  traversal.
   """
 
   alias Tptp.Diagnostic

@@ -4,7 +4,6 @@ defmodule Tptp.LintTest do
   doctest Tptp.Lint
   doctest Tptp.Lint.Collect
   doctest Tptp.Lint.Context
-  doctest Tptp.Lint.Rules.Arity
 
   alias Tptp.Lint
 
@@ -38,8 +37,6 @@ defmodule Tptp.LintTest do
        "fof(a, axiom, p). fof(b, axiom, q)."},
       {Tptp.Lint.Rules.Parent, "TPTP0504", "fof(a, axiom, p, inference(r, [], [ghost])).",
        "fof(ghost, axiom, q). fof(a, axiom, p, inference(r, [], [ghost]))."},
-      {Tptp.Lint.Rules.Arity, "TPTP0505", "fof(a, axiom, p(x)). fof(b, axiom, p(x, y)).",
-       "fof(a, axiom, p(x)). fof(b, axiom, p(y))."},
       {Tptp.Lint.Rules.Conjecture, "TPTP0506", "fof(g1, conjecture, p). fof(g2, conjecture, q).",
        "fof(g, conjecture, p)."}
     ]
@@ -151,30 +148,39 @@ defmodule Tptp.LintTest do
     end
   end
 
-  describe "the arity rule and polymorphism" do
-    test "a first-order clash is reported" do
-      assert ["TPTP0505"] = codes("fof(a, axiom, p(x)). fof(b, axiom, p(x, y)).")
+  describe "arity overloading is legal, and recorded rather than reported" do
+    # The TPTP language page: "Symbols may be overloaded with different arity
+    # signatures, and are treated as different symbols." A rule reported these pairs
+    # until 2026-09-09; it was wrong about all eleven library files it fired on.
+    test "a first-order symbol at two arities is not a finding" do
+      assert codes("fof(a, axiom, p(x)). fof(b, axiom, p(x, y)).") == []
     end
 
-    test "an apply spine at two lengths is not" do
-      refute "TPTP0505" in codes("""
-             thf(f_type, type, f: $i > $i > $o).
-             thf(a, axiom, f @ x).
-             thf(b, axiom, f @ x @ y).
-             """)
-    end
-
-    test "a symbol with a polymorphic declared type is exempt" do
+    test "two declarations at two arities are not a finding either" do
+      # The shape of `SWX091_1.p`, which declares `sqrt/1` and `sqrt/2` and uses both.
       source = """
-      tff(g_type, type, g: !>[A: $tType]: (A > A)).
-      tff(a, axiom, g(x)).
-      tff(b, axiom, g(x, y)).
+      tff(t1, type, sqrt: $i > $o).
+      tff(t2, type, sqrt: ( $i * $i ) > $o).
+      tff(a, axiom, sqrt(x)).
+      tff(b, axiom, sqrt(x, y)).
+      tff(t3, type, x: $i).
+      tff(t4, type, y: $i).
       """
 
-      refute "TPTP0505" in codes(source)
+      assert codes(source) == []
     end
 
-    test "the arities are recorded even where the rule declines" do
+    test "a $let binding is not an application at arity zero" do
+      # The shape of `SYN000_4.p`, the TPTP's own TXF syntax demonstration. The let's
+      # type section names `ff` with no arguments, and reading that as a use reported
+      # `ff` as applied at 0 and 2 — which was this library's bug, not the file's.
+      source = ~s{tff(a, axiom, $let(ff: ( $int * $int ) > $int, ff(X,Y) := X, p(ff(1,2)))).}
+
+      assert %{arities: arities} = table(source).symbols["ff"]
+      assert MapSet.to_list(arities) == [2]
+    end
+
+    test "the arities are recorded, for a consumer that wants them" do
       table =
         table("""
         thf(f_type, type, f: $i > $i > $o).
@@ -182,18 +188,8 @@ defmodule Tptp.LintTest do
         thf(b, axiom, f @ x @ y).
         """)
 
-      assert table.symbols["f"].arities |> MapSet.to_list() |> Enum.sort() == [1, 2]
-    end
-
-    test "argument counting handles both list shapes" do
-      assert table("fof(a, axiom, p(x, y, z)).").symbols["p"].arities == MapSet.new([3])
-      assert table("tff(a, axiom, p(x, y, z)).").symbols["p"].arities == MapSet.new([3])
-      assert table("thf(a, axiom, p(x, y, z)).").symbols["p"].arities == MapSet.new([3])
-    end
-
-    test "one occurrence is counted once, not once per node that mentions it" do
-      assert table("fof(a, axiom, p(b)).").symbols["p"].arities == MapSet.new([1])
-      assert table("fof(a, axiom, p).").symbols["p"].arities == MapSet.new([0])
+      assert %{arities: arities} = table.symbols["f"]
+      assert Enum.sort(MapSet.to_list(arities)) == [1, 2]
     end
   end
 
@@ -254,10 +250,38 @@ defmodule Tptp.LintTest do
       assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == []
     end
 
-    test "an arity clash across the two spellings is found" do
+    test "a $let binding declares the name it binds" do
+      # `$let` introduces a local declaration inside an ordinary axiom, so the rule
+      # must not report the bound name as undeclared. 39 library files turned on
+      # this, all of them TFX.
+      source = """
+      tff(arr, type, array: $tType > $tType).
+      tff(e, type, elt: $tType).
+      tff(mk, type, mk_array: elt > array(elt)).
+      tff(p, type, permut: ( array(elt) * array(elt) ) > $o).
+      tff(x, type, x: elt).
+      tff(a, axiom, $let(a: array(elt), a := mk_array(x), permut(a, a))).
+      """
+
+      assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == []
+    end
+
+    test "a $let binding does not declare a name used outside it" do
+      source = """
+      tff(e, type, elt: $tType).
+      tff(x, type, x: elt).
+      tff(p, type, p: elt > $o).
+      tff(a, axiom, $let(b: elt, b := x, p(b)) & p(c)).
+      """
+
+      assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == ["TPTP0501"]
+    end
+
+    test "the two spellings are one symbol in the table" do
       source = "fof(a, axiom, p(x)). fof(b, axiom, 'p'(x, y))."
 
-      assert codes(source, only: [Tptp.Lint.Rules.Arity]) == ["TPTP0505"]
+      assert %{arities: arities} = table(source).symbols["p"]
+      assert Enum.sort(MapSet.to_list(arities)) == [1, 2]
     end
 
     test "two statements named the same word two ways are duplicates" do
@@ -456,7 +480,7 @@ defmodule Tptp.LintTest do
     test "passes options through the way run/2 does" do
       {:ok, file, []} = Tptp.from_string(@source)
 
-      assert {[], _table} = Lint.scan(file, only: [Tptp.Lint.Rules.Arity])
+      assert {[], _table} = Lint.scan(file, only: [Tptp.Lint.Rules.Parent])
 
       {diagnostics, _} = Lint.scan(file, severity: %{"TPTP0401" => :error})
       assert Enum.find(diagnostics, &(&1.code == "TPTP0401")).severity == :error

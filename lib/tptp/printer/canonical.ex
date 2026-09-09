@@ -1,48 +1,48 @@
 defmodule Tptp.Printer.Canonical do
   @moduledoc """
-  Prints a CST back to TPTP, deterministically and without comments.
+  Prints a concrete syntax tree to TPTP, deterministically and without comments.
 
       iex> {:ok, file, []} = Tptp.from_string("fof( a , axiom , p(X)&q ).")
       iex> Tptp.Printer.Canonical.to_string(file)
-      "fof(a, axiom, p(X) & q).\\n"
+      "fof(a, axiom, p(X) & q)." <> "\\n"
 
-  ## The contract
+  ## Contract
 
-  `from_string(print(tree))` has the same shape as `tree`. Shape means
-  `Tptp.Node.shape/1` — kinds, texts and structure, with every offset erased,
-  because printing moves everything. That property is checked over the whole TPTP
-  library, and it is the one that has to hold before any consumer can rely on this.
+  `from_string(print(tree))` yields a tree with the same shape as `tree`, where
+  shape is `Tptp.Node.shape/1`: kinds, texts and structure, with positions removed,
+  since printing relocates everything. The property is verified over the whole TPTP
+  library.
 
-  ## It does not re-parenthesise, and does not need to
+  ## Parenthesisation
 
-  The obvious way to print a formula language with no precedence table is to
-  parenthesise everything. That is not necessary here, because the tree already
-  says where the parentheses were: `<fof_unitary_formula> ::= (<fof_logic_formula>)`
-  is kept as a node rather than spliced away, precisely so that `a | (b | c)` and
-  `(a | b) | c` are different trees. So the printer neither adds parentheses nor
-  drops them — it writes down what the tree says — and round-tripping follows from
-  faithfulness rather than from over-bracketing.
+  The printer neither introduces nor removes parentheses. A formula language
+  without a precedence table would ordinarily require parenthesising every
+  subterm, but the tree already records where the parentheses occurred:
+  `<fof_unitary_formula> ::= (<fof_logic_formula>)` is retained as a node rather
+  than spliced away, so that `a | (b | c)` and `(a | b) | c` are distinct trees.
+  The round trip therefore follows from fidelity rather than from
+  over-parenthesisation.
 
-  ## The spellings are generated
+  ## Spellings
 
-  `Tptp.Printer.Shapes` says how each node kind is written, and it comes from the
-  same BNF as the parser in the same `mix tptp.gen` run. A hand-written printer
-  would agree with the grammar right up until someone regenerated the grammar.
+  `Tptp.Printer.Shapes` determines how each node kind is written and is generated
+  from the same BNF as the parser, in the same `mix tptp.gen` run. A hand-written
+  printer would agree with the grammar only until the grammar was regenerated.
 
-  ## An empty collection is not a leaf
+  ## Empty collections
 
-  `[]` is a `general_list` with no children, and a `~` connective is a leaf with no
-  children and no text. Both are childless, so the shape is consulted before the
-  leaf case rather than after — the other order prints every empty list as nothing,
-  which is how `inference(r, [], [a])` came out as `inference(r,, [a])`.
+  `[]` is a `general_list` with no children, and a `~` connective is a leaf with
+  neither children nor text. Both are childless, so the shape is consulted before
+  the leaf case; the reverse order prints every empty list as nothing, rendering
+  `inference(r, [], [a])` as `inference(r,, [a])`.
 
   ## Spacing
 
-  Enough to be legible, never enough to change the tokens. Nothing before `)`, `]`,
-  `}`, `,`, `.` or `:`; nothing after `(`, `[` or `{`; nothing before an opening
-  bracket that follows a word or a prefix operator, so `p(a)` and `![X]:` come out
-  as they went in. Everywhere else a single space, which is what keeps two adjacent
-  operators from munching into a third.
+  Sufficient for legibility and never sufficient to alter the token sequence. No
+  space precedes `)`, `]`, `}`, `,`, `.` or `:`; none follows `(`, `[` or `{`; and
+  none precedes an opening bracket following a word or a prefix operator, so `p(a)`
+  and `![X]:` are reproduced as written. A single space is emitted elsewhere, which
+  prevents two adjacent operators from combining into a third.
   """
 
   alias Tptp.Node

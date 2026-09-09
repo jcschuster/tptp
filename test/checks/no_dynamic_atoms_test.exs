@@ -1,15 +1,16 @@
 defmodule Tptp.Checks.NoDynamicAtomsTest do
   use ExUnit.Case, async: true
 
+  alias Credo.Service.SourceFileAST
   alias Tptp.Checks.NoDynamicAtoms
 
   setup_all do
     Application.ensure_all_started(:credo)
 
-    if Process.whereis(Credo.Service.SourceFileAST) do
+    if Process.whereis(SourceFileAST) do
       :ok
     else
-      {:ok, _pid} = Credo.Service.SourceFileAST.start_link([])
+      {:ok, _pid} = SourceFileAST.start_link([])
       :ok
     end
   end

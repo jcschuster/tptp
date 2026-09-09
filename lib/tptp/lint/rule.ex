@@ -1,35 +1,34 @@
 defmodule Tptp.Lint.Rule do
   @moduledoc """
-  What a lint rule is.
+  The behaviour implemented by a lint rule.
 
-  A rule declares its code, its severity and the dialects it applies to, and then
-  implements one or both of two callbacks:
+  A rule declares its diagnostic code, its default severity and a description, and
+  implements one or both callbacks:
 
-    * `c:visit/3` sees every node of every statement, during the one traversal
-      `Tptp.Lint` makes. This is where anything local lives — a role that is not one
-      of the thirteen, a `$`-word that is not in the vocabulary, a construct that
-      does not belong in its dialect.
-    * `c:review/2` runs afterwards, handed the symbol table the traversal built.
-      This is where anything that needs more than one statement lives — an
-      undeclared symbol, a duplicate name, a parent that is not there.
+    * `c:visit/3` is invoked for every node of every statement during the traversal
+      performed by `Tptp.Lint`. Local conditions belong here: a role outside the
+      permitted set, a `$`-word outside the vocabulary.
+    * `c:review/2` runs after the traversal, against the symbol table it produced.
+      Conditions requiring more than one statement belong here: an undeclared
+      symbol, a duplicate name, an absent inference parent.
 
-  ## Why one traversal
+  ## Single traversal
 
-  A rule per walk is the obvious design and the wrong one: ten rules over a 455 MB
-  axiom set is ten traversals of 27 million nodes, and the tree does not fit in
-  cache. `Tptp.Lint` walks once and offers each node to every enabled rule, so the
-  cost of a rule is a function call rather than a pass.
+  `Tptp.Lint` traverses once and offers each node to every enabled rule, so the
+  cost of an additional rule is a function call rather than a further pass. A rule
+  per traversal would require eight traversals of a tree that does not fit in
+  cache.
 
-  It follows that `c:visit/3` must be cheap and must not walk. A rule that needs to
-  look at a subtree is either asking for something the node itself can answer, or
-  it belongs in `c:review/2` where it can look at the table instead.
+  It follows that `c:visit/3` must be inexpensive and must not itself traverse. A
+  rule requiring a subtree is either asking for something the node determines, or
+  belongs in `c:review/2` where the table is available.
 
-  ## Severity is a default, not a decree
+  ## Severity
 
-  `c:severity/0` is what the rule thinks; the caller overrides per code. A rule
-  that fires on conforming library files must not report an error, and there is a
-  corpus test that says so. `:info` is for a rule whose finding is a fact about the
-  file rather than a complaint about it.
+  `c:severity/0` is the rule's default, which the caller may override per code. A
+  rule that applies to conforming library files must not report an error; a corpus
+  test enforces this. `:info` is appropriate where the finding is a property of the
+  file rather than a defect in it.
   """
 
   alias Tptp.Diagnostic

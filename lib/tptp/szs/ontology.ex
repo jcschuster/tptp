@@ -2,81 +2,78 @@ defmodule Tptp.Szs.Ontology do
   @moduledoc """
   The SZS status values, generated from the vendored ontology page.
 
-  Do not edit: `mix tptp.gen` writes this from `priv/szs/SZSOntology-2026-08-31.html`,
-  fetched from <https://tptp.org/UserDocs/SZSOntology>. 112 values in three ontologies:
+  Do not edit: `mix tptp.gen` writes this module from
+  `priv/szs/SZSOntology-2026-08-31.html`, fetched from <https://tptp.org/UserDocs/SZSOntology>. 112
+  values across three ontologies:
 
     * `:success` — 53 values
     * `:no_success` — 29 values
     * `:data` — 30 values
 
-  Every atom here is created at compile time, so `from_string/1` and its siblings
-  can turn untrusted prover output into an atom without `String.to_atom/1` being
-  reachable from input. That is a security property of this library, not a style
-  preference; see `Tptp.Token` for the same discipline and the Credo check that
-  enforces it.
+  Every atom is created at compile time, so `from_string/1` and its counterparts
+  convert untrusted prover output to an atom without `String.to_atom/1` being
+  reachable from input. This is a security property rather than a stylistic one;
+  see `Tptp.Token` for the same constraint and the Credo check enforcing it.
 
-  ## The `isa` hierarchy is deliberately absent
+  ## The `isa` hierarchy is not modelled
 
   There is no `parent/1` or `descendant?/2`. The SZS ontologies are hierarchies —
-  an `EquivalentTheorem` isa `Equivalent` isa `Satisfiable` — but that hierarchy is
-  published only as three diagrams (`Success.png`, `NoSuccess.png`, `Data.png` at
-  the URL above) and appears nowhere in the page's text. Copying a dense diagram
-  out by eye would put unverifiable relations into a library whose contract is
-  faithfulness to what the sources actually say, so what is here is the partition
-  the text does state: which ontology a value belongs to, and which subontology of
-  `Success`. If a machine-readable ontology is published, this module gains the
-  hierarchy in one regeneration.
+  `EquivalentTheorem` isa `Equivalent` isa `Satisfiable` — but the hierarchy is
+  published only as three diagrams (`Success.png`, `NoSuccess.png` and `Data.png`
+  at the URL above) and does not appear in the text of the page. Transcribing a
+  diagram by inspection would introduce unverifiable relations into a library
+  whose contract is fidelity to its sources. What is provided is the partition
+  the text does state: the ontology a value belongs to, and its subontology
+  within `Success`. Publication of a machine-readable ontology would allow the
+  hierarchy to be added by regeneration.
 
-  ## What to do when there is no ordering
+  ## Ordering
 
-  There is no `compare/2` and no precedence table, for the same reason there is
-  no `parent/1`: the page publishes none. A consumer reading prover output still
-  has to choose between two answers, though, and a consumer that invents its own
-  ranking is how a precedence inversion gets written — a `Timeout` from the
-  system that ran longest quietly outranking a `Theorem`. Two things published
-  here are enough for that choice, and are what a consumer should use instead:
+  There is no `compare/2` and no precedence table, for the same reason: the page
+  publishes none. A consumer comparing two prover results nonetheless requires a
+  basis for the comparison, and an invented ranking admits precedence inversions,
+  in which a `Timeout` from the longest-running system outranks a `Theorem`. Two
+  published properties suffice:
 
-    * **`success?/1`.** A `Success` value is an answer; a `NoSuccess` value is
-      the absence of one. Prefer `Success`. That is the whole of the ordering the
-      text supports, and it is the one that matters — nothing in `NoSuccess` is
-      ever a better answer than anything in `Success`.
-    * **`subontology/1`.** Within `Success`, this says which group of the page a
-      value sits in, so two answers can be told apart as the same kind of claim
-      or different kinds without any guess about which is stronger.
+    * `success?/1`. A `Success` value constitutes an answer and a `NoSuccess`
+      value its absence. Prefer `Success`. This is the whole of the ordering the
+      text supports; no `NoSuccess` value is preferable to any `Success` value.
+    * `subontology/1`. Within `Success`, this identifies the group a value
+      belongs to, allowing two answers to be compared as claims of the same or
+      different kinds without assuming a strength ordering.
 
-  One further rule is about provenance rather than about the ontology, and it
-  belongs in the same decision: an explicit `% SZS status` line is the system
-  saying what it concluded, while a prover-specific output pattern is a reader
-  inferring it. Prefer the line. `Tptp.Szs.status/1` returns `:none` when a run
-  printed none, which is the signal to fall back to a pattern — and the only
-  time to.
+  A further consideration concerns provenance. An explicit `% SZS status` line is
+  the system's own statement of its conclusion, whereas an implementation-specific
+  output pattern is an inference drawn by the reader. Prefer the line.
+  `Tptp.Szs.status/1` returns `:none` where a run emitted none, which is the
+  condition under which a pattern may be used.
 
-  ## Case is meaningful
+  ## Case sensitivity
 
-  `SAT` is `Satisfiable`; `Sat` is `Saturation`. `from_mnemonic/1` is case
-  sensitive for that reason. The lower-case three-letter form that appears inside
-  a TPTP `status(...)` annotation has its own entry point, `from_status_value/1`,
-  which searches only the success ontology — the only place `<status_value>` draws
-  from, as the generator checks on every run.
+  `SAT` is `Satisfiable` and `Sat` is `Saturation`, so `from_mnemonic/1` is case
+  sensitive. The lower-case three-letter form occurring inside a TPTP
+  `status(...)` annotation has a separate entry point, `from_status_value/1`,
+  which searches the success ontology alone, that being the only source
+  `<status_value>` draws from, as the generator verifies on each run.
 
-  `Ass` and `ASS` are a second pair, and a sharper one: `Ass` is `Assurance` in
-  the data ontology, `ASS` is `Assumed` in the no-success ontology.
+  `Ass` and `ASS` are a second such pair: `Ass` is `Assurance` in the data
+  ontology and `ASS` is `Assumed` in the no-success ontology.
 
-  ## `Assumed` carries arguments this module does not model
+  ## Arguments of `Assumed`
 
-  The page writes every mnemonic as three letters except one. `Assumed` is
-  `ASS(U,S)`: the success value `S` was assumed because the real answer is
-  unknown for the no-success reason `U`, with `U` drawn from the subontology
-  under `Unknown`. `mnemonic(:assumed)` is `"ASS"` and `from_mnemonic/1` answers
-  to `"ASS"` alone, because a pair of arguments is not a member of a closed set of
-  atoms and pretending otherwise would put a parser in a lookup table.
+  Every mnemonic on the page is three letters except one. `Assumed` is
+  `ASS(U,S)`: the success value `S` was assumed because the actual result is
+  unknown for the no-success reason `U`, where `U` is drawn from the subontology
+  beneath `Unknown`. `mnemonic(:assumed)` returns `"ASS"` and `from_mnemonic/1`
+  accepts `"ASS"` alone, since a pair of arguments is not a member of a closed
+  set of atoms.
 
-  A consumer reading a status line has to do the splitting itself: take the text
-  up to the first `(`, look that up here, and read the arguments — themselves two
-  mnemonics — with a second and third call. Nothing on the page says how the form
-  is written in a `% SZS status` line, and the TPTP BNF cannot express it at all:
+  A consumer reading such a status line must decompose it: take the text
+  preceding the first `(`, resolve it here, and resolve the two arguments, which
+  are themselves mnemonics, with further calls. The page does not state how the
+  form is written in a `% SZS status` line, and the TPTP BNF cannot express it:
   `<status_value>` is a list of plain words, so `status(ass(...))` has no
-  derivation. Treat `ASS(...)` as a form to recognise rather than one to emit.
+  derivation. Treat `ASS(...)` as a form to recognise rather than to emit.
   """
 
   @typedoc "One SZS status value. A closed set of 112 compile-time atoms."
@@ -104,7 +101,7 @@ defmodule Tptp.Szs.Ontology do
           | :finite_tautology
           | :counter_unsatisfiability_preserving
           | :counter_satisfiability_preserving
-          | :counter_tautologyy_preserving
+          | :counter_tautology_preserving
           | :equi_counter_satisfiable
           | :equi_counter_tautologous
           | :counter_model_extending
@@ -238,7 +235,7 @@ defmodule Tptp.Szs.Ontology do
       :finite_tautology,
       :counter_unsatisfiability_preserving,
       :counter_satisfiability_preserving,
-      :counter_tautologyy_preserving,
+      :counter_tautology_preserving,
       :equi_counter_satisfiable,
       :equi_counter_tautologous,
       :counter_model_extending,
@@ -386,7 +383,7 @@ defmodule Tptp.Szs.Ontology do
   def from_string("CounterSatisfiabilityPreserving"),
     do: {:ok, :counter_satisfiability_preserving}
 
-  def from_string("CounterTautologyyPreserving"), do: {:ok, :counter_tautologyy_preserving}
+  def from_string("CounterTautologyyPreserving"), do: {:ok, :counter_tautology_preserving}
   def from_string("EquiCounterSatisfiable"), do: {:ok, :equi_counter_satisfiable}
   def from_string("EquiCounterTautologous"), do: {:ok, :equi_counter_tautologous}
   def from_string("CounterModelExtending"), do: {:ok, :counter_model_extending}
@@ -521,7 +518,7 @@ defmodule Tptp.Szs.Ontology do
   def name(:finite_tautology), do: "FiniteTautology"
   def name(:counter_unsatisfiability_preserving), do: "CounterUnsatisfiabilityPreserving"
   def name(:counter_satisfiability_preserving), do: "CounterSatisfiabilityPreserving"
-  def name(:counter_tautologyy_preserving), do: "CounterTautologyyPreserving"
+  def name(:counter_tautology_preserving), do: "CounterTautologyyPreserving"
   def name(:equi_counter_satisfiable), do: "EquiCounterSatisfiable"
   def name(:equi_counter_tautologous), do: "EquiCounterTautologous"
   def name(:counter_model_extending), do: "CounterModelExtending"
@@ -646,7 +643,7 @@ defmodule Tptp.Szs.Ontology do
   def from_mnemonic("CSP"), do: {:ok, :counter_satisfiability_preserving}
   def from_mnemonic("CTH"), do: {:ok, :counter_theorem}
   def from_mnemonic("CTO"), do: {:ok, :cpu_timeout}
-  def from_mnemonic("CTP"), do: {:ok, :counter_tautologyy_preserving}
+  def from_mnemonic("CTP"), do: {:ok, :counter_tautology_preserving}
   def from_mnemonic("CUP"), do: {:ok, :counter_unsatisfiability_preserving}
   def from_mnemonic("Com"), do: {:ok, :comment}
   def from_mnemonic("DIn"), do: {:ok, :domain_interpretation}
@@ -787,7 +784,7 @@ defmodule Tptp.Szs.Ontology do
   def from_status_value("ftt"), do: {:ok, :finite_tautology}
   def from_status_value("cup"), do: {:ok, :counter_unsatisfiability_preserving}
   def from_status_value("csp"), do: {:ok, :counter_satisfiability_preserving}
-  def from_status_value("ctp"), do: {:ok, :counter_tautologyy_preserving}
+  def from_status_value("ctp"), do: {:ok, :counter_tautology_preserving}
   def from_status_value("ecs"), do: {:ok, :equi_counter_satisfiable}
   def from_status_value("eca"), do: {:ok, :equi_counter_tautologous}
   def from_status_value("cmx"), do: {:ok, :counter_model_extending}
@@ -849,7 +846,7 @@ defmodule Tptp.Szs.Ontology do
   def mnemonic(:finite_tautology), do: "FTT"
   def mnemonic(:counter_unsatisfiability_preserving), do: "CUP"
   def mnemonic(:counter_satisfiability_preserving), do: "CSP"
-  def mnemonic(:counter_tautologyy_preserving), do: "CTP"
+  def mnemonic(:counter_tautology_preserving), do: "CTP"
   def mnemonic(:equi_counter_satisfiable), do: "ECS"
   def mnemonic(:equi_counter_tautologous), do: "ECA"
   def mnemonic(:counter_model_extending), do: "CMX"
@@ -1023,7 +1020,7 @@ defmodule Tptp.Szs.Ontology do
     do:
       "If there exists a model of Ax then there exists a model of ~C, i.e., if Ax is satisfiable then ~C is satisfiable."
 
-  def describe(:counter_tautologyy_preserving),
+  def describe(:counter_tautology_preserving),
     do:
       "If every interpretation is a model of Ax then every interpretations is a model of ~C, i.e., if Ax is a tautology then ~C is a tautology."
 
@@ -1235,7 +1232,7 @@ defmodule Tptp.Szs.Ontology do
   def ontology(:finite_tautology), do: :success
   def ontology(:counter_unsatisfiability_preserving), do: :success
   def ontology(:counter_satisfiability_preserving), do: :success
-  def ontology(:counter_tautologyy_preserving), do: :success
+  def ontology(:counter_tautology_preserving), do: :success
   def ontology(:equi_counter_satisfiable), do: :success
   def ontology(:equi_counter_tautologous), do: :success
   def ontology(:counter_model_extending), do: :success
@@ -1357,7 +1354,7 @@ defmodule Tptp.Szs.Ontology do
   def subontology(:finite_tautology), do: :semantic_success
   def subontology(:counter_unsatisfiability_preserving), do: :semantic_success
   def subontology(:counter_satisfiability_preserving), do: :semantic_success
-  def subontology(:counter_tautologyy_preserving), do: :semantic_success
+  def subontology(:counter_tautology_preserving), do: :semantic_success
   def subontology(:equi_counter_satisfiable), do: :semantic_success
   def subontology(:equi_counter_tautologous), do: :semantic_success
   def subontology(:counter_model_extending), do: :semantic_success
@@ -1479,7 +1476,7 @@ defmodule Tptp.Szs.Ontology do
   def value?(:finite_tautology), do: true
   def value?(:counter_unsatisfiability_preserving), do: true
   def value?(:counter_satisfiability_preserving), do: true
-  def value?(:counter_tautologyy_preserving), do: true
+  def value?(:counter_tautology_preserving), do: true
   def value?(:equi_counter_satisfiable), do: true
   def value?(:equi_counter_tautologous), do: true
   def value?(:counter_model_extending), do: true

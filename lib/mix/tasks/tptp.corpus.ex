@@ -2,53 +2,77 @@ defmodule Mix.Tasks.Tptp.Corpus do
   @shortdoc "Sweep a local TPTP library through the parser and write the report"
 
   @moduledoc """
-  Read every problem and axiom file of a local TPTP library, and write down what
-  happened.
+  Reads every problem and axiom file of a local TPTP library and writes a report.
 
       mix tptp.corpus
       mix tptp.corpus --every 5
       mix tptp.corpus --check
 
-  This is the library's headline measurement rather than a test: a parser for a
-  standardised language is worth exactly what it reads, and the honest way to say
-  so is a number over the whole published corpus. The report it writes is committed,
-  so a change to the parser that costs coverage shows up as a diff rather than as a
-  line of CI output nobody reads.
+  This is a measurement rather than a test. A parser for a standardised language is
+  characterised by what it reads, and the report is committed so that a change
+  reducing coverage appears as a diff.
 
-  ## The parser alone
+  ## Scope
 
-  Each file is read with `Tptp.from_string/2` and nothing else. No `include` is
-  resolved, no lint rule runs, no unit is built. That is deliberate: `include`
-  resolution reads other files and would count one axiom set once per problem that
-  pulls it in, and lint findings are opinions rather than a statement about whether
-  the bytes were understood. The question this answers is narrow — *does this file
-  parse, and how fast* — and it is the question the rest of the library rests on.
+  Each file is read with `Tptp.from_string/2` alone. No `include` is resolved, no
+  lint rule is applied and no unit is constructed. Include resolution would read
+  further files and count one axiom set once per problem including it, and lint
+  findings do not bear on whether the input was parsed. The question is whether a
+  file parses, and at what cost.
 
   A file counts as parsed when the result carries no error-severity diagnostic.
-  Warnings do not count against it: an empty quoted atom is real TPTP that this
-  library reads and complains about, and refusing it would be wrong.
+  Warnings do not count against it: an empty quoted atom is TPTP this library reads
+  and reports.
 
-  ## The budget
+  ## Time budget
 
-  Each file gets `--timeout` milliseconds of wall clock, and a file that exceeds it
-  is killed and counted as a timeout rather than allowed to stall the sweep. The
-  budget is wall time under `--concurrency` workers, so it is a property of the
-  machine as much as of the file; the report records both.
+  Each file is allowed `--timeout` milliseconds of wall clock; one exceeding it is
+  terminated and recorded as a timeout rather than allowed to block the sweep. The
+  budget is wall time under `--concurrency` workers and is therefore a property of
+  the machine as much as of the file. The report records both.
+
+  ## Memory budget
+
+  A file's size does not predict the cost of parsing it. Across the library the
+  source ranges from 2.5 to 111 bytes per tree node, a 44-fold spread, since
+  `p(a,b)` and a paragraph of prose occupy comparable numbers of bytes and
+  different numbers of nodes. Peak heap tracks nodes, at a more uniform 400–950
+  bytes each. Budgeting by file size therefore bounds the wrong quantity:
+  `SWV535-1.010.p` is 8.1 MB and peaks at 3.2 GB, while `SWW778_1.p` is twice its
+  size and peaks at a ninth of that.
+
+  Since the cost is not known in advance, it is bounded during the parse. Each file
+  is parsed in its own process under a `max_heap_size` flag, so the ceiling is
+  enforced by the VM. The flag counts shared binaries, without which it would
+  exclude the source itself: a single reference-counted binary into which every
+  leaf's `text` points, and the larger part of what a parse retains. `--heap` is the
+  total, divided equally among the workers of a tier, so peak heap across the sweep
+  is that total by construction.
+
+  Size determines concurrency, since it predicts wall time adequately: paths are
+  grouped into tiers at 1 MB and 4 MB, and each tier runs at its own worker count,
+  the largest files at the fewest workers. This is scheduling rather than a bound.
+
+  A file whose parse would exceed its worker's share is terminated and retried alone
+  against the whole of `--heap`, so tiering costs no coverage. A file exceeding the
+  budget when run alone is reported as `:heap` in the failure table.
 
   ## Options
 
-    * `--every N` — sweep one file in N. The full sweep is the default and the
-      only one whose number means anything; thinning is for a quick local check.
+    * `--every N` — sweep one file in N. The full sweep is the default; thinning is
+      for a local check and its counts are not comparable.
     * `--timeout MS` — per-file budget, default #{60_000}.
     * `--max-bytes N` — skip files larger than this, default 20 MB. In a complete
-      TPTP that is seventy files — five axiom sets and sixty-five `HWV` problems,
-      3.4 GB between them — and they belong in the streaming benchmark, which
-      measures what they are there to measure.
-    * `--concurrency N` — workers, default one per scheduler.
-    * `--out PATH` — where to write, default `CORPUS.md`.
-    * `--check` — write nothing; fail if the committed report's results differ from
-      this run's. For CI. Timings are excluded from the comparison, so only a real
-      change in what parses can fail it.
+      TPTP this excludes seventy files, five axiom sets and sixty-five problems,
+      which the streaming benchmark reads instead.
+    * `--concurrency N` — workers in the smallest tier, default one per scheduler.
+      Larger tiers scale down from it.
+    * `--heap BYTES` — peak heap across all workers, default 6 GB. Lowering it on a
+      smaller machine makes the sweep slower rather than incorrect.
+    * `--out PATH` — output path, default `CORPUS.md`.
+    * `--check` — write nothing and fail if the committed report's results differ
+      from this run. Timings are excluded from the comparison, so only a change in
+      what parses can fail it.
   """
 
   use Mix.Task
@@ -57,6 +81,8 @@ defmodule Mix.Tasks.Tptp.Corpus do
   @conventional "/opt/TPTP"
   @default_timeout 60_000
   @default_max_bytes 20_000_000
+  @default_heap 6 * 1024 * 1024 * 1024
+  @tier_bounds [1_048_576, 4_194_304]
   @theory "use `theory(equality)` as an inference parent. v9.3.1.2 expanded " <>
             "`<source> ::= <general_term>` into a list of alternatives and `theory(...)` " <>
             "is not among them, so the shipped grammar does not admit it. A gap between " <>
@@ -83,6 +109,7 @@ defmodule Mix.Tasks.Tptp.Corpus do
           timeout: :integer,
           max_bytes: :integer,
           concurrency: :integer,
+          heap: :integer,
           out: :string,
           check: :boolean
         ]
@@ -102,25 +129,26 @@ defmodule Mix.Tasks.Tptp.Corpus do
   end
 
   @doc """
-  The library files this parser refuses, and why.
+  Returns the library files this parser rejects, with the reason for each.
 
-  Keyed by base name. A file lands here only once it has been chased down to a fact
-  about the sources rather than left as a failure — every entry so far is a gap
-  between the vendored BNF release and the library that ships alongside it, which
-  is a thing a parser generated from that BNF is *supposed* to report.
+  Keyed by base name. An entry is added only once the failure has been resolved to
+  a property of the sources. Every entry is a discrepancy between the vendored BNF
+  release and the library distributed alongside it, which a parser generated from
+  that BNF is expected to report.
 
-  The report renders these beside the failure they explain, and the corpus tests
-  exclude them and then assert that each one still fails, so a stale exception
-  cannot sit here quietly.
+  The report renders each reason beside the failure it explains. The corpus tests
+  exclude these files and then assert that each still fails, so an entry that has
+  become unnecessary is reported rather than retained.
   """
   @spec known_failures() :: %{binary() => binary()}
   def known_failures, do: @known
 
   @doc """
-  The library root: `$TPTP_ROOT`, `$TPTP`, or `/opt/TPTP`, whichever is a directory.
+  Returns the library root: `$TPTP_ROOT`, `$TPTP` or `/opt/TPTP`, whichever names a
+  directory.
 
-  `nil` when there is none, which is what lets the corpus tests skip rather than
-  fail on a machine that has no copy of the library.
+  Returns `nil` where none does, which allows the corpus tests to be skipped rather
+  than fail on a machine without a copy of the library.
   """
   @spec root() :: Path.t() | nil
   def root do
@@ -154,14 +182,137 @@ defmodule Mix.Tasks.Tptp.Corpus do
     end
   end
 
+  @doc """
+  Group paths into size tiers, each with the workers and heap share it runs under.
+
+  Sizes are grouped at `#{inspect(@tier_bounds)}` bytes, ascending, empty tiers
+  dropped. The smallest tier gets `:concurrency` workers and each larger one half
+  of the tier below, down to one, because a file eight times the size is worth
+  proportionally fewer simultaneous parses. Every tier divides the same `:heap`
+  between its workers, so peak heap is the same number whichever tier is running.
+
+  Returns `{workers, heap_per_worker, paths}` per tier.
+  """
+  @spec tiers([Path.t()], keyword()) :: [{pos_integer(), pos_integer(), [Path.t()]}]
+  def tiers(paths, options \\ []) do
+    ceiling = Keyword.get(options, :concurrency, System.schedulers_online())
+    heap = Keyword.get(options, :heap, @default_heap)
+
+    paths
+    |> Enum.group_by(&tier(File.stat!(&1).size))
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.map(fn {tier, tier_paths} ->
+      workers = max(1, div(ceiling, Bitwise.bsl(1, tier)))
+      {workers, div(heap, workers), tier_paths}
+    end)
+  end
+
+  @doc """
+  Run `fun` over `paths`, tier by tier, under a heap ceiling the VM enforces.
+
+  Each file is parsed in its own monitored process carrying a `max_heap_size` flag,
+  so a parse that would blow the budget is killed rather than the sweep. A killed
+  file is retried alone against the whole `:heap` before being reported as
+  `{:exit, :heap}`, so the tiering costs coverage only for a file that cannot be
+  read at all.
+
+  Returns `{path, {:ok, value}}` or `{path, {:exit, reason}}` in the order given.
+  """
+  @spec stream([Path.t()], (Path.t() -> term()), keyword()) :: [{Path.t(), term()}]
+  def stream(paths, fun, options \\ []) do
+    timeout = Keyword.get(options, :timeout, @default_timeout)
+    heap = Keyword.get(options, :heap, @default_heap)
+
+    swept =
+      paths
+      |> tiers(options)
+      |> Enum.flat_map(fn {workers, share, tier_paths} ->
+        tier_paths
+        |> Task.async_stream(&{&1, guarded(&1, fun, share)},
+          max_concurrency: workers,
+          timeout: timeout,
+          on_timeout: :kill_task,
+          ordered: true
+        )
+        |> Enum.zip(tier_paths)
+        |> Enum.map(fn
+          {{:ok, {path, outcome}}, _path} -> {path, outcome}
+          {{:exit, reason}, path} -> {path, {:exit, reason}}
+        end)
+      end)
+      |> Map.new()
+
+    Enum.map(paths, &{&1, retry(&1, Map.fetch!(swept, &1), fun, heap, timeout)})
+  end
+
+  @spec retry(Path.t(), term(), (Path.t() -> term()), pos_integer(), timeout()) :: term()
+  defp retry(path, {:exit, :killed}, fun, heap, timeout) do
+    task = Task.async(fn -> guarded(path, fun, heap) end)
+
+    case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {:exit, :killed}} -> {:exit, :heap}
+      {:ok, outcome} -> outcome
+      nil -> {:exit, :timeout}
+    end
+  end
+
+  defp retry(_path, outcome, _fun, _heap, _timeout), do: outcome
+
+  # `include_shared_binaries` is required for the ceiling to bound what the parse
+  # retains. A file's source is one reference-counted binary and every leaf's `text`
+  # is a sub-binary of it, so an unqualified `max_heap_size` measures the tree and
+  # not the source it indexes; a consumer resolving `include` holds one such binary
+  # per file in the graph. Counting them overestimates, a shared binary being charged
+  # to each process referencing it, which is the conservative direction for a bound
+  # intended to keep the machine responsive.
+  #
+  # The parse runs in a child process so that `max_heap_size` terminates the parse
+  # alone: `:kill` is untrappable, and a linked termination would take the sweep with
+  # it. The child is therefore monitored, and also linked so that the relationship
+  # holds in both directions — when the per-file timeout terminates this worker, the
+  # link delivers `:killed` to the child rather than leaving a parse running for a
+  # result no longer awaited and still holding its share of the heap. Trapping exits
+  # is what prevents the link from defeating the monitor.
+  @spec guarded(Path.t(), (Path.t() -> term()), pos_integer()) :: {:ok, term()} | {:exit, term()}
+  defp guarded(path, fun, heap) do
+    parent = self()
+    words = div(heap, :erlang.system_info(:wordsize))
+    Process.flag(:trap_exit, true)
+
+    {pid, ref} =
+      spawn_monitor(fn ->
+        Process.flag(:max_heap_size, %{
+          size: words,
+          kill: true,
+          error_logger: false,
+          include_shared_binaries: true
+        })
+
+        send(parent, {:swept, self(), fun.(path)})
+      end)
+
+    Process.link(pid)
+
+    receive do
+      {:swept, ^pid, value} ->
+        Process.demonitor(ref, [:flush])
+        {:ok, value}
+
+      {:DOWN, ^ref, :process, ^pid, reason} ->
+        {:exit, reason}
+    end
+  end
+
+  @spec tier(non_neg_integer()) :: non_neg_integer()
+  defp tier(size), do: Enum.count(@tier_bounds, &(size > &1))
+
   defp report(root, paths, options) do
     timeout = Keyword.get(options, :timeout, @default_timeout)
-    concurrency = Keyword.get(options, :concurrency, System.schedulers_online())
 
     Mix.shell().info("sweeping #{length(paths)} files under #{root} ...")
 
     started = System.monotonic_time(:millisecond)
-    results = sweep(paths, timeout, concurrency)
+    results = sweep(paths, options)
     elapsed = System.monotonic_time(:millisecond) - started
 
     render(results, %{
@@ -169,27 +320,29 @@ defmodule Mix.Tasks.Tptp.Corpus do
       version: version(paths),
       elapsed: elapsed,
       timeout: timeout,
-      concurrency: concurrency,
+      tiers: tiers(paths, options),
+      heap: Keyword.get(options, :heap, @default_heap),
       every: Keyword.get(options, :every, 1),
       max_bytes: Keyword.get(options, :max_bytes, @default_max_bytes)
     })
   end
 
-  defp sweep(paths, timeout, concurrency) do
+  defp sweep(paths, options) do
+    timeout = Keyword.get(options, :timeout, @default_timeout)
+
     paths
-    |> Task.async_stream(&measure/1,
-      max_concurrency: concurrency,
-      timeout: timeout,
-      on_timeout: :kill_task,
-      ordered: true
-    )
-    |> Enum.zip(paths)
+    |> stream(&measure/1, options)
     |> Enum.map(fn
-      {{:ok, result}, _path} ->
+      {_path, {:ok, result}} ->
         result
 
-      {{:exit, :timeout}, path} ->
-        %{path: path, outcome: :timeout, micros: timeout * 1000, bytes: File.stat!(path).size}
+      {path, {:exit, reason}} ->
+        %{
+          path: path,
+          outcome: if(reason == :heap, do: :heap, else: :timeout),
+          micros: timeout * 1000,
+          bytes: File.stat!(path).size
+        }
     end)
   end
 
@@ -285,7 +438,8 @@ defmodule Mix.Tasks.Tptp.Corpus do
     | Elixir | #{System.version()} |
     | OTP | #{:erlang.system_info(:otp_release)} |
     | Schedulers | #{System.schedulers_online()} |
-    | Workers | #{run.concurrency} |
+    | Workers | #{workers(run.tiers)} |
+    | Heap ceiling | #{Float.round(run.heap / 1_073_741_824, 1)} GB |
     | Per-file budget | #{run.timeout / 1000} s |
     | Size cap | #{Float.round(run.max_bytes / 1_048_576, 1)} MB |
     | Thinning | #{thinning(run.every)} |
@@ -311,6 +465,10 @@ defmodule Mix.Tasks.Tptp.Corpus do
     `Tptp.Query.dialect/1` answers that — and it is here because the TH0/TH1 set is
     what the comparison above is over.\
     """
+  end
+
+  defp workers(tiers) do
+    Enum.map_join(tiers, ", ", fn {workers, _share, paths} -> "#{workers} on #{length(paths)}" end)
   end
 
   defp row(label, results) do
@@ -360,6 +518,7 @@ defmodule Mix.Tasks.Tptp.Corpus do
   end
 
   defp describe(:timeout), do: "timed out"
+  defp describe(:heap), do: "exceeded the heap ceiling, alone"
   defp describe({:error, codes}), do: Enum.join(codes, ", ")
 
   defp megabytes(results) do

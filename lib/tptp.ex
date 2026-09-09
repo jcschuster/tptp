@@ -1,64 +1,68 @@
 defmodule Tptp do
   @moduledoc """
-  A faithful, span-carrying reader for the TPTP language.
+  A span-preserving reader for the TPTP language.
 
-  `tptp` scans, splits, parses, resolves `include` directives, validates and prints
-  TPTP. It does not type-check, does not normalise, does not know what `&` means,
-  and has no notion of a logic. Everything it produces is a transcription of the
-  input with byte-accurate spans attached.
+  This library scans, splits, parses, resolves `include` directives, validates and
+  prints TPTP. It performs no type checking, no normalisation and no elaboration,
+  and it attaches no semantics to the operators it recognises. Its output is a
+  transcription of the input with byte-accurate source positions.
 
   ## Reading a file
 
       {:ok, file, diagnostics} = Tptp.from_file("Problems/PUZ/PUZ001+1.p")
 
       file.statements   # [%Tptp.Statement.Annotated{} | %Tptp.Statement.Include{}]
-      file.comments     # ordered spans, never in the tree
-      diagnostics       # everything the library has to say, in reading order
+      file.comments     # ordered spans, held outside the tree
+      diagnostics       # sorted by source position
 
-  ## What it deliberately does not do
+  ## Scope
 
-  TPTP's typed dialects declare every symbol and annotate every bound variable, so
-  there is no inference problem to solve at this layer and none is attempted. The
-  CST records explicit type arguments verbatim, in source order — `f @ $i @ a`
-  keeps its `$i` as an ordinary argument with its own span — so a consumer never
-  has to reconstruct them. It follows that the CST **cannot distinguish a THF type
-  from a THF term**, and does not try: `<thf_unitary_type> ::= <thf_unitary_formula>`
-  makes them the same nonterminal, and only the `:==` layer says which formulae are
-  legal types. Elaboration belongs to the consumer, with a signature in hand.
+  The typed dialects of TPTP require a declaration for every symbol and a type
+  annotation on every bound variable. No type inference is therefore required to
+  read them, and none is performed. Explicit type arguments are recorded verbatim
+  and in source order: in `f @ $i @ a`, the `$i` is retained as an argument of the
+  application with its own span.
 
-  ## Nothing raises on input
+  A consequence is that the concrete syntax tree does not distinguish a THF type
+  from a THF term. The grammar does not either — `<thf_unitary_type> ::=
+  <thf_unitary_formula>` identifies the two nonterminals, and the well-formedness
+  conditions of the `:==` layer are what restrict a formula to those admissible as
+  types. Elaboration against a signature is the consumer's responsibility.
 
-  Every stage threads a diagnostic accumulator, so a partial result is always
-  available and malformed input produces a shorter file rather than an exception.
-  `from_string/2` therefore has no failure case at all: it reports. `from_file/2`
-  fails only when the bytes cannot be read. The `!` variants exist for callers who
-  would rather be interrupted, and raise `Tptp.Error` carrying the full list.
+  ## Error handling
 
-  ## Includes are not followed
+  Each stage threads a diagnostic accumulator, so a partial result is available for
+  any input and malformed input yields a shorter file rather than an exception.
+  `from_string/2` has no failure case; `from_file/2` fails only when the file
+  cannot be read. The `!` variants raise `Tptp.Error` carrying the accumulated
+  diagnostics.
 
-  `from_file/2` reads one file. An `include` directive is recorded as a
-  `Tptp.Statement.Include` and left alone, because following it means reading a
-  file the caller did not name — or, with the HTTP resolver, reaching the network.
-  `Tptp.Unit` is the opt-in entry point for that, and it takes a resolver.
+  ## Includes
 
-  ## Layers
+  `from_file/2` reads a single file. An `include` directive is recorded as a
+  `Tptp.Statement.Include` and not followed, since resolution reads files the
+  caller did not name and, under `Tptp.Resolver.Http`, performs network access.
+  `Tptp.Unit` is the entry point for include resolution and requires a resolver.
 
-  | Module | Job |
-  |--------|-----|
-  | `Tptp.Lexer` | bytes to tokens, one statement at a time |
-  | `Tptp.Splitter` | statement boundaries and the diagnostics the parser cannot reach |
-  | `Tptp.Parser` | tokens to a `%Tptp.Node{}` CST |
-  | `Tptp.Include` | the include graph, with cycle detection |
-  | `Tptp.Lint` | the `:==` semantic layer and the cross-statement conditions |
-  | `Tptp.Analysis` | file, diagnostics, table and dialect from one traversal, via `analyze/2` |
-  | `Tptp.Printer.Canonical` | back to bytes |
+  ## Stages
 
-  ## Versions
+  | Module | Responsibility |
+  |--------|----------------|
+  | `Tptp.Lexer` | tokenisation, resumable at statement granularity |
+  | `Tptp.Splitter` | statement boundaries and position-dependent keyword resolution |
+  | `Tptp.Parser` | tokens to a `%Tptp.Node{}` concrete syntax tree |
+  | `Tptp.Include` | include graph construction, with cycle detection |
+  | `Tptp.Lint` | the `:==` well-formedness conditions and cross-statement checks |
+  | `Tptp.Analysis` | file, diagnostics, symbol table and dialect from one traversal |
+  | `Tptp.Printer.Canonical` | tree to bytes |
 
-  Two numbers, and they are not the same. `bnf_version/0` is the TPTP BNF the
-  shipped parser was generated from; the package version is semver over the Elixir
-  API. A BNF regeneration that adds nonterminals is a minor bump, because new
-  `kind` atoms appear and a consumer matching exhaustively will need updating.
+  ## Versioning
+
+  `bnf_version/0` reports the TPTP BNF release the shipped parser was generated
+  from. It is distinct from the package version, which is semantic versioning over
+  the Elixir API. Regenerating from a BNF release that introduces nonterminals is a
+  minor version increment, since it introduces `kind` atoms that an exhaustive
+  pattern match will not cover.
   """
 
   alias Tptp.Diagnostic
@@ -76,20 +80,20 @@ defmodule Tptp do
   @typedoc """
   Options accepted by the reading entry points.
 
-    * `:file` — the id stamped into every span, for a caller tracking more than one
-      file. Defaults to `0`.
-    * `:path` — recorded on the result and used in rendered diagnostics.
-      `from_file/2` sets it for you.
-    * `:max_statements` — stop after this many and say so, rather than reading a
-      hostile file to the end. Defaults to no limit.
+    * `:file` — the identifier recorded in every span, for callers tracking more
+      than one file. Defaults to `0`.
+    * `:path` — recorded on the result and used when rendering diagnostics.
+      `from_file/2` sets it.
+    * `:max_statements` — an upper bound on the number of statements read, reported
+      as a diagnostic when reached. Defaults to no limit.
   """
   @type option :: {:file, Span.file_id()} | {:path, Path.t()} | {:max_statements, pos_integer()}
 
   @doc """
-  Read TPTP from a binary.
+  Reads TPTP from a binary.
 
-  There is no failure case: everything wrong with the input comes back as a
-  diagnostic, alongside as much of a result as could be built.
+  Always succeeds. Defects in the input are returned as diagnostics alongside
+  whatever result could be constructed.
 
       iex> {:ok, file, []} = Tptp.from_string("fof(a, axiom, p).")
       iex> [statement] = file.statements
@@ -121,10 +125,9 @@ defmodule Tptp do
   end
 
   @doc """
-  Read TPTP from a binary, raising `Tptp.Error` if anything is error-severity.
+  Reads TPTP from a binary, raising `Tptp.Error` on any error-severity diagnostic.
 
-  Warnings do not raise, because a warning is by definition something you can
-  proceed past; they stay on the returned file.
+  Warnings do not raise and remain on the returned file.
   """
   @spec from_string!(binary(), [option()]) :: Tptp.File.t()
   def from_string!(source, options \\ []) when is_binary(source) do
@@ -138,10 +141,10 @@ defmodule Tptp do
   end
 
   @doc """
-  Read one TPTP file from disk.
+  Reads a single TPTP file from disk.
 
-  `include` directives are recorded, not followed; see `Tptp.Unit` for that. Fails
-  only when the bytes cannot be read.
+  `include` directives are recorded rather than followed; see `Tptp.Unit`. Fails
+  only when the file cannot be read.
   """
   @spec from_file(Path.t(), [option()]) ::
           {:ok, Tptp.File.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
@@ -156,8 +159,8 @@ defmodule Tptp do
   end
 
   @doc """
-  Read one TPTP file from disk, raising `Tptp.Error` on an unreadable file or any
-  error-severity diagnostic.
+  Reads a single TPTP file from disk, raising `Tptp.Error` if the file cannot be
+  read or any diagnostic is error-severity.
   """
   @spec from_file!(Path.t(), [option()]) :: Tptp.File.t()
   def from_file!(path, options \\ []) when is_list(options) do
@@ -175,15 +178,15 @@ defmodule Tptp do
   end
 
   @doc """
-  Read TPTP from a binary one statement at a time.
+  Reads TPTP from a binary as a stream of statements.
 
-  The lazy counterpart to `from_string/2`, and the only way to read a file too
-  large to hold as statements — the 455 MB axiom set in the TPTP library is 3.3
-  million of them. Peak memory is one statement, whatever the file size.
+  The lazy counterpart to `from_string/2`, for input too large to materialise as a
+  statement list. Peak memory is bounded by the largest single statement rather
+  than by the size of the input.
 
   Each element is a `t:Tptp.Parser.result/0`: `{:ok, statement, diagnostics}` or
-  `{:error, diagnostics}`. Comments are not observable through this path; a caller
-  that needs them wants `from_string/2` and a file small enough to afford it.
+  `{:error, diagnostics}`. Comments are not observable through this path; use
+  `from_string/2` where they are required.
 
       iex> "fof(a,axiom,p). fof(b,axiom,q)."
       ...> |> Tptp.stream_string!()
@@ -200,11 +203,11 @@ defmodule Tptp do
   end
 
   @doc """
-  Read a TPTP file from disk one statement at a time.
+  Reads a TPTP file from disk as a stream of statements.
 
-  Raises if the file cannot be read, in the manner of `File.stream!/3`. The whole
-  file is held as one binary — that part is cheap, and it is what every leaf's
-  `text` points into; it is the *statements* that are streamed.
+  Raises if the file cannot be read, following the convention of `File.stream!/3`.
+  The source is held as a single binary, into which every leaf's `text` is a
+  sub-binary; the statements are what is streamed.
   """
   @spec stream_file!(Path.t(), [option()]) :: Enumerable.t()
   def stream_file!(path, options \\ []) when is_list(options) do
@@ -212,14 +215,15 @@ defmodule Tptp do
   end
 
   @doc """
-  Parse if needed, lint once, and return a `Tptp.Analysis`.
+  Parses if required, applies the lint traversal once, and returns a
+  `Tptp.Analysis`.
 
-  From a binary this parses first; from a `Tptp.File` or `Tptp.Unit` it lints one
-  already parsed. There is no failure case — a binary that does not parse yields
-  an `Analysis` whose diagnostics explain why.
+  A binary is parsed first; a `Tptp.File` or `Tptp.Unit` is analysed as given.
+  Always succeeds: input that does not parse yields an analysis whose diagnostics
+  record the failure.
 
-  `options` are the union of `t:option/0` and `t:Tptp.Lint.option/0`; each stage
-  takes the keys it recognises.
+  `options` is the union of `t:option/0` and `t:Tptp.Lint.option/0`. Each stage
+  reads the keys it recognises.
 
       iex> analysis = Tptp.analyze("fof(a, axiom, p). fof(a, axiom, q).")
       iex> Enum.map(analysis.diagnostics, & &1.code)
@@ -249,11 +253,11 @@ defmodule Tptp do
   end
 
   @doc """
-  A copy that owns its bytes, so the file it was read from can be collected.
+  Returns a copy holding its own binaries, allowing the source to be collected.
 
-  Every leaf's `text` is a sub-binary of the source, which is the right trade while
-  the file is in hand and the wrong one for a consumer keeping three statements out
-  of a 455 MB axiom set.
+  Every leaf's `text` is ordinarily a sub-binary of the file's source, which keeps
+  the whole source reachable. Use this when retaining a small number of statements
+  from a large file.
 
       iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a,axiom,p).")
       iex> Tptp.detach(statement).formula.text
@@ -263,12 +267,12 @@ defmodule Tptp do
   def detach(statement), do: Tptp.Statement.detach(statement)
 
   @doc """
-  The TPTP BNF version the shipped parser was generated from.
+  Returns the TPTP BNF release the shipped parser was generated from.
 
-  Read at compile time from the vendored grammar, so it cannot drift from the
-  parser it describes. Store it alongside anything you cache: a BNF bump can change
-  node kinds, and a cache keyed without it will hand you a CST the current code
-  cannot read.
+  Read from the vendored grammar at compile time, so it cannot diverge from the
+  parser it describes. Record it alongside any cached tree: a BNF release may
+  change node kinds, and a cache keyed without it can yield a tree the current
+  code cannot interpret.
 
       iex> Tptp.bnf_version()
       "9.3.1.2"

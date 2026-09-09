@@ -1,57 +1,61 @@
 defmodule Tptp.Lint.Collect do
   @moduledoc """
-  Builds the symbol table and the dialect feature set, during the one traversal.
+  Constructs the symbol table and the dialect feature set during the traversal.
 
-  This is not a rule. It runs before the rules at every node and produces what the
-  `c:Tptp.Lint.Rule.review/2` callbacks read afterwards, which is why the walk in
-  `Tptp.Lint` costs one pass rather than one per thing that needs to know something.
+  Not a rule. It is applied before the rules at every node and produces the data
+  read afterwards by the `c:Tptp.Lint.Rule.review/2` callbacks, which is what
+  allows `Tptp.Lint` to require a single pass.
 
-  ## What counts as a declaration
+  ## Declarations
 
-  A `type`-role statement whose formula is an atom typing: `tff(f_decl, type, f: $i
-  > $o).` The subject is declared, the right of the colon is stored verbatim as the
-  declared type, and nothing about it is interpreted.
+  A `type`-role statement whose formula is an atom typing, such as
+  `tff(f_decl, type, f: $i > $o).` The subject is recorded as declared and the
+  right-hand side of the colon is stored verbatim as the declared type. It is not
+  interpreted.
 
-  ## What counts as a use
+  ## Uses
 
-  A `constant`, `functor`, `defined_functor`, `system_functor` or their nullary
-  counterparts, appearing in a formula — not in a name, a role, a source or an
-  info. Never a `variable`: `X @ a` applies a bound variable, and a variable is
-  bound by its quantifier rather than declared by a `type` statement. The annotations are full of atoms that look exactly like symbols and are
-  not: `file` in a `<source>` is a keyword, `status(thm)` is a label, and a rule
-  that counted them would report the whole TSTP vocabulary as undeclared.
+  A `constant`, `functor`, `defined_functor` or `system_functor`, or their nullary
+  counterparts, occurring within a formula — not within a name, role, source or
+  info field. Never a `variable`: in `X @ a` the head is bound by its quantifier
+  rather than declared by a `type` statement.
 
-  An `<ntf_index>` is the other place a word looks like a symbol and is not.
-  `{$necessary(#agent)}` names a modality; `agent` is that modality's label, not a
-  constant of the problem's signature, and `SYN000^7.p` — the reference example for
-  the syntax — declares no type for it. So the whole subtree under an `ntf_index`
-  is claimed before the walk reaches it, and none of it is counted.
+  The annotations contain atoms indistinguishable in form from symbols that are not
+  symbols: `file` in a `<source>` is a keyword and `status(thm)` is a label.
+  Counting them would report the TSTP vocabulary as undeclared.
 
-  ## Symbols are keyed by their canonical value, not their spelling
+  An `<ntf_index>` is the second such position. In `{$necessary(#agent)}` the word
+  `agent` labels a modality rather than denoting a constant of the problem's
+  signature, and `SYN000^7.p`, the reference example for the syntax, declares no
+  type for it. The subtree beneath an `ntf_index` is therefore claimed before the
+  traversal reaches it, and none of it is counted.
 
-  `'p'` and `p` are one symbol — the BNF says a `<single_quoted>` is the enclosed
-  atomic word without its quotes — so every key handed to `Tptp.Lint.Table` comes
-  from `Tptp.Node.value/1` rather than from `text`. Keying on the spelling splits
-  `tff(t, type, 'p': $i > $o). tff(a, axiom, p(x)).` into two entries, which is a
-  false undeclared-symbol finding, a missed arity clash and a missed duplicate
-  name all at once, and hands the same split to anything built on
-  `Tptp.Query.symbols/1`. The same goes for statement names and for the names an
-  inference record gives as parents: `<name> ::= <atomic_word> | <integer>`, so a
-  statement named `a` really is the statement a later `inference(r, [], ['a'])`
-  refers to.
+  ## Symbol identity
 
-  ## Arity is the spine length, counted where the application node is
+  `'p'` and `p` denote one symbol, since the BNF defines a `<single_quoted>` as the
+  enclosed atomic word without its quotes. Every key passed to `Tptp.Lint.Table` is
+  therefore taken from `Tptp.Node.value/1` rather than from `text`. Keying on the
+  spelling separates `tff(t, type, 'p': $i > $o). tff(a, axiom, p(x)).` into two
+  entries, producing a spurious undeclared-symbol finding and a missed duplicate
+  name, and propagates the separation to anything built on
+  `Tptp.Query.symbols/1`. The same applies to statement names and to the names an
+  inference record supplies as parents, since `<name> ::= <atomic_word> |
+  <integer>`.
 
+  ## Arity
+
+  Arity is the length of the application spine, recorded at the application node.
   `f(a, b)` is a `fof_plain_term` with a functor and an argument list, so the arity
-  is the length of that list. `f @ a @ b` is a left-nested apply spine, so the arity
-  is how deep the spine runs. Both are recorded; neither is judged here.
+  is the length of that list; `f @ a @ b` is a left-nested application spine, so the
+  arity is its depth. Both are recorded and neither is evaluated here.
 
-  The argument lists are not all the same shape, and the difference is in the BNF
-  rather than in the generator: `<fof_arguments> ::= <fof_term> | <fof_term>,<fof_arguments>`
-  nests to the right, while `<tff_arguments> ::= <tff_term><comma_tff_term>*` is
-  flat. So `p(x, y, z)` is a two-child node in FOF and a three-child node in TFF,
-  and counting children would call the first one binary. The count recurses through
-  same-kind children instead, which is right for both.
+  Argument lists differ in shape between dialects, and the difference originates in
+  the BNF rather than the generator: `<fof_arguments> ::= <fof_term> |
+  <fof_term>,<fof_arguments>` nests to the right, while `<tff_arguments> ::=
+  <tff_term><comma_tff_term>*` is flat. `p(x, y, z)` is therefore a two-child node
+  in FOF and a three-child node in TFF, and counting children directly would give
+  the FOF form an arity of two. The count recurses through children of the same
+  kind instead, which is correct for both.
   """
 
   alias Tptp.Bnf.Vocabulary
@@ -83,9 +87,17 @@ defmodule Tptp.Lint.Collect do
 
   @argument_lists [:fof_arguments, :tff_arguments, :tff_type_arguments, :thf_formula_list]
 
+  @lets [:txf_let, :thf_let]
+  @typings [:tff_atom_typing, :thf_atom_typing]
+
+  @type_quantifiers [:type_forall, :type_exists]
+  @quantified_types [:thf_quantification, :tf1_quantified_type]
+  @typed_variables [:thf_typed_variable, :tff_typed_variable]
+  @variable_lists [:thf_variable_list, :tff_variable_list]
+  @mapping_types [:thf_mapping_type, :tff_mapping_type]
+  @type_of_types "$tType"
+
   @features %{
-    type_forall: :polymorphic,
-    type_exists: :polymorphic,
     big_forall: :th1,
     big_exists: :th1,
     big_choice: :th1,
@@ -122,6 +134,7 @@ defmodule Tptp.Lint.Collect do
     table
     |> note_language(context)
     |> note_feature(node)
+    |> note_type_binding(node)
     |> note_statement(node, context)
     |> note_conjecture(node, context)
     |> note_symbol(node, context)
@@ -143,6 +156,62 @@ defmodule Tptp.Lint.Collect do
       :error -> table
     end
   end
+
+  # What a type quantifier binds says which of two different things it is doing.
+  # `!>[A: $tType]` abstracts over a type and is polymorphism; `!>[A: nat]` abstracts
+  # over a *term* and is a dependent type, which is DH0/DH1 rather than TH1. Reading
+  # the quantifier alone cannot tell them apart, which is why this matches the
+  # quantified type rather than the `!>` — and matching the quantified type is also
+  # what keeps an ordinary term binder, `![X: $i]`, out of it entirely.
+  #
+  # `$tType` is spelled `defined_type` in TFF and `defined_constant` in THF, because
+  # THF has no separate type nonterminals. The spelling is the same either way, so
+  # this asks about the text and lets the kinds differ.
+  @spec note_type_binding(Table.t(), Node.t()) :: Table.t()
+  defp note_type_binding(table, %Node{kind: kind, children: children})
+       when kind in @quantified_types do
+    if Enum.any?(children, &(&1.kind in @type_quantifiers)) do
+      children
+      |> Enum.flat_map(&bound_types/1)
+      |> Enum.reduce(table, &Table.feature(&2, feature_for(&1)))
+    else
+      table
+    end
+  end
+
+  # A type constructor is declared by an arrow ending in `$tType`. `list: $tType >
+  # $tType` takes a type and is polymorphism; `fin: nat > $tType` takes a term and is
+  # a dependent type. `$tType` is legal only in type position, so an arrow that ends
+  # in one is never a term.
+  defp note_type_binding(table, %Node{kind: kind, children: [argument, result]})
+       when kind in @mapping_types do
+    if type_of_types?(result) do
+      Table.feature(table, feature_for(argument))
+    else
+      table
+    end
+  end
+
+  defp note_type_binding(table, %Node{}), do: table
+
+  # One bound variable sits directly under the quantification; two or more are
+  # wrapped in a list. Matching on the typed-variable kinds rather than on "a node
+  # with two children" is what prevents the list itself from being read as a binding —
+  # its second child is another variable, whose `text` is nil, which looked exactly
+  # like a term type and reported every multi-variable `!>` as a dependent one.
+  @spec bound_types(Node.t()) :: [Node.t()]
+  defp bound_types(%Node{kind: kind, children: [_variable, bound]}) when kind in @typed_variables,
+    do: [bound]
+
+  defp bound_types(%Node{kind: kind, children: variables}) when kind in @variable_lists,
+    do: Enum.flat_map(variables, &bound_types/1)
+
+  defp bound_types(%Node{}), do: []
+
+  defp feature_for(node), do: if(type_of_types?(node), do: :polymorphic, else: :dependent)
+
+  defp type_of_types?(%Node{text: @type_of_types}), do: true
+  defp type_of_types?(%Node{}), do: false
 
   defp note_statement(table, %Node{} = node, %Context{slot: :name, depth: 0} = context) do
     case context.statement do
@@ -195,6 +264,39 @@ defmodule Tptp.Lint.Collect do
     end
   end
 
+  # `$let(a: array(elt2), a := ..., body)` declares `a`, in a scope of its own,
+  # inside an ordinary axiom. `declaring?/2` cannot see it: that asks whether the
+  # statement's *role* is `type` and whether the node sits at depth 1, and a let
+  # binding is neither. So the binding is picked up here, where the shape says it is
+  # one, and the walk being top-down means these land before the body's uses of the
+  # same name.
+  #
+  # The subject's position is claimed as well as declared. A `type`-role statement's
+  # subject is recognised by `declaring?/2` and never reaches `Table.use/5`, but a let
+  # binding is nested, so without the claim the walk reaches the bare `ff` in
+  # `ff: ($int * $int) > $int` a moment later, sees no arguments, and records a use at
+  # arity 0 — which then reads as `ff` applied at 0 and 2 arguments. `SYN000_4.p`,
+  # the TPTP's own TXF syntax demonstration, was reported for exactly that.
+  #
+  # The table is flat and this does not make it scoped: two `$let`s binding one name
+  # produce one entry. That is enough for `Tptp.Lint.Rules.Declaration`, which asks
+  # only whether a name was ever declared, and `Table.declare/5` merges rather than
+  # reporting a clash, so nothing false comes of it. A rule that wanted to say a let
+  # binding shadows a global one would need real scopes.
+  defp note_symbol(table, %Node{kind: kind} = node, %Context{slot: :formula} = context)
+       when kind in @lets do
+    node.children
+    |> Enum.take(1)
+    |> Enum.flat_map(&bindings/1)
+    |> Enum.reduce(table, fn %Node{children: [subject, type | _rest]}, acc ->
+      span = Context.span(context, subject)
+
+      acc
+      |> Table.declare(Node.value(subject), subject.kind, type, span)
+      |> Table.ignore(span)
+    end)
+  end
+
   defp note_symbol(table, %Node{kind: :ntf_index} = node, %Context{slot: :formula} = context) do
     node
     |> Node.walk()
@@ -237,6 +339,23 @@ defmodule Tptp.Lint.Collect do
   end
 
   def typing?(_statement), do: false
+
+  # Every typing in a let's types section, whether it is the bare one the chain rule
+  # collapses to or a bracketed list of them. Only the two-child form binds a name;
+  # the parenthesised `(a: $i)` wraps another typing and is reached by the walk.
+  @spec bindings(Node.t()) :: [Node.t()]
+  defp bindings(%Node{} = node) do
+    node
+    |> Node.reduce([], fn
+      %Node{kind: kind, children: [_subject, _type | _rest]} = typing, found
+      when kind in @typings ->
+        [typing | found]
+
+      _node, found ->
+        found
+    end)
+    |> Enum.reverse()
+  end
 
   defp declaring?(%Context{statement: %Annotated{} = statement} = context, node) do
     context.depth == 1 and typing?(statement) and

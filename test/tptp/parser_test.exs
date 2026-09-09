@@ -7,6 +7,7 @@ defmodule Tptp.ParserTest do
 
   alias Tptp.Node
   alias Tptp.Parser
+  alias Tptp.Printer.Canonical
   alias Tptp.Statement.Annotated
   alias Tptp.Statement.Include
 
@@ -373,7 +374,7 @@ defmodule Tptp.ParserTest do
           Node.new(:constant, "q")
         ])
 
-      printed = Tptp.Printer.Canonical.to_string(tree)
+      printed = Canonical.to_string(tree)
 
       assert printed == "f(a, b) | q"
       assert Node.shape(formula("fof(a, axiom, " <> printed <> ").")) == Node.shape(tree)
@@ -386,7 +387,7 @@ defmodule Tptp.ParserTest do
           Node.new(:fof_arguments, nil, [Node.new(:constant, "a")])
         ])
 
-      printed = Tptp.Printer.Canonical.to_string(wrapped)
+      printed = Canonical.to_string(wrapped)
 
       assert printed == "f(a)"
       refute Node.shape(formula("fof(a, axiom, " <> printed <> ").")) == Node.shape(wrapped)

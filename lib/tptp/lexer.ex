@@ -1,90 +1,88 @@
 defmodule Tptp.Lexer do
   @moduledoc """
-  Scans TPTP bytes into tokens, one statement at a time.
+  Tokenises TPTP source, one statement per call.
 
-  ## Why one statement at a time
+  ## Resumability
 
-  The largest file in the TPTP library is a 455 MB axiom file, roughly 75 million
-  tokens. Materialised as three-tuples that is about 2.4 GB — the token stream, not
-  the file, is what makes a large corpus run fall over. So the file binary is held
-  whole (one refc binary, cheap) and the scanner is resumable over `(source,
-  offset)`, handing back exactly one statement's tokens per call. Peak memory is
-  one statement, whatever the file size.
+  The scanner is resumable over `(source, offset)` and returns the tokens of a
+  single statement per call. The source is retained whole as one reference-counted
+  binary; the token stream is not materialised. Peak memory is therefore bounded by
+  the largest statement rather than by the size of the input, which matters at the
+  scale of the larger TPTP axiom sets: 75 million tokens held as three-tuples
+  require approximately 2.4 GB.
 
-  ## Bytes, not graphemes
+  ## Byte-oriented matching
 
-  Every character class in the BNF lies in `\\40`-`\\176`, so byte matching is
-  correct here and every `String` function — UTF-8 aware and grapheme-based — is
-  both wrong-shaped and several times slower. This module uses byte patterns and
-  `:binary` exclusively. The one place non-ASCII can appear is inside a quoted atom
-  or a comment in a non-conforming file; those bytes are carried through opaquely
-  rather than checked, because checking them would put a branch on every byte of
-  every string for something a lint rule can do later from the token text.
+  Every character class in the BNF lies within `\40`–`\176`, so byte matching is
+  correct and the UTF-8 aware, grapheme-based functions of `String` are both
+  unnecessary and slower. This module uses byte patterns and `:binary` throughout.
 
-  ## No binaries in the scan loop
+  Non-ASCII bytes can occur only inside a quoted atom or a comment in
+  non-conforming input. They are carried through without validation, since
+  validating them would introduce a branch per byte of every string for a condition
+  a lint rule can evaluate from the token text.
+
+  ## Token representation
 
   A token is `{category, offset, length}`. Text is recovered later with
-  `binary_part/3`, so scanning allocates nothing per token beyond the tuple itself.
+  `binary_part/3`, so scanning allocates nothing per token beyond the tuple.
 
-  ## Maximal munch
+  ## Longest match
 
-  The scan clauses for operators are generated from `Tptp.Token.operators/0`, which
-  is sorted longest-spelling-first, so `<=>` is tried before `<=` before `<` as a
-  property of the table rather than something a maintainer has to remember.
+  The operator clauses are generated from `Tptp.Token.operators/0`, which is
+  ordered by descending spelling length, so `<=>` is attempted before `<=` before
+  `<` as a property of the table rather than of the clause order.
 
-  Three cases the table cannot settle on its own, and each is a real bug in a
-  hand-written TPTP lexer:
+  Three cases are not resolved by the table alone:
 
-    * **`.` is the statement terminator, but `1.5` is one `<real>`.** Numbers are
-      scanned from their leading digit and consume their own `.`, and the
-      terminator clause only fires on a `.` that is not followed by a digit. `p(3).`
-      works because `<decimal_fraction>` requires digits *after* the dot.
-    * **A word is always scanned to its end**, never cut short at a prefix that
-      happens to be a keyword. `$letter` is one `dollar_word`, not `$let` followed
-      by `ter`, and `filename` is one `lower_word`, not `file` followed by `name`.
-      This is what makes it safe for `Tptp.Splitter` to recognise keywords by
-      whole-word lookup afterwards.
-    * **`[.]`, `<.>`, `{.}` and `(.)` are single tokens.** `<.>` in particular would
-      otherwise put a bare `.` at bracket depth zero and split a statement in half.
+    * **Statement terminator against decimal point.** Numbers are scanned from
+      their leading digit and consume their own `.`; the terminator clause applies
+      only to a `.` not followed by a digit. `p(3).` is therefore terminated
+      correctly, since `<decimal_fraction>` requires digits after the point.
+    * **Words are scanned to their end** rather than truncated at a prefix that
+      forms a keyword. `$letter` is a single `dollar_word` and `filename` a single
+      `lower_word`. `Tptp.Splitter` relies on this when resolving keywords by
+      whole-word comparison.
+    * **`[.]`, `<.>`, `{.}` and `(.)` are single tokens.** Without this, `<.>`
+      would introduce a `.` at bracket depth zero and divide a statement.
 
-  ## It accepts what the BNF rejects, and says so
+  ## Accepted departures from the BNF
 
-  Two shapes lex cleanly and are still not what the BNF describes, so they produce
-  a token *and* a warning rather than either a silent acceptance or a refusal:
+  Two forms lex without ambiguity but are not admitted by the BNF. Each yields a
+  token together with a warning, rather than being silently accepted or rejected:
 
-    * **An empty quoted atom.** `<single_quoted>` requires at least one `<sq_char>`
-      where `<distinct_object>` allows none, so `""` is legal TPTP and `''` is not
-      (`TPTP0107`).
-    * **A redundant leading zero.** `<unsigned_integer>` is `0` or a digit sequence
-      starting `1`-`9`, so `00`, `-007` and `01.5` are not numbers the grammar
-      admits (`TPTP0110`); and `<positive_integer>`, which is what a rational's
-      denominator must be, may not begin with `0` at all, so neither `1/02` nor
-      `1/0` is a `<rational>` (`TPTP0111`).
+    * **Empty quoted atom.** `<single_quoted>` requires at least one `<sq_char>`
+      while `<distinct_object>` permits none, so `""` is well formed and `''` is
+      not (`TPTP0107`).
+    * **Redundant leading zero.** `<unsigned_integer>` is `0` or a digit sequence
+      beginning `1`–`9`, so `00`, `-007` and `01.5` are not admitted
+      (`TPTP0110`). A rational's denominator is a `<positive_integer>`, which may
+      not begin with `0`, so neither `1/02` nor `1/0` is a `<rational>`
+      (`TPTP0111`).
 
-  Producing the token anyway is what lets the statement go on to parse, which is
-  the whole reason these are warnings. That the list is exactly two is not a claim
-  anyone has to take on trust: `Tptp.Bnf.OracleTable` transcribes the `::-` and
-  `:::` rules mechanically, and `Tptp.LexerOracleTest` asserts that every token this
-  module emits *without complaint* satisfies its own BNF pattern.
+  Emitting the token allows the statement to parse, which is why these are
+  warnings. That the list is exactly these two is checked rather than asserted:
+  `Tptp.Bnf.OracleTable` transcribes the `::-` and `:::` rules mechanically, and
+  `Tptp.LexerOracleTest` verifies that every token emitted without a diagnostic
+  satisfies its BNF pattern.
 
-  ## What this module does not decide
+  ## Deferred decisions
 
-  It emits `lower_word` for `fof`, `inference` and `file`, and `dollar_word` for
-  `$let` and `$thf`. Those are ordinary words until something about their position
-  says otherwise, and position is `Tptp.Splitter`'s business: a statement's first
-  token, and a word directly before `(`, are the only places a keyword reading is
-  possible. Deciding it here would break `fof(fof, axiom, p).`, which is legal
-  TPTP, and would leave keyword resolution split across two modules for no gain —
-  the whole-word guarantee above is all the splitter needs.
+  This module emits `lower_word` for `fof`, `inference` and `file`, and
+  `dollar_word` for `$let` and `$thf`. These are ordinary words except in
+  positions that admit a keyword reading, and position is resolved by
+  `Tptp.Splitter`: the first token of a statement, and a word immediately preceding
+  `(`. Resolving them here would reject `fof(fof, axiom, p).`, which is well
+  formed, and would divide keyword resolution across two modules.
 
-  ## Comments are a side channel
+  ## Comments
 
-  The BNF says comments may occur between any two tokens but do not act as white
+  The BNF permits comments between any two tokens but does not treat them as white
   space. They are collected into a separate ordered list rather than the token
-  stream, so the parser never sees them and the format-preserving printer can
-  re-attach them by position. `%$` and `/*$` mark a defined comment and `%$$` and
-  `/*$$` a system comment; both are reserved in the BNF and some tools use them, so
-  the class is retained.
+  stream, so the parser does not observe them and the format-preserving printer can
+  reattach them by position. `%$` and `/*$` introduce a defined comment and `%$$`
+  and `/*$$` a system comment; both are reserved by the BNF and used by some tools,
+  so the classification is retained.
   """
 
   alias Tptp.Diagnostic

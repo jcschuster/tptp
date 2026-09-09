@@ -1,18 +1,18 @@
 defmodule Tptp.Lint.Rules.Declaration do
   @moduledoc """
-  A symbol used without a declaration, or declared twice.
+  A symbol used without a declaration.
 
-  Only in the typed dialects. TFF, TCF and THF require every symbol to be declared
-  by a `type` statement before use; FOF and CNF have no declarations at all, so
-  running this over them would report every symbol in half the library.
+  Applies to the typed dialects only. TFF, TCF and THF require every symbol to be
+  declared by a `type` statement before use; FOF and CNF have no declarations, so
+  applying the rule to them would report every symbol they contain.
 
-  ## Why this needs the unit, not the file
+  ## Requires a unit
 
-  A problem declares nothing and includes an axiom file that declares everything.
-  Linting the problem alone would report every one of its symbols as undeclared, so
-  `Tptp.Lint.run_unit/2` is the call that gives this rule a chance to be right, and
-  running it on a bare `Tptp.File` that includes its declarations will be noisy.
-  That is not a bug to paper over: the file really does not say where `f` came from.
+  A problem commonly declares nothing and includes an axiom file that declares
+  everything. Analysing the problem alone reports every symbol as undeclared, so
+  `Tptp.Lint.run_unit/2` is the call under which this rule can be correct.
+  Analysing a `Tptp.File` whose declarations are supplied by an include will be
+  noisy, and correctly so: the file does not itself declare the symbols it uses.
   """
 
   @behaviour Tptp.Lint.Rule

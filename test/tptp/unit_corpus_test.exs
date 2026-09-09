@@ -17,7 +17,7 @@ defmodule Tptp.UnitCorpusTest do
   alias Tptp.Unit
 
   @moduletag :corpus
-  @moduletag timeout: 900_000
+  @moduletag timeout: Corpus.timeout()
 
   setup_all do
     root = Corpus.root()
@@ -26,9 +26,13 @@ defmodule Tptp.UnitCorpusTest do
       raise "no TPTP library found; set $TPTP_ROOT to enable the corpus tests"
     end
 
-    files =
-      Corpus.files(every: 5, max_bytes: 2_000_000)
-      |> Enum.filter(&String.contains?(File.read!(&1), "include("))
+    # `expandable/1` and not `files/1`: `:max_bytes` caps the root and not its
+    # closure, and a 2 KB problem that includes a 455 MB axiom set is under any root
+    # cap while being far too large to expand. `including: true` is the graphs-only
+    # filter, done in the same pass rather than by reading every file again here.
+    files = Corpus.expandable(every: 5, max_bytes: 2_000_000, including: true)
+
+    IO.puts("\n  #{length(files)} include graphs selected")
 
     %{files: files, resolver: {Tptp.Resolver.Fs, root: root, cwd: false}}
   end
@@ -37,7 +41,7 @@ defmodule Tptp.UnitCorpusTest do
     noisy =
       files
       |> stream(fn path ->
-        {:ok, unit, diagnostics} = Unit.from_file(path, resolver: resolver)
+        {:ok, unit, diagnostics} = Unit.from_file(path, resolver: resolver, max_concurrency: 1)
 
         if diagnostics == [], do: :ok, else: {path, Unit.format_diagnostics(unit)}
       end)
@@ -53,7 +57,7 @@ defmodule Tptp.UnitCorpusTest do
     counted =
       files
       |> stream(fn path ->
-        {:ok, unit, _diagnostics} = Unit.from_file(path, resolver: resolver)
+        {:ok, unit, _diagnostics} = Unit.from_file(path, resolver: resolver, max_concurrency: 1)
         root = unit.files[unit.root]
 
         %{
@@ -84,7 +88,7 @@ defmodule Tptp.UnitCorpusTest do
       files
       |> Enum.take_every(3)
       |> stream(fn path ->
-        {:ok, unit, _diagnostics} = Unit.from_file(path, resolver: resolver)
+        {:ok, unit, _diagnostics} = Unit.from_file(path, resolver: resolver, max_concurrency: 1)
 
         unknown =
           for {id, statement} <- Unit.statements(unit),
@@ -129,13 +133,25 @@ defmodule Tptp.UnitCorpusTest do
   @spec whole(non_neg_integer()) :: non_neg_integer()
   defp whole(number) when is_integer(number) and number >= 0, do: number
 
+  # One worker, not the usual share of them. Expanding a graph is the largest single
+  # piece of work in the suite: a unit holds every file in the closure, source and
+  # tree. Every call above also passes `max_concurrency: 1`, because `max_heap_size`
+  # is not inherited — `Tptp.Include`'s own stream would otherwise resolve at
+  # `System.schedulers_online()` in processes outside the ceiling entirely, which is
+  # how this gate got past it.
+  #
+  # A graph that will not fit is reported and skipped rather than failing the gate.
+  # See `Tptp.Test.Corpus.within_heap/3` for why no size filter can find those in
+  # advance.
   defp stream(files, fun) do
-    files
-    |> Task.async_stream(fun,
-      max_concurrency: System.schedulers_online(),
-      timeout: 600_000,
-      ordered: false
-    )
-    |> Enum.map(fn {:ok, result} -> result end)
+    {values, skipped} = Corpus.within_heap(files, fun, timeout: 600_000, concurrency: 1)
+
+    if skipped != [] do
+      IO.puts("\n  #{length(skipped)} too large to hold: #{names(skipped)}")
+    end
+
+    values
   end
+
+  defp names(paths), do: paths |> Enum.map_join(" ", &Path.basename/1)
 end

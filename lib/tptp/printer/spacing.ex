@@ -1,24 +1,18 @@
 defmodule Tptp.Printer.Spacing do
   @moduledoc """
-  Where a space goes between two TPTP tokens.
+  Determines the white space between two adjacent tokens.
 
-  Shared by both printers, because they disagree about *which* tokens to emit and
-  not at all about how to space them, and two copies of this would drift.
+  Shared by `Tptp.Printer.Canonical` and `Tptp.Printer.Pretty`, so that both apply
+  the same rules and the pretty printer's token sequence remains that of the
+  canonical printer.
 
-  ## Correctness first, legibility second
+  The rules are positional rather than syntactic, since a token pair is all that is
+  available: no space precedes a closing delimiter or a separator, none follows an
+  opening delimiter, and none precedes an opening delimiter that follows a word or
+  a prefix operator. A single space is emitted elsewhere.
 
-  A printer may not change what the tokens are. Two adjacent operators are the way
-  that happens: `~` beside `|` is `~|`, a different token. So the default is a
-  space, and every rule below removes one only where nothing can munch.
-
-    * Nothing before `)`, `]`, `}`, `,`, `.` or `:`.
-    * Nothing after `(`, `[` or `{`.
-    * Nothing before an opening bracket that follows a word or a prefix operator,
-      so `p(a)` and `![X]:` come out as they went in.
-    * Nothing after a prefix operator when a word follows, so `~p` rather than
-      `~ p`. Only before a word: `~ |` must keep its space.
-
-  Everywhere else, one space.
+  A space is never omitted where its absence would combine two tokens into a third
+  under the lexer's longest-match rule.
   """
 
   @no_space_before [")", "]", "}", ",", ".", ":"]

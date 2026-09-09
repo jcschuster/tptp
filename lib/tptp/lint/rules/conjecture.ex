@@ -1,41 +1,40 @@
 defmodule Tptp.Lint.Rules.Conjecture do
   @moduledoc """
-  Nothing is being asked, or more than one thing is.
+  A file stating no conjecture, or more than one.
 
-  A TPTP problem states axioms and one conjecture. Both departures are legal input
-  and neither is a defect, which is why this is the library's only `:info` rule —
-  but both change what a consumer may do with the file, and every consumer that
-  routes problems to provers ends up counting conjectures for itself. Counting them
-  once, here, is cheaper than counting them in every consumer and getting the two
-  spellings wrong.
+  A TPTP problem states a set of axioms and a single conjecture. Both departures
+  are well-formed input and neither is a defect, which is why this is the library's
+  only `:info` rule. Both nonetheless determine what a consumer may do with the
+  file, and any consumer dispatching problems to provers must establish the count
+  for itself.
 
-  ## Zero
+  ## No conjecture
 
-  A file with no conjecture asks nothing: it is a satisfiability problem, an axiom
-  set, or a problem whose conjecture was dropped. A prover given one will report
-  `Satisfiable` rather than `Theorem`, and a pipeline that expected a proof
-  obligation will read that as a failure rather than as the answer to the question
-  it actually asked.
+  A file without a conjecture states no proof obligation: it is a satisfiability
+  problem, an axiom set, or a problem whose conjecture has been removed. A prover
+  given one reports `Satisfiable` rather than `Theorem`, which a pipeline expecting
+  a proof obligation may misinterpret as failure.
 
-  This half of the rule needs the whole problem, so it reports under
+  This half of the rule requires the whole problem, so it applies under
   `Tptp.Lint.run_unit/2` and declines under `Tptp.Lint.run/2`. A file that includes
-  its conjecture rather than stating it does not lack one, and a rule that could
-  not see through an `include` would say it did. That is `Tptp.Lint.Context`'s
-  `whole` flag, and this is the rule it exists for.
+  its conjecture rather than stating it does not lack one, and a rule unable to
+  resolve `include` would report that it did. This is the purpose of the `whole`
+  flag on `Tptp.Lint.Context`.
 
-  It still fires on an axiom set linted as a unit, where it says something obvious.
-  That is the honest reading — the file really does ask nothing — and it is `:info`
-  and suppressible by code precisely so that a caller who knows what it is holding
-  can say so.
+  It still applies to an axiom set analysed as a unit, where the finding is
+  self-evident. That reading is correct — the file states no obligation — and the
+  diagnostic is `:info` and suppressible by code so that a caller which knows what
+  it holds can discard it.
 
-  ## More than one
+  ## Multiple conjectures
 
-  Two `conjecture` statements make the problem ambiguous: a prover will take one,
-  and which one is its business rather than the file's.
+  Two `conjecture` statements leave the problem ambiguous: a prover will select one,
+  and the selection is not determined by the file.
 
-  `negated_conjecture` is counted separately and never triggers this, because one
-  conjecture negated into clause normal form *is* many `negated_conjecture` clauses.
-  Counting those would report most of the CNF half of the TPTP library.
+  `negated_conjecture` is counted separately and never triggers this rule, since a
+  single conjecture negated into clause normal form yields many
+  `negated_conjecture` clauses. Counting those would report most of the CNF portion
+  of the TPTP library.
   """
 
   @behaviour Tptp.Lint.Rule
