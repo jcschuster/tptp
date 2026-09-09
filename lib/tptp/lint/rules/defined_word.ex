@@ -10,6 +10,16 @@ defmodule Tptp.Lint.Rules.DefinedWord do
   A warning rather than an error: an unrecognised `$`-word is usually a
   misspelling, but a prover extension not yet incorporated into the BNF is also
   possible.
+
+  ## Coverage over the TPTP library
+
+  This rule reports nothing on TPTP v9.3.1, and previously reported 76 occurrences
+  across five modal system names. The BNF's `<ntf_modal_system>` names six systems
+  and its `<ntf_modal_axiom>` six axioms; the Non-classical Logics section of the
+  TPTP language page states sixteen and ten. `Tptp.Bnf.Generator` corrects both
+  lists against that page, and the corrected values enter `<reserved_word>`, which
+  is the list this rule consults. See
+  [TPTP-DEFECTS.md](../../../reports/TPTP-DEFECTS.md), entry `TPTP-3`.
   """
 
   @behaviour Tptp.Lint.Rule

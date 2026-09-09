@@ -11,9 +11,11 @@ defmodule Tptp.Bnf.Vocabulary do
   separates a well-formed statement from a merely parseable one, and it is
   checked by `Tptp.Lint` at warning severity rather than by the parser.
 
-  Every list here is a `:==` rule of the BNF except `<reserved_word>`, which is
-  this library's own: the BNF has no such rule, and the list is every
-  `$`-prefixed literal appearing anywhere in it. See `Tptp.Bnf.Generator`.
+  Every list here is a `:==` rule of the BNF, with two classes of exception.
+  `<reserved_word>` is this library's own: the BNF has no such rule, and the
+  list is every `$`-prefixed literal appearing in it. The lists marked below
+  as corrected carry values the BNF omits and another published TPTP source
+  defines. See `Tptp.Bnf.Generator` for the citations.
   """
 
   @defined_functor_values [
@@ -34,17 +36,24 @@ defmodule Tptp.Bnf.Vocabulary do
     "$round",
     "$to_int",
     "$to_rat",
-    "$to_real"
+    "$to_real",
+    "$abs"
   ]
 
   @doc """
-  The 18 values the BNF lists for `<defined_functor>`.
+  The 19 values defined for `<defined_functor>`.
+
+  Corrected: 18 are listed by the BNF's `:==` rule and the
+  other 1 come from the TPTP language page, which defines them where the
+  BNF does not. See `Tptp.Bnf.Generator.vocabularies/1` for the citation.
+
+  <https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml>
   """
   @spec defined_functor_values() :: [binary()]
   def defined_functor_values, do: @defined_functor_values
 
   @doc """
-  Whether `word` is one of the 18 `<defined_functor>` values.
+  Whether `word` is one of the 19 `<defined_functor>` values.
   """
   @spec defined_functor?(binary()) :: boolean()
   def defined_functor?("$uminus"), do: true
@@ -65,6 +74,7 @@ defmodule Tptp.Bnf.Vocabulary do
   def defined_functor?("$to_int"), do: true
   def defined_functor?("$to_rat"), do: true
   def defined_functor?("$to_real"), do: true
+  def defined_functor?("$abs"), do: true
   def defined_functor?(word) when is_binary(word), do: false
 
   @defined_predicate_values [
@@ -152,7 +162,13 @@ defmodule Tptp.Bnf.Vocabulary do
   ]
 
   @doc """
-  The 14 values the BNF lists for `<formula_role>`.
+  The 14 values defined for `<formula_role>`.
+
+  Corrected: 13 are listed by the BNF's `:==` rule and the
+  other 1 come from the TPTP language page, which defines them where the
+  BNF does not. See `Tptp.Bnf.Generator.vocabularies/1` for the citation.
+
+  <https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml>
   """
   @spec formula_role_values() :: [binary()]
   def formula_role_values, do: @formula_role_values
@@ -263,17 +279,27 @@ defmodule Tptp.Bnf.Vocabulary do
     "$modal_axiom_B",
     "$modal_axiom_D",
     "$modal_axiom_4",
-    "$modal_axiom_5"
+    "$modal_axiom_5",
+    "$modal_axiom_CD",
+    "$modal_axiom_BoxM",
+    "$modal_axiom_C4",
+    "$modal_axiom_C"
   ]
 
   @doc """
-  The 6 values the BNF lists for `<ntf_modal_axiom>`.
+  The 10 values defined for `<ntf_modal_axiom>`.
+
+  Corrected: 6 are listed by the BNF's `:==` rule and the
+  other 4 come from the TPTP language page, which defines them where the
+  BNF does not. See `Tptp.Bnf.Generator.vocabularies/1` for the citation.
+
+  <https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml>
   """
   @spec ntf_modal_axiom_values() :: [binary()]
   def ntf_modal_axiom_values, do: @ntf_modal_axiom_values
 
   @doc """
-  Whether `word` is one of the 6 `<ntf_modal_axiom>` values.
+  Whether `word` is one of the 10 `<ntf_modal_axiom>` values.
   """
   @spec ntf_modal_axiom?(binary()) :: boolean()
   def ntf_modal_axiom?("$modal_axiom_K"), do: true
@@ -282,6 +308,10 @@ defmodule Tptp.Bnf.Vocabulary do
   def ntf_modal_axiom?("$modal_axiom_D"), do: true
   def ntf_modal_axiom?("$modal_axiom_4"), do: true
   def ntf_modal_axiom?("$modal_axiom_5"), do: true
+  def ntf_modal_axiom?("$modal_axiom_CD"), do: true
+  def ntf_modal_axiom?("$modal_axiom_BoxM"), do: true
+  def ntf_modal_axiom?("$modal_axiom_C4"), do: true
+  def ntf_modal_axiom?("$modal_axiom_C"), do: true
   def ntf_modal_axiom?(word) when is_binary(word), do: false
 
   @ntf_modal_system_values [
@@ -290,17 +320,33 @@ defmodule Tptp.Bnf.Vocabulary do
     "$modal_system_B",
     "$modal_system_D",
     "$modal_system_S4",
-    "$modal_system_S5"
+    "$modal_system_S5",
+    "$modal_system_KB",
+    "$modal_system_K4",
+    "$modal_system_K5",
+    "$modal_system_K45",
+    "$modal_system_KB5",
+    "$modal_system_DB",
+    "$modal_system_D4",
+    "$modal_system_D5",
+    "$modal_system_D45",
+    "$modal_system_S5U"
   ]
 
   @doc """
-  The 6 values the BNF lists for `<ntf_modal_system>`.
+  The 16 values defined for `<ntf_modal_system>`.
+
+  Corrected: 6 are listed by the BNF's `:==` rule and the
+  other 10 come from the TPTP language page, which defines them where the
+  BNF does not. See `Tptp.Bnf.Generator.vocabularies/1` for the citation.
+
+  <https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml>
   """
   @spec ntf_modal_system_values() :: [binary()]
   def ntf_modal_system_values, do: @ntf_modal_system_values
 
   @doc """
-  Whether `word` is one of the 6 `<ntf_modal_system>` values.
+  Whether `word` is one of the 16 `<ntf_modal_system>` values.
   """
   @spec ntf_modal_system?(binary()) :: boolean()
   def ntf_modal_system?("$modal_system_K"), do: true
@@ -309,6 +355,16 @@ defmodule Tptp.Bnf.Vocabulary do
   def ntf_modal_system?("$modal_system_D"), do: true
   def ntf_modal_system?("$modal_system_S4"), do: true
   def ntf_modal_system?("$modal_system_S5"), do: true
+  def ntf_modal_system?("$modal_system_KB"), do: true
+  def ntf_modal_system?("$modal_system_K4"), do: true
+  def ntf_modal_system?("$modal_system_K5"), do: true
+  def ntf_modal_system?("$modal_system_K45"), do: true
+  def ntf_modal_system?("$modal_system_KB5"), do: true
+  def ntf_modal_system?("$modal_system_DB"), do: true
+  def ntf_modal_system?("$modal_system_D4"), do: true
+  def ntf_modal_system?("$modal_system_D5"), do: true
+  def ntf_modal_system?("$modal_system_D45"), do: true
+  def ntf_modal_system?("$modal_system_S5U"), do: true
   def ntf_modal_system?(word) when is_binary(word), do: false
 
   @status_value_values [
@@ -492,21 +548,38 @@ defmodule Tptp.Bnf.Vocabulary do
     "$tff",
     "$fof",
     "$cnf",
-    "$fot"
+    "$fot",
+    "$abs",
+    "$modal_axiom_CD",
+    "$modal_axiom_BoxM",
+    "$modal_axiom_C4",
+    "$modal_axiom_C",
+    "$modal_system_KB",
+    "$modal_system_K4",
+    "$modal_system_K5",
+    "$modal_system_K45",
+    "$modal_system_KB5",
+    "$modal_system_DB",
+    "$modal_system_D4",
+    "$modal_system_D5",
+    "$modal_system_D45",
+    "$modal_system_S5U"
   ]
 
   @doc """
-  The 98 `$`-words the BNF mentions anywhere.
+  The 113 `$`-words TPTP defines.
 
-  Not a `:==` rule — the BNF has no `<reserved_word>` — but every `$`-prefixed
-  literal collected from every alternative of it. A superset of the words the
-  language defines, which is what `Tptp.Lint.Rules.DefinedWord` wants.
+  Not a `:==` rule: the BNF has no `<reserved_word>`. This is every `$`-prefixed
+  literal collected from every alternative of the BNF, together with the values
+  of `@documented_values` that another TPTP source defines and the BNF omits. A
+  superset of the words appearing in any closed list, which is what
+  `Tptp.Lint.Rules.DefinedWord` requires.
   """
   @spec reserved_word_values() :: [binary()]
   def reserved_word_values, do: @reserved_word_values
 
   @doc """
-  Whether `word` is one of the 98 `$`-words the BNF mentions.
+  Whether `word` is one of the 113 `$`-words TPTP defines.
   """
   @spec reserved_word?(binary()) :: boolean()
   def reserved_word?("$let"), do: true
@@ -607,5 +680,20 @@ defmodule Tptp.Bnf.Vocabulary do
   def reserved_word?("$fof"), do: true
   def reserved_word?("$cnf"), do: true
   def reserved_word?("$fot"), do: true
+  def reserved_word?("$abs"), do: true
+  def reserved_word?("$modal_axiom_CD"), do: true
+  def reserved_word?("$modal_axiom_BoxM"), do: true
+  def reserved_word?("$modal_axiom_C4"), do: true
+  def reserved_word?("$modal_axiom_C"), do: true
+  def reserved_word?("$modal_system_KB"), do: true
+  def reserved_word?("$modal_system_K4"), do: true
+  def reserved_word?("$modal_system_K5"), do: true
+  def reserved_word?("$modal_system_K45"), do: true
+  def reserved_word?("$modal_system_KB5"), do: true
+  def reserved_word?("$modal_system_DB"), do: true
+  def reserved_word?("$modal_system_D4"), do: true
+  def reserved_word?("$modal_system_D5"), do: true
+  def reserved_word?("$modal_system_D45"), do: true
+  def reserved_word?("$modal_system_S5U"), do: true
   def reserved_word?(word) when is_binary(word), do: false
 end

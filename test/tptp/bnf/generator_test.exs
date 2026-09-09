@@ -105,11 +105,12 @@ defmodule Tptp.Bnf.GeneratorTest do
     end
 
     test "extracts every closed :== word list at the size the BNF states", %{entries: entries} do
-      # `formula_role` is 13 in the BNF and 14 here: `logic` comes from the prose of
-      # the TPTP language page, which lists it as a role a few paragraphs above the
-      # `:==` rule that leaves it out. See `Tptp.Bnf.Generator.vocabularies/1`.
+      # Four lists are larger here than in the BNF, each corrected against the TPTP
+      # language page: `formula_role` 13 -> 14, `defined_functor` 18 -> 19,
+      # `ntf_modal_system` 6 -> 16 and `ntf_modal_axiom` 6 -> 10. See
+      # `Tptp.Bnf.Generator.vocabularies/1`.
       assert Map.new(entries, fn {name, words} -> {name, length(words)} end) == %{
-               "defined_functor" => 18,
+               "defined_functor" => 19,
                "defined_predicate" => 7,
                "defined_proposition" => 2,
                "defined_type" => 8,
@@ -117,24 +118,54 @@ defmodule Tptp.Bnf.GeneratorTest do
                "intro_type" => 4,
                "ntf_connective_name" => 10,
                "ntf_logic_name" => 6,
-               "ntf_modal_axiom" => 6,
-               "ntf_modal_system" => 6,
+               "ntf_modal_axiom" => 10,
+               "ntf_modal_system" => 16,
                "status_value" => 34,
-               "reserved_word" => 98
+               "reserved_word" => 113
              }
     end
 
-    test "a documented value the BNF omits is added, and only that one", %{entries: entries} do
-      roles = entries["formula_role"]
+    test "the corrected lists carry the values the language page defines", %{entries: entries} do
+      assert "logic" in entries["formula_role"]
 
-      assert "logic" in roles, "the TPTP language page lists `logic` among the roles"
-      assert "axiom" in roles
-      refute "wibble" in roles
+      # The page's arithmetic table defines `$abs/1`; the `:==` rule omits it.
+      assert "$abs" in entries["defined_functor"]
 
-      # Nothing else is corrected: every other `:==` list is exactly what the BNF says.
+      # The extended arithmetic symbols on that page sit inside HTML comments and are
+      # not published, so they are not added.
+      for proposed <- ~w($min $max $sqrt $pi $exp $succ $pred $pow) do
+        refute proposed in entries["defined_functor"]
+        refute proposed in entries["reserved_word"]
+      end
+
+      # Sys ∈ {K,KB,K4,K5,K45,KB5,D,DB,D4,D5,D45,M,B,S4,S5,S5U} on the page; the
+      # `:==` rule names six of them. The ten below are the difference.
+      for sys <- ~w(KB K4 K5 K45 KB5 DB D4 D5 D45 S5U) do
+        assert "$modal_system_#{sys}" in entries["ntf_modal_system"]
+      end
+
+      # Ax ∈ {K,M,B,D,4,5,CD,BoxM,C4,C}; the rule names six.
+      for ax <- ~w(CD BoxM C4 C) do
+        assert "$modal_axiom_#{ax}" in entries["ntf_modal_axiom"]
+      end
+    end
+
+    test "a corrected value also enters the reserved words", %{entries: entries} do
+      # `Tptp.Lint.Rules.DefinedWord` consults `<reserved_word>` alone, so a value
+      # added to a closed list has no effect on it unless it is added here too.
+      assert "$modal_system_KB" in entries["reserved_word"]
+      assert "$modal_axiom_BoxM" in entries["reserved_word"]
+    end
+
+    test "nothing outside @documented_values is corrected", %{entries: entries} do
       assert entries["intro_type"] == ~w(definition tautology assumption theory)
-      assert length(entries["ntf_modal_system"]) == 6
-      refute "$modal_system_KB" in entries["ntf_modal_system"]
+      assert length(entries["ntf_logic_name"]) == 6
+      refute "wibble" in entries["formula_role"]
+
+      # Neither published source names this system, and 17 library files mention it
+      # in a header comment the lexer never reaches.
+      refute "$modal_system_T" in entries["ntf_modal_system"]
+      refute "$modal_system_T" in entries["reserved_word"]
     end
 
     test "a $-word applied in a rule is still a reserved word", %{entries: entries} do

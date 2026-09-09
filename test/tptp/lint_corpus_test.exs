@@ -10,18 +10,16 @@ defmodule Tptp.LintCorpusTest do
   below is a warning, and each of the ones that survive was chased down to a real
   fact about TPTP rather than left as noise:
 
-    * `TPTP0402` and `TPTP0503` below are the only two that fire on a conforming
-      library at all. `TPTP0401` used to be a third, on the 354 problems carrying a
-      `logic` role, until the role list was corrected against the TPTP page that
-      defines that role; it now fires on nothing in the library.
+    * `TPTP0503` is the only rule that fires on a conforming library at all.
+      `TPTP0401` and `TPTP0402` were two more until the role list and the modal
+      vocabularies were corrected against the TPTP language page: 354 problems
+      carrying a `logic` role and 76 carrying one of ten modal systems the BNF omits
+      and the page defines. Both now fire on nothing in the library. See
+      [TPTP-DEFECTS.md](../../reports/TPTP-DEFECTS.md), entries `TPTP-1` and
+      `TPTP-3`.
     * `TPTP0503` fires on the machine-generated ITP axiom sets, which repeat
       declarations across files, so a problem pulling in thirty of them defines one
       name thirty times. Ambiguous, and true.
-    * `TPTP0402` fires on the modal problems that specify `$modal_system_KB`, which
-      the vendored BNF's `<ntf_modal_system>` list — `K`, `M`, `B`, `D`, `S4`, `S5`
-      — does not include, and neither does the TPTP language page. Unlike the
-      `logic` role, no published TPTP source defines it, so there is nothing to
-      correct the list against and the warning stands.
     * `TPTP0506` fires at `:info` on the problems that state no conjecture. That is
       not a finding about the file being wrong — a satisfiability problem asks
       nothing on purpose — it is the count a consumer would otherwise make itself.
@@ -66,7 +64,7 @@ defmodule Tptp.LintCorpusTest do
   #     "Number of functors : 0 ( 0 usr; 0 con)".
   #   * `MSC034_1.p` and `MSC035_1.p` are `$modal` problems whose propositional atoms
   #     are never declared. The non-classical extension is the same corner of the BNF
-  #     the `TPTP0402` finding above comes from.
+  #     the non-classical extension, the same corner of the BNF `TPTP-3` concerns.
   #   * `SYN000-3.p` is the TCF syntax demonstration: eight `tcf` statements and no
   #     `type` statement at all. TCF is a typed dialect, so the rule is right about
   #     it, and the file is a demonstration of syntax rather than a problem.
@@ -140,7 +138,7 @@ defmodule Tptp.LintCorpusTest do
     IO.puts("  #{length(problems)} problems selected, linted as units: #{inspect(counts)}")
 
     for {code, _count} <- counts do
-      assert code in ["TPTP0402", "TPTP0503", "TPTP0506"],
+      assert code in ["TPTP0503", "TPTP0506"],
              "#{code} fires on the library; either the rule or our reading of TPTP is wrong"
     end
   end

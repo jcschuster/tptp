@@ -17,17 +17,32 @@ vendored files.
 Each entry was then checked against the TPTP's own published documentation at
 <https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml>, so that "the BNF omits
 this" is not mistaken for "the TPTP omits this". That check changed one entry
-materially: the language page **does** define the `logic` role, which makes TPTP-1 a
+materially: the language page defines the `logic` role, which makes TPTP-1 a
 contradiction between two TPTP sources rather than a gap, and means the library was
-warning about 354 files that were right all along.
+warning about 354 files that were right.
+
+A later revision corrected TPTP-3 the same way, and for a reason worth recording. The
+first check for it grepped the page for literal `$modal_system_X` strings and found
+six, which matched the BNF and appeared to confirm that both sources agreed. The page
+states those values as a schema, `$modal_system_`*Sys* followed by a set of sixteen,
+so the only literals on it were the ones inside its own embedded BNF. Checking the
+prose means reading it, not grepping it for the grammar's spelling.
+
+Two mechanical cautions follow from that, for anyone checking an entry against the
+page. Its values are often given as a schema plus a value set rather than as
+literals, so a search for concrete names finds only the copies inside its embedded
+BNF. And it carries 24 HTML comment blocks holding proposals that are not published;
+text extracted without removing them shows 43 defined arithmetic symbols where the
+page publishes 25.
 
 | | Defect | Severity | Affected |
 |---|---|---|---:|
 | [TPTP-1](#tptp-1) | The BNF's role list omits `logic`, which the language page defines | Contradiction | 354 files |
 | [TPTP-2](#tptp-2) | `<source>` no longer derives `theory(...)` | **Files do not parse** | 4 files |
-| [TPTP-3](#tptp-3) | `$modal_system_KB` is not among the modal systems | Files warn | 26 files |
+| [TPTP-3](#tptp-3) | The BNF's modal system and axiom lists omit ten and four values the language page defines | Contradiction | 76 occurrences |
 | [TPTP-4](#tptp-4) | The SZS ontology page misspells one value | Cosmetic | 1 value |
 | [TPTP-5](#tptp-5) | `''` is not a `<single_quoted>` where `""` is a `<distinct_object>` | Open question | — |
+| [TPTP-6](#tptp-6) | `<defined_functor>` omits `$abs`, which the language page defines | Contradiction | 1 file |
 
 Three apparent defects that are not defects are recorded at the end, so that the
 reasoning need not be reconstructed: [subtypes](#not-a-defect-subtypes),
@@ -154,37 +169,80 @@ mix run -e '{:ok, _f, d} = Tptp.from_string(File.read!("#{System.get_env("TPTP_R
 
 ## TPTP-3
 
-**`$modal_system_KB` is not among the modal systems `<ntf_modal_system>` names, and 26
-library files specify it.**
+**The BNF's modal vocabularies are incomplete against the Non-classical Logics
+section of the language page: ten systems and four axioms are missing.**
+
+The BNF names six of each:
 
 ```
 345: <ntf_modal_system>     :== $modal_system_K | $modal_system_M | $modal_system_B | $modal_system_D |
 346:                            $modal_system_S4 | $modal_system_S5
+347: <ntf_modal_axiom>      :== $modal_axiom_K | $modal_axiom_M | $modal_axiom_B | $modal_axiom_D |
+348:                            $modal_axiom_4 | $modal_axiom_5
 ```
 
-`KB` is the standard name for **K** plus the **B** axiom, and the list already contains
-both `$modal_system_K` and `$modal_system_B` separately. The library uses the combined
-name:
+The Non-classical Logics section of the language page states the values as schemas
+with a value set rather than as literals:
+
+> **$modalities**
+>
+> A known system name in the form `$modal_system_`*Sys*
+> *Sys* ∈ { K, KB, K4, K5, K45, KB5, D, DB, D4, D5, D45, M, B, S4, S5, S5U }
+>
+> A tuple of known axiom names in the form
+> [ `$modal_axiom_`*Ax₁*, `$modal_axiom_`*Ax₂*, ... ]
+> *Ax_i* ∈ { K, M, B, D, 4, 5, CD, BoxM, C4, C }
+
+Sixteen systems and ten axioms. So this is a contradiction between two TPTP sources,
+exactly as `TPTP-1` is, and within the same document.
+
+| Rule | BNF | Page | Omitted from the BNF |
+|---|---:|---:|---|
+| `<ntf_modal_system>` | 6 | 16 | `KB`, `K4`, `K5`, `K45`, `KB5`, `DB`, `D4`, `D5`, `D45`, `S5U` |
+| `<ntf_modal_axiom>` | 6 | 10 | `CD`, `BoxM`, `C4`, `C` |
+
+**Affected:** 76 occurrences across the library, all of them systems —
+`$modal_system_KB` 26, `K4` 22, `K5` 18, `D4` 6, `K45` 4. Every one is named by the
+page. No library file uses an omitted axiom name.
+
+**What the library does:** accepts all sixteen systems and all ten axioms.
+`Tptp.Bnf.Generator`'s `@documented_values` carries both sets as the page publishes
+them, `add_documented/1` supplies the difference against the BNF, and the build fails
+once the BNF states the whole set. The values also enter `<reserved_word>`, which is
+the list `Tptp.Lint.Rules.DefinedWord` consults. `TPTP0402` fired 76 times before
+this and fires on none of them now.
+
+The fix upstream is ten alternatives in one `:==` rule and four in another.
+
+**A third form the grammar cannot represent.** The same section defines the temporal
+case separately:
+
+> A tuple of known axiom names in the form
+> [ `$modal_axiom_`*Ax₁Tm₁*, ... ]
+> *Ax_i* ∈ { K, M, B, D, 4, 5 }, *Tm_i* ∈ { +, - }
+
+`$modal_axiom_K+` is not expressible. `<dollar_word> ::- <dollar><alpha_numeric>*`
+excludes `+`, so it lexes as `$modal_axiom_K` followed by `+` and the statement does
+not parse:
 
 ```
-PHI005^10.p     $modalities == $modal_system_KB ]
+$ Tptp.from_string("tff(s, logic, $modal == [$modalities == [$modal_axiom_K+]]).")
+  TPTP0301 error "unexpected `+`"
 ```
 
-Unlike TPTP-1, there is no second source against which to correct this.
-`$modal_system_KB` appears nowhere on the TPTP language page, which names the same
-six systems, so the two published sources agree with each other and disagree with
-the corpus. The library therefore reports it rather than correcting it.
-
-**Affected:** 26 problems — SYP 18, PHI 8.
-
-**What the library does:** reports `TPTP0402` at warning severity. `$modal_system_KB` is
-the only `$`-word flagged in any of the 26 files. See `Tptp.Lint.Rules.DefinedWord`.
+No library file uses the form, so nothing is corrected for it. Resolving it needs a
+change to the token layer rather than to a `:==` list, which is the maintainers' call.
 
 **Reproduce:**
 
 ```
-grep -rl 'modal_system_KB' $TPTP_ROOT/Problems $TPTP_ROOT/Axioms | wc -l
+grep -rhoE '\$modal_(system|axiom)_[A-Za-z0-9]+' $TPTP_ROOT/Problems $TPTP_ROOT/Axioms |
+  sort | uniq -c | sort -rn
 ```
+
+Note that `$modal_system_T` (17 files) and `$modal_system_S5U` (26 files) appear in
+that count and are named by neither source; both occur only in the `% Syntax` header
+comments the lexer does not reach, so neither is a finding.
 
 ---
 
@@ -230,6 +288,50 @@ lets the statement parse. That is the right behaviour under either reading, whic
 this needs no decision from us. See `Tptp.Lexer`.
 
 ---
+
+---
+
+## TPTP-6
+
+**The BNF's `<defined_functor>` omits `$abs`, which the arithmetic table of the
+language page defines.**
+
+```
+494: <defined_functor>      :== $uminus | $sum | $difference | $product |
+495:                            $quotient | $quotient_e | $quotient_t | $quotient_f |
+496:                            $remainder_e | $remainder_t | $remainder_f |
+497:                            $floor | $ceiling | $truncate | $round |
+498:                            $to_int | $to_rat | $to_real
+```
+
+Eighteen functors. The page's table of defined arithmetic symbols gives nineteen,
+the additional one being:
+
+> `$abs` /1 &nbsp;&nbsp; `$int > $int`, `$rat > $rat`, `$real > $real`
+> Absolute value of a number. `$abs` is related to other operators by
+> `! [X] : ( ( $greatereq(X,0) => $abs(X) = X ) & ( $less(X,0) => $abs(X) = $uminus(X) ) )`
+
+The same class of contradiction as `TPTP-1` and `TPTP-3`, and the smallest: one
+symbol.
+
+**Affected:** `ARI763_1.p`, which applies it four times.
+
+**What the library does:** accepts `$abs`, under the mechanism described in
+`TPTP-1`. `TPTP0402` fired four times before this and fires on nothing in the
+library now.
+
+**A caution for anyone extending this entry.** The page's arithmetic section also
+shows `$succ`, `$pred`, `$min`, `$max`, `$pow`, `$evaleq`, `$sqrt`, `$log10`, `$e`,
+`$exp`, `$log`, `$pi`, `$sin`, `$cos`, `$tan`, `$asin`, `$acos` and `$atan`, and
+none of them is published: all sit inside HTML comments, of which the page carries
+24 blocks. Reading the rendered text without removing them yields 43 defined
+symbols where the page publishes 25. Only `$abs` is a genuine omission.
+
+**Reproduce:**
+
+```
+grep -rlE '^[^%]*\$abs' $TPTP_ROOT/Problems $TPTP_ROOT/Axioms
+```
 
 ---
 

@@ -113,7 +113,7 @@ defmodule Mix.Tasks.Tptp.Gen do
 
     Enum.each(entries, fn
       {"reserved_word", words} ->
-        shell.info("  $-words collected from the whole BNF: #{length(words)} (not a :== rule)")
+        shell.info("  $-words TPTP defines: #{length(words)} (not a :== rule)")
 
       {name, words} ->
         shell.info("  <#{name}> #{length(words)}")

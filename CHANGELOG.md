@@ -92,6 +92,27 @@ moves when TPTP moves, not when this library does.
 
 ### Changed
 
+- The modal system and axiom vocabularies are corrected against the TPTP language
+  page, so `TPTP0402` no longer fires on the 76 library occurrences of a system name
+  the BNF omits. The Non-classical Logics section states that `$modalities` may be a
+  system name of the form `$modal_system_Sys` with Sys drawn from sixteen values, or
+  a tuple of axiom names `$modal_axiom_Ax` with Ax drawn from ten; the `:==` rules on
+  the same page name six of each. The library previously recorded this as the two
+  sources agreeing against the corpus, which was wrong: the first check grepped the
+  page for literal `$modal_system_X` strings, and the page states the values as a
+  schema, so the only literals found were those in its own embedded BNF.
+
+  `@documented_values` now quotes the set a cited source publishes in full rather
+  than the difference against the BNF, so an entry is a citation; `add_documented/1`
+  computes the difference and the build fails once the BNF covers the set. Corrected
+  `$`-words also enter `<reserved_word>`, which is the list
+  `Tptp.Lint.Rules.DefinedWord` consults.
+- `$abs` is now accepted as a defined functor, so `TPTP0402` no longer fires on the
+  four occurrences in `ARI763_1.p`. The arithmetic table of the TPTP language page
+  defines it over `$int`, `$rat` and `$real`; the `:==` rule on the same page omits
+  it. The other extended arithmetic symbols visible on that page — `$min`, `$max`,
+  `$sqrt`, `$pi` and fifteen more — are inside HTML comments and are not published,
+  so they are not added.
 - `logic` is now accepted as a formula role, so `TPTP0401` no longer fires on the 354
   library problems that carry one. The TPTP language page lists fourteen roles
   including `logic` and describes what it is for; the `:==` rule quoted further down
