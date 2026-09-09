@@ -1,47 +1,47 @@
 defmodule Tptp.Printer.Format do
   @moduledoc """
-  Rewrites a file's layout without touching a single token.
+  Rewrites a file's layout without altering its token sequence.
 
-  `mix tptp.format` is what this is for. The guarantee is stronger than the
-  canonical printer's and easier to state: **the token sequence is unchanged**. Not
-  the same shape — the same tokens, in the same order, spelled the same way. Only
-  the white space between them moves.
+  Backs `mix tptp.format`. The guarantee is stronger than the canonical printer's:
+  the tokens are unchanged — not the same structure, but the same tokens, in the
+  same order, with the same spellings. Only the white space between them differs.
 
       iex> Tptp.Printer.Format.to_string("fof( a,axiom,p&q ).  % why\\n")
       "fof(a, axiom, p & q).  % why\\n"
 
-  ## Why this is not the canonical printer with comments bolted on
+  ## Relation to the canonical printer
 
-  `Tptp.Printer.Canonical` rebuilds from the CST, so anything the grammar can spell
-  two ways comes back in the canonical one. Right for a canonical form, wrong for a
-  formatter, which must not change a file it was asked to tidy. So this works from
-  the *tokens*, which are exactly what the source said.
+  `Tptp.Printer.Canonical` reconstructs output from the tree, so anything the
+  grammar admits in more than one form is emitted in the canonical one. That is
+  correct for a canonical form and incorrect for a formatter, which must not alter
+  a file it was asked to lay out. This module therefore operates on the tokens,
+  which are what the source contained.
 
-  ## Comments need no attachment map
+  ## Comment placement
 
-  Re-attaching comments is usually the hard part of a format-preserving printer,
-  and here it is not, because comments and statements arrive already sorted by
-  offset. Merging the two sequences and looking at the white space each item was
-  preceded by answers the question directly:
+  Reattaching comments is ordinarily the difficult part of a format-preserving
+  printer. Here comments and statements are already ordered by position, so
+  merging the two sequences and examining the white space preceding each item
+  determines the placement:
 
-    * no newline before a comment means something was on its line already, so it is
-      a trailing comment and stays there;
-    * one newline means its own line;
-    * two or more means a blank line above, which is kept — a file's paragraphing
-      is information, and collapsing it is not tidying.
+    * no newline before a comment indicates that something preceded it on its
+      line, so it is a trailing comment and remains one;
+    * one newline places it on its own line;
+    * two or more preserve the blank line above it, since paragraphing carries
+      information.
 
-  One pass, no map keyed by position, and nothing to keep in step.
+  This requires a single pass and no position-keyed map.
 
-  ## It declines rather than mangles
+  ## Unparseable input
 
-  A source with a lexical error is returned unchanged. A formatter is reached for
-  precisely when a file is in a bad state, and rewriting one whose tokens are not
-  trustworthy is how a formatter loses someone's work.
+  A source containing a lexical error is returned unchanged. A formatter is
+  invoked precisely when a file is in an inconsistent state, and rewriting one
+  whose tokens are not trustworthy risks discarding content.
   """
 
   alias Tptp.Lexer
-  alias Tptp.Splitter
   alias Tptp.Printer.Spacing
+  alias Tptp.Splitter
 
   @doc """
   Reformat TPTP source.

@@ -1,17 +1,16 @@
 defmodule Tptp.Diagnostic do
   @moduledoc """
-  One thing this library has to say about its input.
+  A single observation about the input.
 
-  Nothing here stops the pipeline. The library's entire job is reading other
-  people's files, so every stage takes and returns an accumulator carrying these,
-  and a result is always available even when it is partial. A warning-severity role
-  does not stop you producing a CST, so success carries diagnostics too.
+  Diagnostics do not interrupt processing. Every stage accepts and returns an
+  accumulator of them, so a result is available even where it is partial, and
+  success carries diagnostics alongside it.
 
   ## Codes
 
-  Codes are stable, documented and greppable, and the tier is readable from the
-  number. An editor can filter by code and a consumer can suppress a rule without
-  regex-matching prose.
+  Codes are stable and the tier is determined by the number, so an editor can
+  filter by code and a consumer can suppress a rule without matching on message
+  text.
 
   | Range | Tier |
   |-------|------|
@@ -19,13 +18,24 @@ defmodule Tptp.Diagnostic do
   | `TPTP01xx` | lexical — `Tptp.Lexer` |
   | `TPTP02xx` | statement structure — `Tptp.Splitter` |
   | `TPTP03xx` | grammar — `Tptp.Parser` |
-  | `TPTP04xx` | semantic, the `:==` layer — `Tptp.Lint` |
+  | `TPTP04xx` | `:==` well-formedness — `Tptp.Lint` |
   | `TPTP05xx` | cross-statement — `Tptp.Lint` |
   | `TPTP06xx` | include — `Tptp.Include` |
-  | `TPTP07xx` | dialect — `Tptp.Lint` |
+  | `TPTP08xx` | analyzer infrastructure — `Tptp.Analyzer` |
 
-  `related` is what separates a useful diagnostic from a useless one: it carries
-  the "first declared here" span alongside the "declared again here" one.
+  A code is never reassigned, so the numbering contains gaps: `TPTP0103`,
+  `TPTP0108`, `TPTP0403`, `TPTP0502`, `TPTP0505` and `TPTP0604` are unassigned.
+  `TPTP0505` was withdrawn when the rule raising it was found to contradict the
+  TPTP.
+
+  There is no `TPTP07xx` tier. It was reserved for dialect findings, of which there
+  are none: the BNF gives each language its own nonterminals, so a construct used
+  in a language that does not provide it fails to parse rather than reaching a
+  rule. `Tptp.Lint` sets this out, and `Tptp.Query.dialect/1` derives the dialect
+  instead.
+
+  `related` carries the accompanying positions of a finding, such as the first
+  declaration alongside a redeclaration.
   """
 
   alias Tptp.Span

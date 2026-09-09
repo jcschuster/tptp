@@ -1,56 +1,68 @@
 defmodule Tptp.Bnf.Generator do
   @moduledoc """
-  Turns the vendored `SyntaxBNF` into `src/tptp_parser.yrl`.
+  Translates the vendored `SyntaxBNF` into `src/tptp_parser.yrl`.
 
-  The generated grammar is committed, so an installing user needs no Python, no
-  awk and no BNF — only OTP, which already ships `yecc`. Regeneration is a
-  maintainer action taken on a TPTP release, and the `.yrl` diff *is* the review
-  of that release.
+  The generated grammar is committed, so installation requires only OTP, which
+  supplies `yecc`. Regeneration is a maintainer action performed on a TPTP release,
+  and the resulting diff constitutes the review of that release.
 
-  * **Repetition.** `X*` becomes a right-recursive helper nonterminal with an
-    empty production. Six `::=` rules use it.
-  * **Literals.** Runs of literal text are split against `Tptp.Token.spellings/0`,
-    longest match first, so `tpi(` becomes `kw_tpi lparen` and `).` becomes
-    `rparen dot`.
-  * **`<nothing>`.** An alternative that is only `<nothing>` becomes yecc's
-    `'$empty'`, and the nonterminal itself disappears.
-  * **Punctuation and fixed spellings are dropped from the children.** A node's
-    `kind` and `alt` already determine every byte of fixed text, and
-    `Tptp.Printer.Shapes` is generated from the same source so the two cannot
-    drift. What survives as a child is a nonterminal or a value-carrying token.
-  * **Single-terminal alternatives become leaves.** `<fof_quantifier> ::= !`
-    yields `%Tptp.Node{kind: :forall}` rather than a wrapper around a token, which
-    is why `<th1_defined_term> ::= !! | ?? | @@+ | @@- | @=` — the polymorphic
-    constants of TH1 — arrive with a precise kind.
+  ## Translation
+
+  * **Repetition.** `X*` becomes a right-recursive helper nonterminal with an empty
+    production. Six `::=` rules require it.
+  * **Literals.** Runs of literal text are divided against
+    `Tptp.Token.spellings/0`, longest match first, so `tpi(` becomes
+    `kw_tpi lparen` and `).` becomes `rparen dot`.
+  * **`<nothing>`.** An alternative consisting only of `<nothing>` becomes yecc's
+    `'$empty'`, and the nonterminal is eliminated.
+  * **Punctuation and fixed spellings are omitted from the children.** A node's
+    `kind` and `alt` determine every byte of fixed text, and
+    `Tptp.Printer.Shapes` is generated from the same source, so the two cannot
+    diverge. A child is therefore a nonterminal or a value-carrying token.
+  * **Single-terminal alternatives become leaves.** `<fof_quantifier> ::= !` yields
+    `%Tptp.Node{kind: :forall}` rather than a wrapper around a token, which gives
+    the polymorphic constants of TH1 — `<th1_defined_term> ::= !! | ?? | @@+ | @@-
+    | @=` — a distinct kind each.
   * **Transparent rules are spliced.** A rule whose every alternative yields
-    exactly one child carries no information; splicing it through keeps the CST
-    roughly the size of the input rather than five times it.
+    exactly one child conveys no information; splicing it keeps the tree
+    approximately the size of the input.
 
-  An alternative that is only `<nothing>` yields `nil` rather than an empty node.
-  There are no tokens to take a span from, and `nil` says "absent" without a
-  consumer having to distinguish it from a node that happens to have no children —
-  `<thf_tuple> ::= []` is exactly that, and means something different.
+  An alternative consisting only of `<nothing>` yields `nil` rather than an empty
+  node, since there are no tokens from which to derive a span, and `nil` denotes
+  absence without a consumer having to distinguish it from a node with no children.
+  `<thf_tuple> ::= []` is such a node and denotes something different.
 
-  Three departures, each of which would otherwise be an LALR(1) conflict. They are
-  reported by `generate/2` so they stay visible.
+  ## Departures
+
+  Four, each of which would otherwise constitute an LALR(1) conflict, and none of
+  which changes the language accepted. `departures/0` returns the list, `generate/1`
+  includes it in its report, and `mix tptp.gen` prints it from that list rather than
+  from a copy, so a fifth cannot be introduced without appearing in the output
+  intended to surface it.
 
   1. `<source> ::= … | unknown` is dropped. `unknown` still parses, as
-     `<dag_source> -> <name>`; keeping the literal alternative as well would make
-     the two indistinguishable in source position.
-  2. `inference`, `introduced` and `file` get terminals of their own but are also
-     admitted as `<atomic_word>`, so `fof(file, axiom, p).` keeps working. The
-     `(` lookahead separates the two readings. In that position they are relabelled
-     `lower_word`, because their keyword-ness is an artefact of parsing and a
-     formula named `file` is an ordinary lower word like any other.
-  3. The six `$`-keywords (`$thf $tff $fof $cnf $fot $let`) are reserved: they are
-     *not* admitted as `<atomic_defined_word>`. Admitting `$let` would make
-     `$let(a,b,c)` ambiguous between `<thf_let>` and `<thf_fof_function>`. Upstream
-     reserves them too.
+     `<dag_source> -> <name>`; retaining the literal alternative would render the
+     two indistinguishable in source position.
+  2. `inference`, `introduced` and `file` are given terminals of their own and are
+     also admitted as `<atomic_word>`, so that `fof(file, axiom, p).` continues to
+     parse. The `(` lookahead separates the two readings. In `<atomic_word>`
+     position they are relabelled `lower_word`, their keyword status being an
+     artefact of parsing.
+  3. The six `$`-keywords — `$thf`, `$tff`, `$fof`, `$cnf`, `$fot` and `$let` — are
+     reserved, and are not admitted as `<atomic_defined_word>`. Admitting `$let`
+     would render `$let(a,b,c)` ambiguous between `<thf_let>` and
+     `<thf_fof_function>`. The BNF has no notion of reservation — the word does not
+     occur in it — so this is a decision the grammar compels rather than states.
+  4. The five `$`-language markers — `$thf`, `$tff`, `$fof`, `$cnf` and `$fot` —
+     retain their terminals as children of `<formula_data>`, where the generator
+     would otherwise omit them as fixed spellings. `$fot(a)` and `$fof(a)` are
+     distinct nodes of the same shape, so the marker is what distinguishes them and
+     must be present in the tree.
 
-  The seven language keywords (`thf tff tcf fof cnf tpi include`) need no such
-  handling: they only ever occur as a statement's first token, so `Tptp.Splitter`
-  promotes token zero and every other occurrence stays a `<lower_word>`. That is
-  what keeps `fof(fof, axiom, p).` legal.
+  The seven language keywords — `thf`, `tff`, `tcf`, `fof`, `cnf`, `tpi` and
+  `include` — require no such treatment. They occur only as a statement's first
+  token, so `Tptp.Splitter` promotes token zero and every other occurrence remains
+  a `<lower_word>`. This is what admits `fof(fof, axiom, p).`
   """
 
   alias Tptp.Bnf
@@ -70,6 +82,21 @@ defmodule Tptp.Bnf.Generator do
   @significant_names Enum.map(@significant, &Atom.to_string/1)
 
   @dropped_alternatives [{"source", [{:literal, "unknown"}]}]
+
+  # A `:==` list the BNF gets wrong, corrected from another published TPTP source.
+  # See `vocabularies/1` for the citation and for why this is not a place to add
+  # values to taste. `check_documented!/2` fails the build when the BNF catches up.
+  @documented_values %{
+    "formula_role" => %{
+      values: ["logic"],
+      source: "https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml",
+      because:
+        "the prose of the TPTP language page lists fourteen roles including `logic`, " <>
+          "and describes it — \"logic formulae are used for defining the logic in " <>
+          "non-classical logics\" — while the `:==` rule quoted further down the same " <>
+          "page lists thirteen and omits it"
+    }
+  }
 
   @injected_productions [
     {"atomic_word", :kw_inference},
@@ -94,7 +121,8 @@ defmodule Tptp.Bnf.Generator do
           significant: [binary()],
           pruned: [binary()],
           dropped: [binary()],
-          injected: non_neg_integer()
+          injected: non_neg_integer(),
+          departures: [binary()]
         }
 
   @doc """
@@ -142,40 +170,104 @@ defmodule Tptp.Bnf.Generator do
       significant: Enum.sort(Enum.filter(@significant_names, &Map.has_key?(kept, &1))),
       pruned: pruned,
       dropped: Enum.map(@dropped_alternatives, &elem(&1, 0)),
-      injected: length(@injected_productions)
+      injected: length(@injected_productions),
+      departures: departures()
     }
 
     {source, report}
   end
 
   @doc """
-  The nonterminals whose node `Tptp.Parser` collapses onto its leaf.
+  Returns one line per departure from a mechanical translation of the BNF.
 
-  These are the chain rules that say what *role* a symbol plays — `<constant>`,
-  `<functor>`, `<variable>` and the rest. Each is a pure rename of the thing below
-  it, so keeping a node for every level would cost three nodes to say one thing;
-  collapsing keeps the outermost name and drops the nodes.
+  Rendered from the constants producing them, so the list cannot diverge from the
+  code. `mix tptp.gen` prints this list; the module documentation describes each
+  entry.
 
-  The list is curated rather than derived, and that is the point. A rule like
-  `<tff_arguments> ::= <tff_term>` is also a single-child chain, but its child is
-  an *element* rather than a rename, and collapsing it would rewrite an argument's
-  kind to `:tff_arguments` and lose what the argument actually was.
+      iex> Tptp.Bnf.Generator.departures() |> length()
+      4
+  """
+  @spec departures() :: [binary()]
+  def departures do
+    [
+      "dropped #{length(@dropped_alternatives)} alternative(s): " <>
+        Enum.map_join(@dropped_alternatives, ", ", fn {lhs, alternative} ->
+          "<#{lhs}> ::= " <> Enum.map_join(alternative, " ", &symbol_text/1)
+        end),
+      "injected #{length(@injected_productions)} productions admitting keywords as " <>
+        Enum.map_join(Enum.uniq(Enum.map(@injected_productions, &elem(&1, 0))), ", ", &"<#{&1}>"),
+      "reserved the #{length(Token.dollar_keywords())} $-keywords: " <>
+        Enum.map_join(Token.dollar_keywords(), " ", &elem(&1, 1)),
+      "kept the #{length(@kept_terminals)} $-language markers as children of <formula_data>"
+    ]
+  end
+
+  defp symbol_text({:literal, text}), do: text
+  defp symbol_text({:nonterminal, name}), do: "<#{name}>"
+  defp symbol_text({:terminal, category}), do: Atom.to_string(category)
+  defp symbol_text({:repeat, name}), do: "<#{name}>*"
+
+  @doc """
+  Returns the nonterminals whose node `Tptp.Parser` collapses onto its leaf.
+
+  These are the chain rules recording the role a symbol occupies — `<constant>`,
+  `<functor>`, `<variable>` and the rest. Each is a renaming of the production
+  beneath it, so retaining a node per level would require three nodes to record one
+  fact. Collapsing retains the outermost name and discards the nodes.
+
+  The list is enumerated rather than derived. `<tff_arguments> ::= <tff_term>` is
+  also a single-child chain, but its child is an element rather than a renaming,
+  and collapsing it would replace the argument's kind with `:tff_arguments`.
   """
   @spec significant() :: [atom()]
   def significant, do: @significant
 
   @doc """
-  Build `Tptp.Bnf.Vocabulary` from the `:==` rules that are closed word lists.
+  Builds `Tptp.Bnf.Vocabulary` from the `:==` rules that are closed word lists.
 
-  These are the semantic layer the grammar deliberately does not enforce. The
-  syntactic rule for `<formula_role>` accepts any `<lower_word>`; only the `:==`
-  rule names the thirteen that mean something. `fof(a, axim, p).` is therefore
-  valid TPTP and semantically wrong, and the difference between those two is a
-  warning-severity diagnostic rather than a parse failure.
+  These constitute the well-formedness conditions the grammar does not enforce. The
+  syntactic rule for `<formula_role>` admits any `<lower_word>`; the `:==` rule
+  names those that are defined. `fof(a, axim, p).` is therefore well-formed TPTP
+  and semantically incorrect, and that difference is reported as a warning rather
+  than a parse failure.
+
+  ## Correction against a second TPTP source
+
+  `@documented_values` supplies a value the BNF omits and another published TPTP
+  page defines. There is one such value, and it is a contradiction within a single
+  document: the prose of
+  <https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml> lists fourteen
+  roles —
+
+  > The role gives the user semantics of the formula, one of axiom, hypothesis,
+  > definition, assumption, lemma, theorem, corollary, conjecture,
+  > negated_conjecture, plain, type, interpretation, **logic**, and unknown.
+
+  The same page states that "logic formulae are used for defining the logic in
+  non-classical logics", while the `:==` rule reproduced further down it lists
+  thirteen roles and omits `logic`. 354 problems in TPTP v9.3.1 carry the role.
+
+  The BNF remains this library's source for syntax. Where two published TPTP
+  sources contradict each other on a point of semantics, the prose defining a value
+  is preferred to a list omitting it, the alternative being 354 incorrect warnings.
+  The correction is narrow, cited and checked: `check_documented!/3` fails the build
+  once the BNF lists the value, so the entry cannot outlive the defect. This is the
+  same treatment `Tptp.Szs.Generator` applies to the misspelled SZS value. It is not
+  a mechanism for adjusting vocabularies to preference; an entry requires a citation
+  to a
+  TPTP source, not an opinion. See [TPTP-DEFECTS.md](TPTP-DEFECTS.md), entry `TPTP-1`.
 
   Emitted as multi-clause functions over binary literals, which the compiler turns
   into a direct dispatch — faster than a `MapSet`, and every atom involved stays a
   compile-time one.
+
+  One entry is not a `:==` rule and is labelled as such in the generated module.
+  `<reserved_word>` does not exist in the BNF — the word "reserved" does not occur in
+  the file — and `reserved_words/1` builds the list by collecting every `$`-prefixed
+  literal that appears anywhere in any alternative. That is a superset of the
+  `$`-words the language defines, which is the appropriate form for
+  `Tptp.Lint.Rules.DefinedWord`: a `$`-word outside it is certainly not TPTP's, and
+  the cost of the few extras is a warning not raised.
   """
   @spec vocabularies(Path.t()) :: {binary(), [{binary(), [binary()]}]}
   def vocabularies(bnf_path) do
@@ -188,33 +280,33 @@ defmodule Tptp.Bnf.Generator do
       |> Enum.filter(fn {_lhs, words} -> words != nil end)
       |> Enum.sort()
 
+    entries = Enum.map(entries, &add_documented/1)
     entries = entries ++ [{"reserved_word", reserved_words(rules)}]
 
     {render_vocabulary(entries, bnf_path), entries}
   end
 
   @doc """
-  Build `Tptp.Printer.Shapes` from the same grammar the parser is built from.
+  Builds `Tptp.Printer.Shapes` from the grammar the parser is generated from.
 
-  A canonical printer has to know how each node kind is spelled — where the
-  parentheses go, which literal separates the children — and that is exactly what
-  the `::=` productions say. Hand-writing it would be a hundred clauses that agree
-  with the grammar until someone regenerates the grammar, so it is derived from the
-  same source in the same pass.
+  A canonical printer requires the spelling of each node kind: the positions of the
+  parentheses and the literal separating the children. This is what the `::=`
+  productions state, so the table is derived from the same source in the same pass
+  rather than written by hand.
 
-  A shape is keyed by node kind and child count, which is enough: of the groups the
-  grammar produces, exactly one has two spellings — `<cnf_literal>` writes `~p` and
-  `~(p)`. Those mean the same thing and the parentheses are redundant, since the
-  operand is already atomic, so the shorter one is taken. The tie-break is "fewest
-  literals" generally, which is safe because a tree carries its own parenthesisation
-  nodes: `<fof_unitary_formula> ::= (<fof_logic_formula>)` is a node, so no
-  parenthesis that changes a reading is ever a printer's to invent or omit.
+  A shape is keyed by node kind and child count. Of the groups the grammar
+  produces, one has two spellings: `<cnf_literal>` admits `~p` and `~(p)`. These
+  are equivalent and the parentheses redundant, the operand being atomic, so the
+  shorter is selected. The general tie-break is the fewest literals, which is sound
+  because a tree carries its own parenthesisation nodes —
+  `<fof_unitary_formula> ::= (<fof_logic_formula>)` is a node — so no parenthesis
+  affecting a reading is ever introduced or omitted by the printer.
 
-  This is also why a leading comma is spliced away only for the `comma_*` list
-  helpers, whose comma is a list separator the `{:separated, ","}` shape supplies.
-  Everywhere else — `<optional_info> ::= ,<useful_info>` and its two siblings — the
-  comma is syntax a printer has to emit, and splicing it would leave a shape with
-  two adjacent slots and no way to know whether they need separating.
+  For the same reason a leading comma is spliced only for the `comma_*` list
+  helpers, whose comma is the list separator supplied by the `{:separated, ","}`
+  shape. Elsewhere — in `<optional_info> ::= ,<useful_info>` and its two siblings —
+  the comma is syntax the printer must emit, and splicing it would leave a shape
+  with two adjacent slots and no separator between them.
   """
   @spec shapes(Path.t()) :: {binary(), non_neg_integer()}
   def shapes(bnf_path) do
@@ -282,14 +374,21 @@ defmodule Tptp.Bnf.Generator do
   end
 
   @doc """
-  Every `$`-prefixed literal the BNF mentions, in any rule and any position.
+  Every `$`-prefixed word the BNF mentions, in any rule and any position.
 
-  The closed vocabularies above only catch rules whose alternatives are *nothing
-  but* literals, and several reserved words are not written that way:
-  `<ntf_domains_spec> :== $domains <identical> <ntf_domains_value>` puts `$domains`
-  beside two other symbols, so it is a word the language knows that no closed list
-  contains. Linting `$`-words against the closed lists alone reports those as
-  unknown, which they are not.
+  The closed vocabularies capture only rules whose alternatives consist entirely of
+  literals, and several defined words are not written that way:
+  `<ntf_domains_spec> :== $domains <identical> <ntf_domains_value>` places
+  `$domains` alongside two other symbols, so it is a word the language defines that
+  no closed list contains. Checking `$`-words against the closed lists alone reports
+  such words as unrecognised.
+
+  A `$`-word is also not always a literal run of its own. A rule applying one
+  includes the bracket in the same run — `<txf_conditional> :==
+  $ite(<tff_logic_formula>,…)` is the literal `$ite(` — so the word is extracted
+  from the run rather than matched against it. Matching whole runs omits `$ite` and
+  the six `$`-keywords, and reports `$ite` as undefined on the single library file
+  using it.
   """
   @spec reserved_words([Rule.t()]) :: [binary()]
   def reserved_words(rules) do
@@ -297,12 +396,30 @@ defmodule Tptp.Bnf.Generator do
         is_list(rule.alternatives),
         alternative <- rule.alternatives,
         {:literal, text} <- alternative,
-        word = plain_word(text),
-        is_binary(word),
-        String.starts_with?(word, "$"),
-        not String.starts_with?(word, "$$"),
+        word <- Regex.scan(~r/\$[A-Za-z_][A-Za-z_0-9]*/, text) |> List.flatten(),
         uniq: true,
         do: word
+  end
+
+  @spec add_documented({binary(), [binary()]}) :: {binary(), [binary()]}
+  defp add_documented({name, words}) do
+    case Map.fetch(@documented_values, name) do
+      {:ok, %{values: extra}} -> {name, words ++ check_documented!(name, words, extra)}
+      :error -> {name, words}
+    end
+  end
+
+  @spec check_documented!(binary(), [binary()], [binary()]) :: [binary()]
+  defp check_documented!(name, words, extra) do
+    dead = Enum.filter(extra, &(&1 in words))
+
+    if dead != [] do
+      raise "the BNF's <#{name}> now lists #{inspect(dead)}, so the entry for it in " <>
+              "@documented_values is dead. Drop it — and note that the corresponding " <>
+              "diagnostic stops firing either way, so nothing else has to change."
+    end
+
+    extra
   end
 
   defp closed_words(alternatives) do
@@ -400,6 +517,10 @@ defmodule Tptp.Bnf.Generator do
         <atomic_defined_word>` admits any `$`-word. Membership here is what
         separates a well-formed statement from a merely parseable one, and it is
         checked by `Tptp.Lint` at warning severity rather than by the parser.
+
+        Every list here is a `:==` rule of the BNF except `<reserved_word>`, which is
+        this library's own: the BNF has no such rule, and the list is every
+        `$`-prefixed literal appearing anywhere in it. See `Tptp.Bnf.Generator`.
         \"\"\"
       """,
       Enum.map(entries, &render_vocabulary_entry/1),
@@ -408,19 +529,41 @@ defmodule Tptp.Bnf.Generator do
     |> IO.iodata_to_binary()
   end
 
+  defp render_vocabulary_entry({"reserved_word" = name, words}) do
+    render_vocabulary_entry(
+      name,
+      words,
+      "The #{length(words)} `$`-words the BNF mentions anywhere.\n\n" <>
+        "  Not a `:==` rule — the BNF has no `<reserved_word>` — but every `$`-prefixed\n" <>
+        "  literal collected from every alternative of it. A superset of the words the\n" <>
+        "  language defines, which is what `Tptp.Lint.Rules.DefinedWord` wants."
+    )
+  end
+
   defp render_vocabulary_entry({name, words}) do
+    render_vocabulary_entry(
+      name,
+      words,
+      "The #{length(words)} values the BNF lists for `<#{name}>`."
+    )
+  end
+
+  defp predicate_subject("reserved_word"), do: "`$`-words the BNF mentions"
+  defp predicate_subject(name), do: "`<#{name}>` values"
+
+  defp render_vocabulary_entry(name, words, summary) do
     """
 
       @#{name}_values #{inspect(words, limit: :infinity)}
 
       @doc \"\"\"
-      The #{length(words)} values the BNF lists for `<#{name}>`.
+      #{summary}
       \"\"\"
       @spec #{name}_values() :: [binary()]
       def #{name}_values, do: @#{name}_values
 
       @doc \"\"\"
-      Whether `word` is one of the #{length(words)} `<#{name}>` values.
+      Whether `word` is one of the #{length(words)} #{predicate_subject(name)}.
       \"\"\"
       @spec #{name}?(binary()) :: boolean()
     #{Enum.map_join(words, "\n", &"  def #{name}?(#{inspect(&1)}), do: true")}

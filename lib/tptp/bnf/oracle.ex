@@ -2,19 +2,19 @@ defmodule Tptp.Bnf.Oracle do
   @moduledoc """
   Renders `Tptp.Bnf.OracleTable`, the regex transcription of the BNF's token layer.
 
-  `mix tptp.gen` runs this; nothing at runtime does. The output goes to
-  `test/support/`, because its only purpose is to be a second opinion the lexer can
-  be checked against.
+  `mix tptp.gen` invokes this; nothing calls it at runtime. The output is written to
+  `test/support/`, its purpose being to provide an independent check on the lexer.
 
-  ## Why a second opinion is worth generating
+  ## Rationale
 
-  `Tptp.Lexer` is the one hand-written stage in this library. Everything else is
-  derived from the BNF, so a mistake shows up as a compile failure or a coverage
-  gap; a lexer that quietly accepts `1.` as a real, or stops a `<sq_char>` one byte
-  early, produces a plausible token stream and a wrong parse. The BNF's `::-` and
-  `:::` rules are already regular expressions with `<name>` references in place of
-  sub-patterns, so transcribing them mechanically costs almost nothing and gives a
-  property test something independent to disagree with.
+  `Tptp.Lexer` is the only hand-written stage in this library. Every other stage is
+  derived from the BNF, so an error appears as a compilation failure or a coverage
+  gap. A lexer accepting `1.` as a real, or terminating a `<sq_char>` one byte
+  early, instead produces a plausible token stream and an incorrect parse.
+
+  The BNF's `::-` and `:::` rules are already regular expressions, with `<name>`
+  references in place of sub-patterns, so transcribing them mechanically is
+  inexpensive and gives a property test an independent basis for comparison.
 
   It is an oracle, not an implementation. It anchors and matches one token at a
   time; it does not scan, has no notion of maximal munch, and is far too slow for
@@ -130,9 +130,9 @@ defmodule Tptp.Bnf.Oracle do
       @doc \"\"\"
       Whether `text` is exactly one `name`, start to end.
 
-      Anchored on both sides: a token that only starts with a `<lower_word>` is not
-      a `<lower_word>`, and the whole point of the oracle is to catch a lexer that
-      stopped a byte early.
+      Anchored at both ends: a token merely beginning with a `<lower_word>` is not
+      a `<lower_word>`, and detecting a lexer that terminated a token early is the
+      purpose of this table.
       \"\"\"
       @spec matches?(name(), binary()) :: boolean()
       def matches?(name, text) when is_binary(text), do: Regex.match?(pattern(name), text)

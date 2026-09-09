@@ -4,7 +4,6 @@ defmodule Tptp.LintTest do
   doctest Tptp.Lint
   doctest Tptp.Lint.Collect
   doctest Tptp.Lint.Context
-  doctest Tptp.Lint.Rules.Arity
 
   alias Tptp.Lint
 
@@ -38,8 +37,8 @@ defmodule Tptp.LintTest do
        "fof(a, axiom, p). fof(b, axiom, q)."},
       {Tptp.Lint.Rules.Parent, "TPTP0504", "fof(a, axiom, p, inference(r, [], [ghost])).",
        "fof(ghost, axiom, q). fof(a, axiom, p, inference(r, [], [ghost]))."},
-      {Tptp.Lint.Rules.Arity, "TPTP0505", "fof(a, axiom, p(x)). fof(b, axiom, p(x, y)).",
-       "fof(a, axiom, p(x)). fof(b, axiom, p(y))."}
+      {Tptp.Lint.Rules.Conjecture, "TPTP0506", "fof(g1, conjecture, p). fof(g2, conjecture, q).",
+       "fof(g, conjecture, p)."}
     ]
 
     for {rule, code, positive, negative} <- @cases do
@@ -93,6 +92,24 @@ defmodule Tptp.LintTest do
     end
   end
 
+  describe "a typing below the top of a statement" do
+    @only [only: [Tptp.Lint.Rules.AtomTyping]]
+
+    test "a $let binding is a typing nested on purpose" do
+      assert codes("thf(a, axiom, $let(ff: $int > $rat, ff @ X := g @ X, p @ ff)).", @only) == []
+
+      assert codes("thf(a, axiom, $let([f: $int, g: $rat], [f := c, g := d], p @ f)).", @only) ==
+               []
+
+      assert codes("tff(a, axiom, $let(ff: $int, ff := c, p(ff))).", @only) == []
+    end
+
+    test "a declaration in brackets is the same declaration" do
+      assert codes("thf(a, type, (f: $i)).", @only) == []
+      assert codes("tff(a, type, (f: $i)).", @only) == []
+    end
+  end
+
   describe "clean input stays quiet" do
     test "an ordinary first-order problem" do
       assert codes("""
@@ -131,30 +148,39 @@ defmodule Tptp.LintTest do
     end
   end
 
-  describe "the arity rule and polymorphism" do
-    test "a first-order clash is reported" do
-      assert ["TPTP0505"] = codes("fof(a, axiom, p(x)). fof(b, axiom, p(x, y)).")
+  describe "arity overloading is legal, and recorded rather than reported" do
+    # The TPTP language page: "Symbols may be overloaded with different arity
+    # signatures, and are treated as different symbols." A rule reported these pairs
+    # until 2026-09-09; it was wrong about all eleven library files it fired on.
+    test "a first-order symbol at two arities is not a finding" do
+      assert codes("fof(a, axiom, p(x)). fof(b, axiom, p(x, y)).") == []
     end
 
-    test "an apply spine at two lengths is not" do
-      refute "TPTP0505" in codes("""
-             thf(f_type, type, f: $i > $i > $o).
-             thf(a, axiom, f @ x).
-             thf(b, axiom, f @ x @ y).
-             """)
-    end
-
-    test "a symbol with a polymorphic declared type is exempt" do
+    test "two declarations at two arities are not a finding either" do
+      # The shape of `SWX091_1.p`, which declares `sqrt/1` and `sqrt/2` and uses both.
       source = """
-      tff(g_type, type, g: !>[A: $tType]: (A > A)).
-      tff(a, axiom, g(x)).
-      tff(b, axiom, g(x, y)).
+      tff(t1, type, sqrt: $i > $o).
+      tff(t2, type, sqrt: ( $i * $i ) > $o).
+      tff(a, axiom, sqrt(x)).
+      tff(b, axiom, sqrt(x, y)).
+      tff(t3, type, x: $i).
+      tff(t4, type, y: $i).
       """
 
-      refute "TPTP0505" in codes(source)
+      assert codes(source) == []
     end
 
-    test "the arities are recorded even where the rule declines" do
+    test "a $let binding is not an application at arity zero" do
+      # The shape of `SYN000_4.p`, the TPTP's own TXF syntax demonstration. The let's
+      # type section names `ff` with no arguments, and reading that as a use reported
+      # `ff` as applied at 0 and 2 — which was this library's bug, not the file's.
+      source = ~s{tff(a, axiom, $let(ff: ( $int * $int ) > $int, ff(X,Y) := X, p(ff(1,2)))).}
+
+      assert %{arities: arities} = table(source).symbols["ff"]
+      assert MapSet.to_list(arities) == [2]
+    end
+
+    test "the arities are recorded, for a consumer that wants them" do
       table =
         table("""
         thf(f_type, type, f: $i > $i > $o).
@@ -162,18 +188,8 @@ defmodule Tptp.LintTest do
         thf(b, axiom, f @ x @ y).
         """)
 
-      assert table.symbols["f"].arities |> MapSet.to_list() |> Enum.sort() == [1, 2]
-    end
-
-    test "argument counting handles both list shapes" do
-      assert table("fof(a, axiom, p(x, y, z)).").symbols["p"].arities == MapSet.new([3])
-      assert table("tff(a, axiom, p(x, y, z)).").symbols["p"].arities == MapSet.new([3])
-      assert table("thf(a, axiom, p(x, y, z)).").symbols["p"].arities == MapSet.new([3])
-    end
-
-    test "one occurrence is counted once, not once per node that mentions it" do
-      assert table("fof(a, axiom, p(b)).").symbols["p"].arities == MapSet.new([1])
-      assert table("fof(a, axiom, p).").symbols["p"].arities == MapSet.new([0])
+      assert %{arities: arities} = table.symbols["f"]
+      assert Enum.sort(MapSet.to_list(arities)) == [1, 2]
     end
   end
 
@@ -199,10 +215,152 @@ defmodule Tptp.LintTest do
       assert Map.has_key?(table.symbols, "p")
     end
 
+    test "a modality index names a modality, not a symbol" do
+      table = table("thf(a, axiom, {$necessary(#agent)} @ p).")
+
+      refute Map.has_key?(table.symbols, "agent")
+      assert Map.has_key?(table.symbols, "p")
+    end
+
+    test "a compound modality index is a label all the way down" do
+      table = table("thf(a, axiom, {$necessary(#f(b))} @ p).")
+
+      refute Map.has_key?(table.symbols, "f")
+      refute Map.has_key?(table.symbols, "b")
+    end
+
     test "parents are collected from the source slot" do
       table = table("fof(a, axiom, p, inference(r, [], [b, c])).")
 
       assert table.parents |> Enum.map(&elem(&1, 0)) |> Enum.sort() == ["b", "c"]
+    end
+  end
+
+  describe "a quoted atom is the same atomic word as its unquoted spelling" do
+    test "one symbol, not two" do
+      table = table("tff(t, type, 'p': $i > $o). tff(a, axiom, p(x)).")
+
+      assert Map.has_key?(table.symbols, "p")
+      refute Map.has_key?(table.symbols, "'p'")
+    end
+
+    test "the declaration satisfies the use" do
+      source = "tff(t, type, 'p': $i > $o). tff(c, type, x: $i). tff(a, axiom, p(x))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == []
+    end
+
+    test "a $let binding declares the name it binds" do
+      # `$let` introduces a local declaration inside an ordinary axiom, so the rule
+      # must not report the bound name as undeclared. 39 library files turned on
+      # this, all of them TFX.
+      source = """
+      tff(arr, type, array: $tType > $tType).
+      tff(e, type, elt: $tType).
+      tff(mk, type, mk_array: elt > array(elt)).
+      tff(p, type, permut: ( array(elt) * array(elt) ) > $o).
+      tff(x, type, x: elt).
+      tff(a, axiom, $let(a: array(elt), a := mk_array(x), permut(a, a))).
+      """
+
+      assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == []
+    end
+
+    test "a $let binding does not declare a name used outside it" do
+      source = """
+      tff(e, type, elt: $tType).
+      tff(x, type, x: elt).
+      tff(p, type, p: elt > $o).
+      tff(a, axiom, $let(b: elt, b := x, p(b)) & p(c)).
+      """
+
+      assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == ["TPTP0501"]
+    end
+
+    test "the two spellings are one symbol in the table" do
+      source = "fof(a, axiom, p(x)). fof(b, axiom, 'p'(x, y))."
+
+      assert %{arities: arities} = table(source).symbols["p"]
+      assert Enum.sort(MapSet.to_list(arities)) == [1, 2]
+    end
+
+    test "two statements named the same word two ways are duplicates" do
+      source = "fof(a, axiom, p). fof('a', axiom, q)."
+
+      assert codes(source, only: [Tptp.Lint.Rules.DuplicateName]) == ["TPTP0503"]
+    end
+
+    test "a parent named with quotes finds its statement" do
+      source = "fof(a, axiom, p). fof(b, plain, q, inference(r, [], ['a']))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Parent]) == []
+    end
+
+    test "escapes are resolved, so the word is the bytes it denotes" do
+      table = table(~S|fof(a, axiom, 'it\'s').|)
+
+      assert Map.has_key?(table.symbols, "it's")
+    end
+
+    test "a distinct object is not the atom of the same letters" do
+      table = table(~S|fof(a, axiom, p("cat") = 'cat').|)
+
+      assert Map.has_key?(table.symbols, "cat")
+      refute Map.has_key?(table.symbols, ~S|"cat"|)
+    end
+  end
+
+  describe "conjectures" do
+    test "a unit that asks nothing is reported once, at the top of the root file" do
+      {:ok, unit, []} = Tptp.Unit.from_string("fof(a, axiom, p).")
+      [diagnostic] = Lint.run_unit(unit)
+
+      assert diagnostic.code == "TPTP0506"
+      assert diagnostic.severity == :info
+      assert diagnostic.span.offset == 0
+    end
+
+    test "a file is not a problem, so run/2 declines to say it asks nothing" do
+      assert codes("fof(a, axiom, p).") == []
+    end
+
+    test "a conjecture reached through an include counts" do
+      resolver = {Tptp.Resolver.Map, files: %{"goal.ax" => "fof(g, conjecture, p)."}}
+
+      {:ok, unit, []} =
+        Tptp.Unit.from_string("fof(a, axiom, p). include('goal.ax').", resolver: resolver)
+
+      assert Lint.run_unit(unit) == []
+    end
+
+    test "many negated_conjecture clauses are one conjecture, not many" do
+      source = """
+      cnf(a, axiom, p).
+      cnf(n1, negated_conjecture, ~q).
+      cnf(n2, negated_conjecture, ~r).
+      """
+
+      assert codes(source) == []
+
+      {:ok, unit, []} = Tptp.Unit.from_string(source)
+      assert Lint.run_unit(unit) == []
+    end
+
+    test "two conjectures are reported against the first" do
+      [diagnostic] =
+        found("fof(g1, conjecture, p). fof(g2, conjecture, q).",
+          only: [Tptp.Lint.Rules.Conjecture]
+        )
+
+      assert diagnostic.message =~ "2 conjectures"
+      assert [{span, "first conjecture here"}] = diagnostic.related
+      assert span.offset == 8
+    end
+
+    test "an empty unit asks nothing and is not worth saying so" do
+      {:ok, unit, []} = Tptp.Unit.from_string("")
+
+      assert Lint.run_unit(unit) == []
     end
   end
 
@@ -248,7 +406,10 @@ defmodule Tptp.LintTest do
          }}
 
       {:ok, unit, []} =
-        Tptp.Unit.from_string("include('sig.ax'). tff(a, axiom, p(c)).", resolver: resolver)
+        Tptp.Unit.from_string(
+          "include('sig.ax'). tff(a, axiom, p(c)). tff(g, conjecture, p(c)).",
+          resolver: resolver
+        )
 
       assert Lint.run_unit(unit) == []
     end
@@ -269,7 +430,10 @@ defmodule Tptp.LintTest do
          }}
 
       {:ok, unit, []} =
-        Tptp.Unit.from_string("include('left.ax'). include('right.ax').", resolver: resolver)
+        Tptp.Unit.from_string(
+          "include('left.ax'). include('right.ax'). fof(g, conjecture, p).",
+          resolver: resolver
+        )
 
       assert Lint.run_unit(unit) == []
     end
@@ -290,6 +454,36 @@ defmodule Tptp.LintTest do
 
       assert [{span, "first named here"}] = diagnostic.related
       assert span.offset == 4
+    end
+  end
+
+  describe "scan/2" do
+    @source "tff(t, type, p: $i > $o). tff(a, axiom, p(x)). fof(b, wibble, q). fof(b, axiom, r)."
+
+    test "returns the diagnostics run/2 returns and the table table/1 returns" do
+      {:ok, file, []} = Tptp.from_string(@source)
+      {diagnostics, table} = Lint.scan(file)
+
+      assert diagnostics == Lint.run(file)
+      assert table == Lint.table(file)
+      assert %Tptp.Lint.Table{} = table
+    end
+
+    test "only: [] builds the table and runs no rule" do
+      {:ok, file, []} = Tptp.from_string("fof(a, wibble, p). fof(a, axiom, q).")
+      {diagnostics, table} = Lint.scan(file, only: [])
+
+      assert diagnostics == []
+      assert Map.has_key?(table.symbols, "p")
+    end
+
+    test "passes options through the way run/2 does" do
+      {:ok, file, []} = Tptp.from_string(@source)
+
+      assert {[], _table} = Lint.scan(file, only: [Tptp.Lint.Rules.Parent])
+
+      {diagnostics, _} = Lint.scan(file, severity: %{"TPTP0401" => :error})
+      assert Enum.find(diagnostics, &(&1.code == "TPTP0401")).severity == :error
     end
   end
 end

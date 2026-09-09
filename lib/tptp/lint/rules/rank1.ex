@@ -1,20 +1,20 @@
 defmodule Tptp.Lint.Rules.Rank1 do
   @moduledoc """
-  A type quantifier where TPTP only allows rank-1 polymorphism.
+  A type quantifier in a position admitting only rank-1 polymorphism.
 
-  `!>[A: $tType]: ...` binds a type variable, and TPTP allows it only at the very
-  outside of a type. TF1's grammar enforces that itself — `<tf1_quantified_type>`
-  appears only under `<tff_top_level_type>` — but TH1's does not, because THF makes
-  types and terms the same nonterminal and so cannot say where a type ends. So
-  `thf(f, type, f: ($i > !>[A: $tType]: A) > $o).` parses, and is rank-2, and no
-  TPTP tool will read it.
+  `!>[A: $tType]: ...` binds a type variable, which TPTP permits only at the
+  outermost position of a type. The TF1 grammar enforces this directly, since
+  `<tf1_quantified_type>` occurs only beneath `<tff_top_level_type>`. The TH1
+  grammar cannot, because THF identifies types with terms and therefore cannot
+  delimit a type. Consequently `thf(f, type, f: ($i > !>[A: $tType]: A) > $o).`
+  parses, denotes a rank-2 type, and is accepted by no TPTP implementation.
 
-  This is the one place the library says something about a *type* rather than a
-  term, and it stays syntactic: a `!>` or `?*` that has an arrow above it inside the
-  same typing is rank-2. No elaboration, no notion of what the type means — just
-  where the quantifier sits.
+  This is the only rule concerning a type rather than a term, and it remains
+  syntactic: a `!>` or `?*` occurring beneath an arrow within the same typing is
+  rank-2. No elaboration is performed and the meaning of the type is not
+  considered.
 
-  A warning, because a prover with genuine rank-N support is entitled to its own
+  A warning, since an implementation with genuine rank-N support may define its own
   extension.
   """
 

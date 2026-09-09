@@ -10,6 +10,10 @@ defmodule Tptp.Bnf.Vocabulary do
   <atomic_defined_word>` admits any `$`-word. Membership here is what
   separates a well-formed statement from a merely parseable one, and it is
   checked by `Tptp.Lint` at warning severity rather than by the parser.
+
+  Every list here is a `:==` rule of the BNF except `<reserved_word>`, which is
+  this library's own: the BNF has no such rule, and the list is every
+  `$`-prefixed literal appearing anywhere in it. See `Tptp.Bnf.Generator`.
   """
 
   @defined_functor_values [
@@ -143,17 +147,18 @@ defmodule Tptp.Bnf.Vocabulary do
     "plain",
     "type",
     "interpretation",
-    "unknown"
+    "unknown",
+    "logic"
   ]
 
   @doc """
-  The 13 values the BNF lists for `<formula_role>`.
+  The 14 values the BNF lists for `<formula_role>`.
   """
   @spec formula_role_values() :: [binary()]
   def formula_role_values, do: @formula_role_values
 
   @doc """
-  Whether `word` is one of the 13 `<formula_role>` values.
+  Whether `word` is one of the 14 `<formula_role>` values.
   """
   @spec formula_role?(binary()) :: boolean()
   def formula_role?("axiom"), do: true
@@ -169,6 +174,7 @@ defmodule Tptp.Bnf.Vocabulary do
   def formula_role?("type"), do: true
   def formula_role?("interpretation"), do: true
   def formula_role?("unknown"), do: true
+  def formula_role?("logic"), do: true
   def formula_role?(word) when is_binary(word), do: false
 
   @intro_type_values ["definition", "tautology", "assumption", "theory"]
@@ -389,6 +395,8 @@ defmodule Tptp.Bnf.Vocabulary do
   def status_value?(word) when is_binary(word), do: false
 
   @reserved_word_values [
+    "$let",
+    "$ite",
     "$box",
     "$dia",
     "$necessary",
@@ -479,19 +487,30 @@ defmodule Tptp.Bnf.Vocabulary do
     "$round",
     "$to_int",
     "$to_rat",
-    "$to_real"
+    "$to_real",
+    "$thf",
+    "$tff",
+    "$fof",
+    "$cnf",
+    "$fot"
   ]
 
   @doc """
-  The 91 values the BNF lists for `<reserved_word>`.
+  The 98 `$`-words the BNF mentions anywhere.
+
+  Not a `:==` rule — the BNF has no `<reserved_word>` — but every `$`-prefixed
+  literal collected from every alternative of it. A superset of the words the
+  language defines, which is what `Tptp.Lint.Rules.DefinedWord` wants.
   """
   @spec reserved_word_values() :: [binary()]
   def reserved_word_values, do: @reserved_word_values
 
   @doc """
-  Whether `word` is one of the 91 `<reserved_word>` values.
+  Whether `word` is one of the 98 `$`-words the BNF mentions.
   """
   @spec reserved_word?(binary()) :: boolean()
+  def reserved_word?("$let"), do: true
+  def reserved_word?("$ite"), do: true
   def reserved_word?("$box"), do: true
   def reserved_word?("$dia"), do: true
   def reserved_word?("$necessary"), do: true
@@ -583,5 +602,10 @@ defmodule Tptp.Bnf.Vocabulary do
   def reserved_word?("$to_int"), do: true
   def reserved_word?("$to_rat"), do: true
   def reserved_word?("$to_real"), do: true
+  def reserved_word?("$thf"), do: true
+  def reserved_word?("$tff"), do: true
+  def reserved_word?("$fof"), do: true
+  def reserved_word?("$cnf"), do: true
+  def reserved_word?("$fot"), do: true
   def reserved_word?(word) when is_binary(word), do: false
 end

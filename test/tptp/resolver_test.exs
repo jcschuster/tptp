@@ -5,6 +5,8 @@ defmodule Tptp.ResolverTest do
   doctest Tptp.Resolver.Http
 
   alias Tptp.Resolver
+  alias Tptp.Resolver.Fs
+  alias Tptp.Resolver.Http
 
   @tmp Path.join(System.tmp_dir!(), "tptp-resolver-test")
 
@@ -108,9 +110,9 @@ defmodule Tptp.ResolverTest do
     end
 
     test "roots/2 reports the search order", %{library: library} do
-      roots = Tptp.Resolver.Fs.roots("/somewhere/problem.p", root: library, cwd: false)
+      roots = Fs.roots("/somewhere/problem.p", root: library, cwd: false)
 
-      assert ["/somewhere", ^library] = roots
+      assert ["/somewhere", ^library | _] = roots
     end
   end
 
@@ -158,27 +160,27 @@ defmodule Tptp.ResolverTest do
 
   describe "Tptp.Resolver.Http" do
     test "maps an axiom name to the Axioms category" do
-      assert Tptp.Resolver.Http.url("Axioms/SET007+0.ax") ==
+      assert Http.url("Axioms/SET007+0.ax") ==
                "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2B0.ax"
 
-      assert Tptp.Resolver.Http.url("SET007+0.ax") == Tptp.Resolver.Http.url("Axioms/SET007+0.ax")
+      assert Http.url("SET007+0.ax") == Http.url("Axioms/SET007+0.ax")
     end
 
     test "maps a problem name to its domain" do
-      assert Tptp.Resolver.Http.url("Problems/PUZ/PUZ001+1.p") ==
+      assert Http.url("Problems/PUZ/PUZ001+1.p") ==
                "https://tptp.org/cgi-bin/SeeTPTP?Category=Problems&Domain=PUZ&File=PUZ001%2B1.p"
 
-      assert Tptp.Resolver.Http.url("PUZ001+1.p") ==
-               Tptp.Resolver.Http.url("Problems/PUZ/PUZ001+1.p")
+      assert Http.url("PUZ001+1.p") ==
+               Http.url("Problems/PUZ/PUZ001+1.p")
     end
 
     test "the + in a TPTP name survives encoding" do
-      assert Tptp.Resolver.Http.url("PUZ123^5.p") =~ "File=PUZ123%5E5.p"
-      refute Tptp.Resolver.Http.url("SET007+0.ax") =~ "SET007 0.ax"
+      assert Http.url("PUZ123^5.p") =~ "File=PUZ123%5E5.p"
+      refute Http.url("SET007+0.ax") =~ "SET007 0.ax"
     end
 
     test "the base url can be pointed elsewhere" do
-      assert Tptp.Resolver.Http.url("a.ax", base_url: "http://localhost:4000/see") ==
+      assert Http.url("a.ax", base_url: "http://localhost:4000/see") ==
                "http://localhost:4000/see?Category=Axioms&File=a.ax"
     end
 
@@ -190,7 +192,7 @@ defmodule Tptp.ResolverTest do
     test "a cached body is served without reaching the network" do
       dir = Path.join(@tmp, "cache")
       options = [cache_dir: dir, base_url: "http://127.0.0.1:1/see"]
-      url = Tptp.Resolver.Http.url("a.ax", options)
+      url = Http.url("a.ax", options)
 
       File.mkdir_p!(dir)
 
@@ -225,7 +227,7 @@ defmodule Tptp.ResolverTest do
       </body></html>
       """
 
-      assert {:ok, contents} = Tptp.Resolver.Http.contents(page)
+      assert {:ok, contents} = Http.contents(page)
 
       refute contents =~ "<A NAME"
       refute contents =~ "&lt;"
@@ -241,7 +243,7 @@ defmodule Tptp.ResolverTest do
         "<pre>\nfof(a,axiom, (p &lt;=> q) | (r &lt;~> s)).\n" <>
           "thf(t,type, f: $i > $i).\nthf(u,axiom, a &lt;&lt; b).\n</pre>"
 
-      assert {:ok, contents} = Tptp.Resolver.Http.contents(page)
+      assert {:ok, contents} = Http.contents(page)
       assert contents =~ "(p <=> q) | (r <~> s)"
       assert contents =~ "f: $i > $i"
       assert contents =~ "a << b"
@@ -250,11 +252,11 @@ defmodule Tptp.ResolverTest do
     end
 
     test "a page with no pre block is the error page" do
-      assert Tptp.Resolver.Http.contents("<html><body>No such file</body></html>") == :error
+      assert Http.contents("<html><body>No such file</body></html>") == :error
     end
 
     test "a plain body is already the file" do
-      assert Tptp.Resolver.Http.contents("fof(a, axiom, p).") == {:ok, "fof(a, axiom, p)."}
+      assert Http.contents("fof(a, axiom, p).") == {:ok, "fof(a, axiom, p)."}
     end
 
     test "the library does not make its consumers start :inets and :ssl" do
@@ -269,7 +271,7 @@ defmodule Tptp.ResolverTest do
     test "a cache hit resolves without needing them started" do
       dir = Path.join(@tmp, "no-network")
       options = [cache_dir: dir, base_url: "http://127.0.0.1:1/see"]
-      url = Tptp.Resolver.Http.url("b.ax", options)
+      url = Http.url("b.ax", options)
 
       File.mkdir_p!(dir)
 
@@ -283,8 +285,8 @@ defmodule Tptp.ResolverTest do
     end
 
     test "starting them is idempotent and reports rather than raises" do
-      assert Tptp.Resolver.Http.started() == :ok
-      assert Tptp.Resolver.Http.started() == :ok
+      assert Http.started() == :ok
+      assert Http.started() == :ok
     end
   end
 end

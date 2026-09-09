@@ -1,38 +1,64 @@
 defmodule Tptp.Lint.Table do
   @moduledoc """
-  What the traversal learned, for the rules that need more than one statement.
+  The information accumulated by the traversal, for rules requiring more than one
+  statement.
 
-  ## Syntactic only
+  ## Syntactic content only
 
-  A symbol's entry records the *node* its type was declared as, unelaborated. There
-  is no unification here, no substitution, no notion that `$i` is a type and `a` is
-  not. That is the boundary the whole library is built around: TPTP's typed
-  dialects annotate everything, so nothing needs inferring, and a table that
-  started inferring would be a type checker wearing a lint rule's clothes.
+  A symbol's entry records the unelaborated `Tptp.Node` its type was declared as.
+  No unification or substitution is performed and `$i` is not interpreted as a
+  type. The questions asked of `declared_as` are syntactic: whether it contains a
+  `!>`, how many arrows its spine has. Anything further requires a signature and
+  belongs to the consumer.
 
-  So `declared_as` is a `Tptp.Node`, and the only questions asked of it are
-  syntactic — does it contain a `!>`, how many arrows does its spine have. Anything
-  further belongs to a consumer with a signature in hand.
+  ## Keys
 
-  ## Arities are recorded, not judged
+  Every key — symbol, statement name, inference parent — is a `Tptp.Node.value/1`
+  rather than a `text`. `'p'` and `p` are one atomic word by the BNF's definition
+  and therefore one entry, and `name` in a symbol holds the unquoted word. A caller
+  reporting the spelling has the spans from which to read it.
 
-  `arities` collects every spine length a symbol was applied at. Inconsistency is
-  a finding in CNF and FOF and *not* a finding in TH1, because instantiating a type
-  variable raises arity — `ar(t[b]) >= ar(t)` — so a polymorphic symbol is applied
-  at several arities as a matter of course. The table records; `Tptp.Lint.Rules.Arity`
-  decides, and knows the difference.
+  ## Arities
+
+  `arities` records every application arity observed for a symbol. No rule reads it
+  to derive a finding, because arity overloading is well formed. The TPTP language
+  page states:
+
+  > Symbols may be overloaded with different arity signatures, and are treated as
+  > different symbols.
+
+  So `color/1` alongside `color/2` denotes two symbols in every dialect. A rule
+  reporting such pairs was shipped for a period and was incorrect on every file it
+  applied to; see the CHANGELOG.
+
+  Two consequences follow. Arity forms part of a symbol's identity in TPTP, and
+  this table is keyed on the name alone, so `sqrt/1` and `sqrt/2` occupy one entry.
+  That suffices for the rules reading this table, each of which asks only whether a
+  name was declared, and is recorded here because a consumer deriving a signature
+  from `Tptp.Query.symbols/1` must account for it. Further, the arity condition
+  TPTP does state — "If a symbol's type is declared more than once, and the types
+  are not the same, that's an error" — concerns a single symbol and therefore
+  compares two declarations at the same arity, which this table cannot presently
+  distinguish.
   """
 
   alias Tptp.Node
   alias Tptp.Span
 
-  defstruct symbols: %{}, names: %{}, parents: [], features: MapSet.new(), counted: MapSet.new()
+  defstruct symbols: %{},
+            names: %{},
+            parents: [],
+            conjectures: [],
+            features: MapSet.new(),
+            counted: MapSet.new()
 
   @typedoc """
   One symbol, as the traversal saw it.
 
-  `declared_as` is `nil` for a symbol that was used but never declared, which is
-  legal in FOF and CNF and a finding in the typed dialects.
+  `name` is the canonical atomic word, so a symbol written `'p'` in one statement
+  and `p` in the next is this one entry. `declared_as` is `nil` for a symbol that
+  was used but never declared, which is legal in FOF and CNF and a finding in the
+  typed dialects.
   """
   @type symbol :: %{
           name: binary(),
@@ -43,11 +69,15 @@ defmodule Tptp.Lint.Table do
           arities: MapSet.t(non_neg_integer())
         }
 
-  @typedoc "Everything the single walk accumulated: symbols, names, parents, dialect features and counts."
+  @typedoc "Which of the two spellings of a conjecture a statement used."
+  @type conjecture :: :conjecture | :negated_conjecture
+
+  @typedoc "Everything the single walk accumulated: symbols, names, parents, conjectures, dialect features and counts."
   @type t :: %__MODULE__{
           symbols: %{binary() => symbol()},
           names: %{binary() => [Span.t()]},
           parents: [{binary(), Span.t()}],
+          conjectures: [{conjecture(), Span.t()}],
           features: MapSet.t(atom()),
           counted: MapSet.t({Span.file_id(), non_neg_integer()})
         }
@@ -99,6 +129,19 @@ defmodule Tptp.Lint.Table do
   end
 
   @doc """
+  Claim a position without recording anything, so nothing else counts it.
+
+  For a subtree whose atoms are labels rather than uses — the term of an
+  `<ntf_index>`, where `#agent` names a modality rather than applying a symbol.
+  `use/5` drops a position it has already seen, so claiming the position first is
+  how a top-down walk with no way to look up says "not this one".
+  """
+  @spec ignore(t(), Span.t()) :: t()
+  def ignore(%__MODULE__{} = table, span) do
+    %{table | counted: MapSet.put(table.counted, {:use, span.file, span.offset})}
+  end
+
+  @doc """
   Record a statement's name, so a second one can be reported against the first.
 
   One position counts once, for the same reason `use/5` says so and a sharper one:
@@ -142,6 +185,31 @@ defmodule Tptp.Lint.Table do
   end
 
   @doc """
+  Record a conjecture, in whichever of the two spellings it was written.
+
+  `conjecture` and `negated_conjecture` are kept apart because they do not count
+  the same way: one conjecture negated into clause normal form becomes many
+  `negated_conjecture` clauses, so counting those would call every CNF problem in
+  the library over-specified.
+
+  One position counts once, for the reason `use/5` gives.
+  """
+  @spec conjecture(t(), conjecture(), Span.t()) :: t()
+  def conjecture(%__MODULE__{} = table, form, span) do
+    position = {:conjecture, span.file, span.offset}
+
+    if MapSet.member?(table.counted, position) do
+      table
+    else
+      %{
+        table
+        | conjectures: [{form, span} | table.conjectures],
+          counted: MapSet.put(table.counted, position)
+      }
+    end
+  end
+
+  @doc """
   Record a dialect feature the traversal saw.
   """
   @spec feature(t(), atom()) :: t()
@@ -156,6 +224,14 @@ defmodule Tptp.Lint.Table do
   def feature?(%__MODULE__{} = table, feature), do: MapSet.member?(table.features, feature)
 
   @doc """
+  Every dialect feature the traversal saw, as a list.
+
+  `Tptp.Query.from_features/1` turns this into a dialect.
+  """
+  @spec features(t()) :: [atom()]
+  def features(%__MODULE__{features: features}), do: MapSet.to_list(features)
+
+  @doc """
   Put every accumulated list back into reading order.
 
   The traversal prepends, because prepending is what a list is for; this is the one
@@ -168,7 +244,8 @@ defmodule Tptp.Lint.Table do
       | symbols:
           Map.new(table.symbols, fn {k, v} -> {k, %{v | used_at: Enum.reverse(v.used_at)}} end),
         names: Map.new(table.names, fn {k, v} -> {k, Enum.reverse(v)} end),
-        parents: Enum.reverse(table.parents)
+        parents: Enum.reverse(table.parents),
+        conjectures: Enum.reverse(table.conjectures)
     }
   end
 
@@ -181,5 +258,29 @@ defmodule Tptp.Lint.Table do
       used_at: [],
       arities: MapSet.new()
     }
+  end
+
+  defimpl Inspect do
+    @moduledoc false
+    import Inspect.Algebra
+
+    # The table carries every symbol in the unit, each with its spans. On a large axiom
+    # set that is hundreds of thousands of entries. `Tptp.Query.symbols/1` is how to
+    # read them.
+    @impl true
+    def inspect(table, opts) do
+      concat([
+        "#Tptp.Lint.Table<",
+        count(map_size(table.symbols), "symbol"),
+        ", ",
+        count(map_size(table.names), "name"),
+        ", ",
+        to_doc(Enum.sort(MapSet.to_list(table.features)), opts),
+        ">"
+      ])
+    end
+
+    defp count(1, noun), do: "1 #{noun}"
+    defp count(n, noun), do: "#{n} #{noun}s"
   end
 end

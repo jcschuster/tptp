@@ -38,7 +38,7 @@ defmodule Tptp.ParserCorpusTest do
   alias Tptp.Test.Corpus
 
   @moduletag :corpus
-  @moduletag timeout: 900_000
+  @moduletag timeout: Corpus.timeout()
 
   @consumed MapSet.new([
               :thf_annotated,
@@ -104,15 +104,7 @@ defmodule Tptp.ParserCorpusTest do
            "only #{MapSet.size(observed)} kinds seen; the sample is too thin to mean anything"
   end
 
-  defp stream(files, fun) do
-    files
-    |> Task.async_stream(fun,
-      max_concurrency: System.schedulers_online(),
-      timeout: 600_000,
-      ordered: false
-    )
-    |> Enum.map(fn {:ok, result} -> result end)
-  end
+  defp stream(files, fun), do: Corpus.values(files, fun, timeout: 600_000)
 
   defp unparsable(path) do
     source = File.read!(path)

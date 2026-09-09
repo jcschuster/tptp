@@ -2,7 +2,7 @@ defmodule Tptp.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/johannes-schuster/tptp"
+  @source_url "https://github.com/jcschuster/tptp"
 
   def project do
     [
@@ -89,7 +89,7 @@ defmodule Tptp.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
       files: ~w(lib src/tptp_parser.yrl priv/bnf priv/szs mix.exs README.md LICENSE NOTICE
-           CHANGELOG.md examples .formatter.exs)
+           CHANGELOG.md CORPUS.md CENSUS.md TPTP-DEFECTS.md examples .formatter.exs)
     ]
   end
 
@@ -98,7 +98,15 @@ defmodule Tptp.MixProject do
       main: "readme",
       source_url: @source_url,
       source_ref: "v#{@version}",
-      extras: ["README.md", "CHANGELOG.md", "NOTICE", "LICENSE"],
+      extras: [
+        "README.md",
+        "TPTP-DEFECTS.md",
+        "CORPUS.md",
+        "CENSUS.md",
+        "CHANGELOG.md",
+        "NOTICE",
+        "LICENSE"
+      ],
       groups_for_modules: [
         "Reading a file": [
           Tptp,
@@ -109,6 +117,10 @@ defmodule Tptp.MixProject do
           Tptp.Statement.Include,
           Tptp.Node,
           Tptp.Query
+        ],
+        Analysis: [
+          Tptp.Analysis,
+          Tptp.Analyzer
         ],
         Stages: [
           Tptp.Lexer,
@@ -137,8 +149,8 @@ defmodule Tptp.MixProject do
           Tptp.Lint.Context,
           Tptp.Lint.Table,
           Tptp.Lint.Collect,
-          Tptp.Lint.Rules.Arity,
           Tptp.Lint.Rules.AtomTyping,
+          Tptp.Lint.Rules.Conjecture,
           Tptp.Lint.Rules.Declaration,
           Tptp.Lint.Rules.DefinedWord,
           Tptp.Lint.Rules.DuplicateName,

@@ -17,6 +17,7 @@ defmodule Tptp.SzsTest do
 
   alias Tptp.Bnf.Vocabulary
   alias Tptp.Szs
+  alias Tptp.Szs.Extract
   alias Tptp.Szs.Ontology
 
   describe "the generated ontology" do
@@ -85,9 +86,62 @@ defmodule Tptp.SzsTest do
       assert String.length(Ontology.digest()) == 64
     end
 
-    test "the page's own typo is preserved rather than corrected" do
-      assert Ontology.name(:counter_tautologyy_preserving) == "CounterTautologyyPreserving"
-      assert Ontology.from_status_value("ctp") == {:ok, :counter_tautologyy_preserving}
+    test "the page's own typo is kept in the name and overridden in the atom" do
+      # The name quotes the source, so it keeps the doubled `y`; the atom is this
+      # library's own identifier and does not have to spell one.
+      assert Ontology.name(:counter_tautology_preserving) == "CounterTautologyyPreserving"
+      assert Ontology.from_status_value("ctp") == {:ok, :counter_tautology_preserving}
+      assert Ontology.from_mnemonic("CTP") == {:ok, :counter_tautology_preserving}
+
+      # Only the page's spelling parses. A corrected spelling is a name the
+      # published ontology does not carry, so this ontology cannot claim it.
+      assert Ontology.from_string("CounterTautologyyPreserving") ==
+               {:ok, :counter_tautology_preserving}
+
+      assert Ontology.from_string("CounterTautologyPreserving") == :error
+    end
+
+    test "the one value whose mnemonic takes arguments is here, under its bare code" do
+      assert Ontology.from_string("Assumed") == {:ok, :assumed}
+      assert Ontology.mnemonic(:assumed) == "ASS"
+      assert Ontology.from_mnemonic("ASS") == {:ok, :assumed}
+      assert Ontology.ontology(:assumed) == :no_success
+      assert Ontology.describe(:assumed) =~ "has been assumed"
+    end
+
+    test "ASS and Ass are two values, and case is what tells them apart" do
+      assert Ontology.from_mnemonic("ASS") == {:ok, :assumed}
+      assert Ontology.from_mnemonic("Ass") == {:ok, :assurance}
+      assert Ontology.ontology(:assurance) == :data
+    end
+  end
+
+  describe "reading the page" do
+    test "every value the page lists is recovered" do
+      markup = File.read!(Path.join(["priv", "szs", Ontology.vendored()]))
+
+      listed =
+        ~r{<LI>\s*<TT>([A-Za-z0-9]+)</TT>}i |> Regex.scan(markup) |> Enum.map(&Enum.at(&1, 1))
+
+      recovered = Enum.map(Ontology.values(), &Ontology.name/1)
+
+      assert listed -- recovered == []
+    end
+
+    test "a listed value the pattern cannot read raises rather than going missing" do
+      markup =
+        "<H3> The <TT>Success</TT> Ontology </H3>" <>
+          "<H3> The <TT>NoSuccess</TT> Ontology </H3>" <>
+          "<H3> The <TT>Data</TT> Ontology </H3>" <>
+          "<UL><LI> <TT>Proof</TT> (<TT>Prf</TT>):<BR>A proof." <>
+          "<LI> <TT>Puzzling</TT> (<TT>PZL(</TT><EM>Q</EM><TT>)</TT>):<BR>Unclear.</UL>"
+
+      assert [%{name: "Proof"}, %{name: "Puzzling", mnemonic: "PZL"}] =
+               Extract.parse!(markup)
+
+      broken = String.replace(markup, "(<TT>Prf</TT>)", "")
+
+      assert_raise RuntimeError, ~r/Proof/, fn -> Extract.parse!(broken) end
     end
   end
 

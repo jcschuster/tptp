@@ -1,14 +1,14 @@
 defmodule Tptp.Statement do
   @moduledoc """
-  The two shapes a parsed TPTP statement can take.
+  The two forms a parsed TPTP statement takes.
 
-  `<TPTP_input> ::= <annotated_formula> | <include>`, so there are exactly two, and
-  they are separate structs rather than one struct with a tag because they share no
-  fields worth sharing and a consumer almost always wants one or the other.
+  `<TPTP_input> ::= <annotated_formula> | <include>`, so there are exactly two.
+  They are separate structs rather than one struct with a discriminator, since they
+  share no fields and a consumer requires one or the other.
 
-  `Tptp.Statement.Annotated` is the `thf`/`tff`/`tcf`/`fof`/`cnf`/`tpi` form.
-  `Tptp.Statement.Include` is the `include` directive, which is what makes a file
-  set a graph rather than a list.
+  `Tptp.Statement.Annotated` is the `thf`, `tff`, `tcf`, `fof`, `cnf` and `tpi`
+  form. `Tptp.Statement.Include` is the `include` directive, which makes a set of
+  files a graph rather than a list.
   """
 
   alias Tptp.Statement.Annotated

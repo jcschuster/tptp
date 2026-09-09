@@ -8,19 +8,29 @@ defmodule Tptp.VendoredTest do
   them, so the file cannot drift from the bytes it describes: editing a vendored
   file without updating its attribution fails here, and so does the reverse.
 
-  The `:network` test is the other half, excluded by default because a test suite
-  should not need tptp.org to pass. Run it when bumping a TPTP release:
+  The `:network` tests are the other half, excluded by default because a test suite
+  should not need tptp.org to pass. Run them when bumping a TPTP release:
 
       mix test --include network
 
-  It reconstructs the BNF the way a browser copy does — `<BR>` to newline, tags
+  There is one per vendored file, because `NOTICE` makes the same verbatim claim for
+  both and a claim checked on one of two files is checked on neither.
+
+  The BNF is reconstructed the way a browser copy does — `<BR>` to newline, tags
   stripped, entities and `&nbsp;` undone — because that is exactly how the vendored
-  copy was made, and compares. Trailing white space is ignored on both sides: the
+  copy was made, and compared. Trailing white space is ignored on both sides: the
   page ends with a long run of `&nbsp;<P>` padding so that its anchors have
   somewhere to scroll to, and 43 spaces of scroll room are not part of the grammar.
+
+  The SZS page needs none of that. It is vendored as its own markup, byte for byte,
+  so the check is the digest and nothing else — and a difference there is a fact
+  about the release rather than about how the copy was taken.
   """
 
   use ExUnit.Case, async: true
+
+  alias Tptp.Resolver.Http
+  alias Tptp.Szs.Ontology
 
   @notice Path.join(__DIR__, "../../NOTICE") |> Path.expand()
   @bnf Path.join(__DIR__, "../../priv/bnf/SyntaxBNF-v9.3.1.2") |> Path.expand()
@@ -56,8 +66,8 @@ defmodule Tptp.VendoredTest do
   end
 
   test "the generated ontology was built from the vendored page" do
-    assert Tptp.Szs.Ontology.digest() == digest(@szs)
-    assert Path.basename(@szs) == Tptp.Szs.Ontology.vendored()
+    assert Ontology.digest() == digest(@szs)
+    assert Path.basename(@szs) == Ontology.vendored()
   end
 
   @tag :network
@@ -65,6 +75,14 @@ defmodule Tptp.VendoredTest do
     assert {:ok, page} = fetch("https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html")
 
     assert String.trim_trailing(File.read!(@bnf)) == plain_text(page)
+  end
+
+  @tag :network
+  test "the vendored SZS ontology still matches its page upstream" do
+    assert {:ok, page} = fetch("https://tptp.org/UserDocs/SZSOntology")
+
+    assert :sha256 |> :crypto.hash(page) |> Base.encode16(case: :lower) == digest(@szs),
+           "the SZS page has changed; re-vendor it, run `mix tptp.gen`, and update NOTICE"
   end
 
   defp plain_text(page) do
@@ -87,7 +105,7 @@ defmodule Tptp.VendoredTest do
   end
 
   defp fetch(url) do
-    with :ok <- Tptp.Resolver.Http.started(),
+    with :ok <- Http.started(),
          request = {String.to_charlist(url), [{~c"user-agent", ~c"tptp-elixir"}]},
          {:ok, {{_version, 200, _phrase}, _headers, body}} <-
            :httpc.request(:get, request, [timeout: 60_000, autoredirect: true],

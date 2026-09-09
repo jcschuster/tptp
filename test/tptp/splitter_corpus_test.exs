@@ -26,7 +26,7 @@ defmodule Tptp.SplitterCorpusTest do
   alias Tptp.Test.Corpus
 
   @moduletag :corpus
-  @moduletag timeout: 900_000
+  @moduletag timeout: Corpus.timeout()
 
   setup_all do
     files = Corpus.files(every: 3)
@@ -101,15 +101,11 @@ defmodule Tptp.SplitterCorpusTest do
     assert disagreed == []
   end
 
-  defp stream(files, fun) do
-    files
-    |> Task.async_stream(fun,
-      max_concurrency: System.schedulers_online(),
-      timeout: 600_000,
-      ordered: false
-    )
-    |> Enum.map(fn {:ok, result} -> result end)
-  end
+  # Splitting stops at the token stream, and the one test here that parses goes
+  # through the generated grammar a statement at a time rather than building a
+  # file's tree — so, like the lexer gate, this one takes more workers over the same
+  # module share rather than a ceiling of its own.
+  defp stream(files, fun), do: Corpus.values(files, fun, timeout: 600_000, concurrency: 4)
 
   defp tier_two(path) do
     source = File.read!(path)

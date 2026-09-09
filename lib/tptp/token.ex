@@ -16,8 +16,8 @@ defmodule Tptp.Token do
   which keeps the scan loop free of binary allocation.
 
   Every atom named here is created at compile time. Nothing in this library ever
-  calls `String.to_atom/1` on input; see the `Credo.Check.Warning.NoDynamicAtoms`
-  check for the mechanical enforcement.
+  calls `String.to_atom/1` on input; see `Tptp.Checks.NoDynamicAtoms`, the custom
+  Credo check that enforces it mechanically.
   """
 
   @typedoc "A terminal category. Always a compile-time atom."

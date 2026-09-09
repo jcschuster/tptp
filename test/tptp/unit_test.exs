@@ -181,6 +181,22 @@ defmodule Tptp.UnitTest do
       refute Unit.any_errors?(unit)
     end
 
+    test "a quoted selection name selects the unquoted statement, and back" do
+      {unit, []} =
+        unit("include('a.ax', ['wanted']).", %{
+          "a.ax" => "fof(wanted, axiom, p). fof(unwanted, axiom, q)."
+        })
+
+      assert names(unit) == ["wanted"]
+
+      {other, []} =
+        unit("include('a.ax', [wanted]).", %{
+          "a.ax" => "fof('wanted', axiom, p). fof(unwanted, axiom, q)."
+        })
+
+      assert names(other) == ["'wanted'"]
+    end
+
     test "the same file may be included twice with different selections" do
       {unit, []} =
         unit("include('a.ax', [one]). include('a.ax', [two]).", %{

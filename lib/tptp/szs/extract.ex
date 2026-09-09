@@ -2,22 +2,37 @@ defmodule Tptp.Szs.Extract do
   @moduledoc """
   Reads the vendored SZS ontology page into a list of status values.
 
-  `mix tptp.gen` runs this and writes `Tptp.Szs.Ontology`; nothing at runtime calls
-  it. It is here rather than in `lib/mix/tasks/` so it can be tested directly and so
-  its reading of the page is documented where the reading happens.
+  `mix tptp.gen` invokes this and writes `Tptp.Szs.Ontology`; nothing calls it at
+  runtime. It resides here rather than under `lib/mix/tasks/` so that it can be
+  tested directly and its reading of the page documented alongside it.
 
-  ## Why a web page and not a data file
+  ## Source format
 
-  There is no machine-readable SZS ontology to fetch. The BNF ships as a file and is
-  vendored as one; the ontology exists as
-  <https://tptp.org/UserDocs/SZSOntology>, and everything below is recovered from
-  its markup. That markup is regular enough to parse strictly rather than
-  heuristically: every value is one `<LI> <TT>Name</TT> (<TT>Mnc</TT>):<BR>` line
-  followed by its description, and nothing else in the three ontology sections has
-  that shape. A page that stops matching produces no values rather than wrong ones,
-  and the generator refuses to write a suspiciously short table.
+  No machine-readable SZS ontology is published. The BNF is distributed as a file
+  and vendored as one; the ontology exists only as
+  <https://tptp.org/UserDocs/SZSOntology>, and the values are recovered from its
+  markup. That markup is regular enough to parse strictly: every value is a single
+  `<LI> <TT>Name</TT> (<TT>Mnc</TT>):<BR>` line followed by its description, and
+  nothing else in the three ontology sections has that form.
 
-  ## What is recovered, and what is not
+  ## Completeness
+
+  A pattern that ceases to match one entry is the failure mode of concern, since
+  the result is a table correct in what it contains and short by one entry. This
+  occurred: `Assumed` is written
+  `(<TT>ASS(</TT><EM>U</EM><TT>,</TT><EM>S</EM><TT>)</TT>)`, the only mnemonic on
+  the page taking arguments, and a pattern requiring three letters between `<TT>`
+  and `</TT>` did not match it. A lower bound on the total does not detect this.
+
+  So the count is checked against the page rather than against a constant. Every
+  `<LI> <TT>Name</TT>` in a section must come back as a value, and a name that does
+  not raises with its own spelling in the message. The mnemonic pattern is now
+  whatever stands between the parentheses, of which the leading three letters are
+  the code — `ASS` for `ASS(U,S)` — so the arguments no longer cost the value its
+  place in the table. What they are is in the value's own description, which is the
+  page's sentence about them.
+
+  ## Recovered fields
 
   Recovered: every value's `OneWord` name, its three-letter mnemonic, its
   description, which of the three ontologies it belongs to, and — from the nesting
@@ -53,7 +68,9 @@ defmodule Tptp.Szs.Extract do
     {~r{<H3>\s*The\s*<TT>Data</TT>\s*Ontology\s*</H3>}i, :data, "Data"}
   ]
 
-  @entry ~r"<LI>\s*<TT>([A-Za-z0-9]+)</TT>\s*\(<TT>([A-Za-z0-9]{3})</TT>\)\s*:\s*<BR>(.*?)(?=<LI>|</UL>|<H3>|\z)"is
+  @entry ~r"<LI>\s*<TT>([A-Za-z0-9]+)</TT>\s*\((.*?)\)\s*:\s*<BR>(.*?)(?=<LI>|</UL>|<H3>|\z)"is
+
+  @candidate ~r"<LI>\s*<TT>([A-Za-z0-9]+)</TT>"i
 
   @doc """
   Read every status value out of the page at `path`.
@@ -96,14 +113,32 @@ defmodule Tptp.Szs.Extract do
 
   @spec entries(binary(), atom(), binary()) :: [value()]
   defp entries(section, ontology, root) do
-    @entry
-    |> Regex.scan(section, return: :index)
-    |> Enum.map_reduce(root, fn captures, carried ->
-      value = entry(section, captures, ontology, root, carried)
+    values =
+      @entry
+      |> Regex.scan(section, return: :index)
+      |> Enum.map_reduce(root, fn captures, carried ->
+        value = entry(section, captures, ontology, root, carried)
 
-      {value, value.subontology}
-    end)
-    |> elem(0)
+        {value, value.subontology}
+      end)
+      |> elem(0)
+
+    complete!(section, values, ontology)
+  end
+
+  @spec complete!(binary(), [value()], atom()) :: [value()]
+  defp complete!(section, values, ontology) do
+    listed = for [_whole, name] <- Regex.scan(@candidate, section), do: name
+    recovered = Enum.map(values, & &1.name)
+
+    case listed -- recovered do
+      [] ->
+        values
+
+      missing ->
+        raise "the SZS #{ontology} section lists #{Enum.join(missing, ", ")}, " <>
+                "which #{__MODULE__} did not recover; the page has changed shape"
+    end
   end
 
   @spec entry(binary(), [{integer(), integer()}], atom(), binary(), binary()) :: value()
@@ -112,11 +147,19 @@ defmodule Tptp.Szs.Extract do
 
     %{
       name: name,
-      mnemonic: slice(section, mnemonic),
+      mnemonic: section |> slice(mnemonic) |> mnemonic!(name),
       description: section |> slice(description) |> text(),
       ontology: ontology,
       subontology: subontology(section, whole, ontology, root, carried, name)
     }
+  end
+
+  @spec mnemonic!(binary(), binary()) :: binary()
+  defp mnemonic!(fragment, name) do
+    case fragment |> text() |> String.split("(", parts: 2) do
+      [<<code::binary-size(3)>> | _arguments] -> code
+      _otherwise -> raise "#{name} has no three-letter SZS mnemonic: #{inspect(text(fragment))}"
+    end
   end
 
   @spec subontology(binary(), {integer(), integer()}, atom(), binary(), binary(), binary()) ::

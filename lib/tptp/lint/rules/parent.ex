@@ -1,16 +1,22 @@
 defmodule Tptp.Lint.Rules.Parent do
   @moduledoc """
-  An inference record naming a parent that is not in the unit.
+  An inference record naming a parent absent from the unit.
 
-  A derivation's `inference(rule, [], [a, b])` says this formula came from `a` and
-  `b`. If `a` is nowhere, the derivation cannot be checked and probably cannot be
-  read — either a statement was dropped or the name is wrong.
+  In a derivation, `inference(rule, [], [a, b])` records that the formula was
+  derived from `a` and `b`. An absent parent renders the derivation uncheckable,
+  indicating either a dropped statement or an incorrect name.
 
-  A warning, and only reported for names that look like formula names: a `<source>`
-  can also be a `<file_source>`, a `<theory>` or an arbitrary `<general_term>`, and
-  the grammar reaches `<name>` through several of them. The rule stays quiet unless
-  the unit names at least one formula, so it says nothing at all about a problem
-  file that has no derivation in it.
+  A warning, reported only for names occurring in formula-name position. A
+  `<source>` is a `<dag_source>`, an `<internal_source>`, an `<external_source>`,
+  the literal `unknown`, or a bracketed list of sources, and `<name>` is reachable
+  through more than one of these: the rule of an `<inference_record>` and the file
+  name of a `<file_source>` are not formula names and are not resolved as such. The
+  rule also declines unless the unit names at least one formula, so it reports
+  nothing for a problem containing no derivation.
+
+  Before v9.3.1.2 a `<source>` was a `<general_term>`. That expansion is also what
+  renders four library files unparseable; see
+  [TPTP-DEFECTS.md](TPTP-DEFECTS.md), entry `TPTP-2`.
   """
 
   @behaviour Tptp.Lint.Rule

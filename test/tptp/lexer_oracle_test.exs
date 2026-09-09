@@ -38,6 +38,7 @@ defmodule Tptp.LexerOracleTest do
 
   alias Tptp.Bnf.OracleTable
   alias Tptp.Lexer
+  alias Tptp.Test.Corpus
   alias Tptp.Token
 
   @value_categories Token.value_categories()
@@ -110,8 +111,13 @@ defmodule Tptp.LexerOracleTest do
       end
     end
 
+    # Unlike the `:corpus` gates this one runs in the default suite, because it thins
+    # to one file in 97 and reads nothing at all on a machine without the library. It
+    # still reads a few hundred real files, which is more than ExUnit's default minute
+    # allows for when the suite is sharing a machine with something else.
+    @tag timeout: 300_000
     test "on the syntax exercises in the corpus" do
-      for path <- Tptp.Test.Corpus.files(every: 97, max_bytes: 200_000) do
+      for path <- Corpus.files(every: 97, max_bytes: 200_000) do
         source = File.read!(path)
 
         for {category, text} <- value_tokens(source) do

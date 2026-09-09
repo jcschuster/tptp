@@ -194,9 +194,9 @@ defmodule Tptp.Bnf.OracleTable do
   @doc """
   Whether `text` is exactly one `name`, start to end.
 
-  Anchored on both sides: a token that only starts with a `<lower_word>` is not
-  a `<lower_word>`, and the whole point of the oracle is to catch a lexer that
-  stopped a byte early.
+  Anchored at both ends: a token merely beginning with a `<lower_word>` is not
+  a `<lower_word>`, and detecting a lexer that terminated a token early is the
+  purpose of this table.
   """
   @spec matches?(name(), binary()) :: boolean()
   def matches?(name, text) when is_binary(text), do: Regex.match?(pattern(name), text)

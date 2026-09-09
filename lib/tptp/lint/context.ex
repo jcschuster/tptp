@@ -1,24 +1,30 @@
 defmodule Tptp.Lint.Context do
   @moduledoc """
-  Where a node is, when a rule is looking at it.
+  The position of a node within the statement being traversed.
 
-  A `Tptp.Node` knows nothing about its surroundings — it has no parent pointer and
-  no idea which statement it is in — because paying for that on 27 million nodes to
-  serve nine rules would be the wrong trade. The traversal carries this alongside
-  instead, and it is rebuilt per statement rather than per node.
+  A `Tptp.Node` carries no parent pointer and no reference to its statement, since
+  storing either on every node would be prohibitive at the scale the traversal
+  operates on. The traversal carries this structure alongside instead, rebuilt per
+  statement rather than per node.
 
-  `slot` is which part of the statement the walk is in: `:formula`, `:name`,
-  `:role`, `:source` or `:info`. It is what lets a rule about symbols ignore the
-  annotations, where the same words mean something else entirely — `file` in a
-  `<source>` is a keyword, and an atom in a `<general_term>` is a label, not a
-  functor.
+  `whole` records the subject of the traversal: a complete `Tptp.Unit` with
+  includes resolved, or a single `Tptp.File` that may be one part of a problem. A
+  rule whose question concerns the problem rather than the statement — whether any
+  proof obligation is stated — must decline when this is `false`, since the answer
+  may lie in an unread file.
+
+  `slot` records which part of the statement the traversal is within: `:formula`,
+  `:name`, `:role`, `:source` or `:info`. It allows a rule concerned with symbols
+  to disregard the annotations, where the same words denote something else — `file`
+  in a `<source>` is a keyword, and an atom in a `<general_term>` is a label rather
+  than a functor.
   """
 
   alias Tptp.Span
   alias Tptp.Statement
 
   @enforce_keys [:file, :statement, :slot]
-  defstruct [:file, :statement, :slot, :path, depth: 0]
+  defstruct [:file, :statement, :slot, :path, depth: 0, whole: false]
 
   @typedoc "Which part of the statement the walk is currently inside."
   @type slot :: :name | :role | :formula | :source | :info | :file_name | :selection
@@ -29,7 +35,8 @@ defmodule Tptp.Lint.Context do
           statement: Statement.t(),
           slot: slot(),
           path: Path.t() | nil,
-          depth: non_neg_integer()
+          depth: non_neg_integer(),
+          whole: boolean()
         }
 
   @doc """

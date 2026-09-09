@@ -1,57 +1,69 @@
 defmodule Tptp.Lint do
   @moduledoc """
-  The `:==` semantic layer, and the conditions that need more than one statement.
+  The `:==` well-formedness conditions, and the conditions requiring more than one
+  statement.
 
-  The grammar accepts far more than TPTP means. `<formula_role> ::= <lower_word>`
-  admits `wibble`; `<defined_functor> ::= <atomic_defined_word>` admits `$wibble`;
-  `<thf_top_level_type>` admits a rank-2 type that no TPTP tool will read. The `:==`
-  rules of the BNF say which of those are actually well formed, and they are
-  deliberately not enforced by the parser — a file that trips one of them still has
-  a perfectly good CST, and refusing to produce it would make the library useless
-  for exactly the malformed input it exists to describe.
+  The grammar admits considerably more than the language defines.
+  `<formula_role> ::= <lower_word>` admits `wibble`; `<defined_functor> ::=
+  <atomic_defined_word>` admits `$wibble`; `<thf_top_level_type>` admits a rank-2
+  type that no TPTP implementation accepts. The `:==` rules of the BNF state which
+  of these are well formed, and the parser does not enforce them: input violating
+  one still yields a usable tree, and refusing to produce it would preclude the
+  malformed input this library exists to describe.
 
       {:ok, file, []} = Tptp.from_string("fof(a, wibble, p).")
       Tptp.Lint.run(file)
       #=> [%Tptp.Diagnostic{code: "TPTP0401", severity: :warning, ...}]
 
-  ## One walk, not one walk per rule
+  ## Single traversal
 
-  Ten rules over a 455 MB axiom set is either ten traversals of 27 million nodes or
-  one, and the tree does not fit in cache. So `run/2` walks once, offering each node
-  to every enabled rule, and accumulates the symbol table and the dialect features
-  in the same pass. Rules that need the whole picture run afterwards against the
-  table, not against the tree.
+  `run/2` traverses once, offering each node to every enabled rule, and accumulates
+  the symbol table and the dialect features in the same pass. Rules requiring the
+  complete picture run afterwards against the table rather than the tree. Eight
+  rules over a large axiom set would otherwise require eight traversals of a tree
+  that does not fit in cache.
 
-  ## Nothing here infers a type
+  ## No type inference
 
-  The symbol table stores a declared type as the unelaborated `Tptp.Node` it was
-  written as. No unification, no substitution, no notion that `$i` is a type. Every
-  rule that could be tempted — arity consistency above all — is written to be
-  syntactic or to decline. See `Tptp.Lint.Rules.Arity` for the one that would
-  otherwise be wrong on essentially every TH1 file in the library.
+  The symbol table records a declared type as the unelaborated `Tptp.Node` it was
+  written as. No unification or substitution is performed, and `$i` is not
+  interpreted as a type. Every rule is either syntactic or declines. See
+  `Tptp.Lint.Rules.Rank1`, which determines only whether a `!>` occurs within a
+  typing.
 
-  ## There is no dialect rule, and that is a fact about the BNF
+  ## Absence of a dialect rule
 
-  A construct used in a language that does not have it would be a good thing to
-  report, and it cannot happen: the BNF gives each language its own nonterminals,
-  so `^` is unreachable from `<tff_formula>`, `!!` from `<fof_formula>`, and a THF
-  tuple from anywhere but THF. Every one of those was tried against every statement
-  keyword; the grammar refuses all of them at parse time, and a lint rule for it
-  would be a rule that can never fire.
+  Use of a construct in a language that does not provide it is not reportable,
+  because it cannot occur. The BNF gives each language its own nonterminals, so `^`
+  is unreachable from `<tff_formula>`, `!!` from `<fof_formula>`, and a THF tuple
+  from anything but THF. Each was tested against every statement keyword; the
+  grammar rejects all of them at parse time, so such a rule could never apply.
 
-  What is left is not a defect but a classification — a `tff` file using `!>` is
-  TF1 rather than TF0, and perfectly well formed — and `Tptp.Query.dialect/1`
-  answers that constructively from the same traversal.
+  What remains is classification rather than defect — a `tff` file using `!>` is
+  TF1 rather than TF0, and well formed — which `Tptp.Query.dialect/1` derives from
+  the same traversal.
 
   ## Severities
 
-  A rule's severity is its own opinion; `:severity` overrides it per code and
-  `:only`/`:except` select which rules run at all. Every shipped rule that can fire
-  on a conforming TPTP library file does so as a warning, and there is a corpus test
-  that will fail if that stops being true.
+  A rule's severity is a default. `:severity` overrides it per code, and
+  `:only`/`:except` select the rules that run. No shipped rule reports an error on
+  a conforming TPTP library file, and a corpus test enforces this. One rule is
+  `:info` rather than `:warning`: `Tptp.Lint.Rules.Conjecture` reports a property of
+  the problem rather than a defect in it. The remainder are warnings.
+
+  ## Analyzer interface
+
+  `Tptp.Lint` implements `Tptp.Analyzer` as `:tptp_lint`, applicable to any
+  dialect. The callback performs the traversal under the options it is given.
+  Consumers requiring only the default rule set should read `analysis.diagnostics`
+  from `Tptp.analyze/2` rather than dispatching through
+  `Tptp.Analyzer.run_all/3`.
   """
 
+  @behaviour Tptp.Analyzer
+
   alias Tptp.Diagnostic
+  alias Tptp.Lint.Collect
   alias Tptp.Lint.Context
   alias Tptp.Lint.Table
   alias Tptp.Node
@@ -67,20 +79,20 @@ defmodule Tptp.Lint do
     Tptp.Lint.Rules.Declaration,
     Tptp.Lint.Rules.DuplicateName,
     Tptp.Lint.Rules.Parent,
-    Tptp.Lint.Rules.Arity
+    Tptp.Lint.Rules.Conjecture
   ]
 
   @typedoc """
   Options accepted by `run/2`.
 
-    * `:only` — run just these rule modules.
-    * `:except` — run everything but these.
-    * `:severity` — a map of code to severity, overriding what the rule thinks.
-      `severity: %{"TPTP0401" => :error}` promotes an unusual role to a failure.
-      Keyed by binary rather than atom on purpose: a diagnostic code is data that
-      arrives from a config file, and turning it into an atom to look it up is how
-      a library grows an atom-table leak.
-    * `:suppress` — diagnostic codes to drop entirely.
+    * `:only` — run only these rule modules.
+    * `:except` — run every rule but these.
+    * `:severity` — a map from code to severity, overriding the rule's default.
+      `severity: %{"TPTP0401" => :error}` raises an unrecognised role to an error.
+      Keyed by binary rather than atom: a diagnostic code originates in
+      configuration, and converting it to an atom for lookup would admit unbounded
+      growth of the atom table.
+    * `:suppress` — diagnostic codes to discard.
   """
   @type option ::
           {:only, [module()]}
@@ -88,11 +100,30 @@ defmodule Tptp.Lint do
           | {:severity, %{binary() => Diagnostic.severity()}}
           | {:suppress, [binary()]}
 
+  @typedoc """
+  The diagnostics a lint pass produced and the table it built, from one traversal.
+  """
+  @type scan :: {[Diagnostic.t()], Table.t()}
+
   @doc """
-  Every rule this library ships, in the order they are offered each node.
+  Returns the shipped rules, in the order each node is offered to them.
   """
   @spec rules() :: [module()]
   def rules, do: @rules
+
+  @impl Tptp.Analyzer
+  def id, do: :tptp_lint
+
+  @impl Tptp.Analyzer
+  def label, do: "TPTP lint"
+
+  @impl Tptp.Analyzer
+  def dialects, do: :any
+
+  @impl Tptp.Analyzer
+  def analyze(%Tptp.Analysis{} = analysis, options) do
+    analysis.file |> scan(options) |> elem(0)
+  end
 
   @doc """
   Lint one file.
@@ -103,7 +134,7 @@ defmodule Tptp.Lint do
   """
   @spec run(Tptp.File.t(), [option()]) :: [Diagnostic.t()]
   def run(%Tptp.File{} = file, options \\ []) do
-    lint(statements(file), %{file.id => file}, options)
+    file |> scan(options) |> elem(0)
   end
 
   @doc """
@@ -115,20 +146,52 @@ defmodule Tptp.Lint do
   """
   @spec run_unit(Tptp.Unit.t(), [option()]) :: [Diagnostic.t()]
   def run_unit(%Tptp.Unit{} = unit, options \\ []) do
-    lint(statements(unit), unit.files, options)
+    unit |> scan(options) |> elem(0)
+  end
+
+  @doc """
+  One traversal, both halves kept.
+
+  Every enabled rule is offered every node, and the symbol table and dialect
+  features accumulate in the same pass; the diagnostics and the finished table
+  are returned together rather than one being recomputed later.
+
+  `run/2`, `run_unit/2` and `table/1` are projections of this. Pass `only: []` to
+  build the table without applying a rule, as `table/1` does.
+  """
+  @spec scan(Tptp.File.t() | Tptp.Unit.t(), [option()]) :: scan()
+  def scan(subject, options \\ []) do
+    whole = match?(%Tptp.Unit{}, subject)
+    statements = statements(subject)
+
+    enabled = enabled(options)
+    visiting = Enum.filter(enabled, &implements?(&1, :visit, 3))
+    reviewing = Enum.filter(enabled, &implements?(&1, :review, 2))
+
+    {found, table} = traverse(statements, files(subject), visiting, whole)
+    table = Table.finish(table)
+
+    context = %Context{file: root(statements), statement: nil, slot: :formula, whole: whole}
+    reviewed = Enum.flat_map(reviewing, fn rule -> rule.review(table, context) end)
+
+    diagnostics =
+      (Enum.reverse(found) ++ reviewed)
+      |> adjust(options)
+      |> Diagnostic.sort()
+
+    {diagnostics, table}
   end
 
   @doc """
   The symbol table and feature set, without running a single rule.
 
   The same traversal `run/2` makes, stopping before the opinions. `Tptp.Query` is
-  built on this, which is what keeps "one walk" true across both modules rather
+  built on this, which is what maintains "one walk" true across both modules rather
   than only within one of them.
   """
   @spec table(Tptp.File.t() | Tptp.Unit.t()) :: Table.t()
   def table(subject) do
-    {_found, table} = traverse(statements(subject), files(subject), [])
-    Table.finish(table)
+    subject |> scan(only: []) |> elem(1)
   end
 
   @doc """
@@ -141,34 +204,19 @@ defmodule Tptp.Lint do
   defp files(%Tptp.File{} = file), do: %{file.id => file}
   defp files(%Tptp.Unit{} = unit), do: unit.files
 
-  @spec lint([{Tptp.Span.file_id(), Statement.t()}], map(), [option()]) :: [Diagnostic.t()]
-  defp lint(statements, files, options) do
-    enabled = enabled(options)
-    visiting = Enum.filter(enabled, &implements?(&1, :visit, 3))
-    reviewing = Enum.filter(enabled, &implements?(&1, :review, 2))
+  defp root([{id, _statement} | _rest]), do: id
+  defp root([]), do: 0
 
-    {found, table} = traverse(statements, files, visiting)
-    table = Table.finish(table)
-
-    reviewed =
-      Enum.flat_map(reviewing, fn rule ->
-        rule.review(table, %Context{file: 0, statement: nil, slot: :formula})
-      end)
-
-    (Enum.reverse(found) ++ reviewed)
-    |> adjust(options)
-    |> Diagnostic.sort()
-  end
-
-  @spec traverse([{Tptp.Span.file_id(), Statement.t()}], map(), [module()]) ::
+  @spec traverse([{Tptp.Span.file_id(), Statement.t()}], map(), [module()], boolean()) ::
           {[Diagnostic.t()], Table.t()}
-  defp traverse(statements, files, visiting) do
+  defp traverse(statements, files, visiting, whole) do
     Enum.reduce(statements, {[], %Table{}}, fn {id, statement}, {found, table} ->
       context = %Context{
         file: id,
         statement: statement,
         slot: :formula,
-        path: files[id] && files[id].path
+        path: files[id] && files[id].path,
+        whole: whole
       }
 
       walk_statement(statement, context, visiting, found, table)
@@ -195,7 +243,7 @@ defmodule Tptp.Lint do
   end
 
   defp walk(%Node{} = node, context, visiting, {found, table}) do
-    table = Tptp.Lint.Collect.observe(node, context, table)
+    table = Collect.observe(node, context, table)
 
     found =
       Enum.reduce(visiting, found, fn rule, acc ->

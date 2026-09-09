@@ -1,21 +1,19 @@
 defmodule Tptp.Span do
   @moduledoc """
-  A byte range in one file.
+  A byte range within a file.
 
-  Spans are byte offsets, not line/column pairs. Tracking a line and a column in
-  the scanner costs a branch and two increments per byte for information that most
-  tokens never need; a line index is built once per file instead, and only when a
-  diagnostic is actually rendered.
+  Spans record byte offsets rather than line and column pairs. Tracking a line and
+  column in the scanner costs a branch and two increments per byte for information
+  most tokens never require; a line index is constructed once per file instead, and
+  only where a diagnostic is rendered.
 
-  The `file` field is what makes `include` work. A declaration can arrive from an
-  axiom file and be used in the problem file, and a diagnostic about it has to be
-  able to point at both, so a span is meaningless without knowing which file it
-  indexes.
+  The `file` field is required by `include` resolution. A declaration may originate
+  in an axiom file and be used in the problem file, and a diagnostic concerning it
+  must refer to both, so a span is not interpretable without the file it indexes.
 
-  Nodes do not store spans. `%Tptp.Node{}` carries a bare offset and length, and a
-  span is built on demand — the file id is a per-file fact, and paying a word for
-  it on every node of a multi-million-node CST would be paying it in the wrong
-  place.
+  Nodes do not store spans. `%Tptp.Node{}` carries an offset and a length, and a
+  span is constructed on demand, the file identifier being a property of the file
+  rather than of each of its nodes.
   """
 
   @enforce_keys [:file, :offset, :length]

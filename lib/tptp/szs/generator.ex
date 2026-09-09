@@ -8,7 +8,7 @@ defmodule Tptp.Szs.Generator do
   `Tptp.Szs.Ontology.from_string/1` can be a total function over a closed set
   without `String.to_atom/1` ever being reachable from input.
 
-  ## The three checks it refuses to skip
+  ## The four checks it refuses to skip
 
   A generator that silently emits a short table is worse than one that fails, so
   this raises rather than writes if:
@@ -18,7 +18,9 @@ defmodule Tptp.Szs.Generator do
     * two values underscore to the same atom — the `OneWord` names are the identity
       of a value and two of them collapsing would silently merge two rows;
     * a `<status_value>` from the BNF is not a success-ontology mnemonic — the two
-      vendored files disagree, which is a fact about the release, not about us.
+      vendored files disagree, which is a fact about the release, not about us;
+    * an entry in `@name_atom_overrides` names a value the page does not carry —
+      the release it was written for has moved and the entry is now a lie.
 
   The third is the interesting one. `<status_value>` in the BNF is the lower-cased
   three-letter mnemonic, so the grammar and the ontology can be checked against each
@@ -31,12 +33,36 @@ defmodule Tptp.Szs.Generator do
   that appears inside a TPTP `status(...)` annotation gets its own entry point,
   `from_status_value/1`, which looks only in the success ontology because that is
   the only place the BNF draws from.
+
+  ## The name is the page's; the atom is ours
+
+  `@name_atom_overrides` supplies the atom for a value whose published name is
+  misspelled. There is one: the page writes `CounterTautologyyPreserving`, with a
+  doubled `y`, which `Macro.underscore/1` would carry into the API as
+  `:counter_tautologyy_preserving`.
+
+  Only the atom is overridden. `name/1` returns `"CounterTautologyyPreserving"` and
+  `from_string/1` admits that spelling and no other, the name being a quotation of
+  the source, which this library does not correct. The atom is not a quotation: it
+  is the identifier this library introduces to denote the value, it occurs in every
+  consumer's pattern matches, and no fidelity is served by requiring each of them to
+  reproduce a misspelling.
+
+  An override is not a place to rename a value to taste. The entry exists because the
+  page is wrong, the fourth check above fails the build when the page stops being
+  wrong, and the collision check covers the case where a corrected page carries both
+  spellings at once.
   """
 
+  alias Tptp.Bnf.Vocabulary
   alias Tptp.Szs.Extract
 
   @minimum 100
   @source "https://tptp.org/UserDocs/SZSOntology"
+
+  # The page's spelling => the atom to use for it. See "The name is the page's; the
+  # atom is ours" above, and note that removing an entry is a breaking API change.
+  @name_atom_overrides %{"CounterTautologyyPreserving" => "counter_tautology_preserving"}
 
   @doc """
   Render the ontology module, and say how many values went into it.
@@ -65,10 +91,19 @@ defmodule Tptp.Szs.Generator do
       raise "SZS names collide as atoms: #{inspect(Enum.map(collisions, &elem(&1, 0)))}"
     end
 
-    stray = Enum.reject(Tptp.Bnf.Vocabulary.status_value_values(), &(&1 in mnemonics(values)))
+    stray = Enum.reject(Vocabulary.status_value_values(), &(&1 in mnemonics(values)))
 
     if stray != [] do
       raise "BNF <status_value>s absent from the SZS success ontology: #{inspect(stray)}"
+    end
+
+    names = MapSet.new(values, & &1.name)
+    dead = Enum.reject(Map.keys(@name_atom_overrides), &MapSet.member?(names, &1))
+
+    if dead != [] do
+      raise "@name_atom_overrides names values #{path} does not carry: #{inspect(dead)}. " <>
+              "If the page has corrected the spelling, drop the entry — and note that " <>
+              "doing so renames a public atom."
     end
 
     :ok
@@ -106,42 +141,82 @@ defmodule Tptp.Szs.Generator do
     """
     The SZS status values, generated from the vendored ontology page.
 
-    Do not edit: `mix tptp.gen` writes this from `priv/szs/#{Path.basename(path)}`,
-    fetched from <#{@source}>. #{length(values)} values in three ontologies:
+    Do not edit: `mix tptp.gen` writes this module from
+    `priv/szs/#{Path.basename(path)}`, fetched from <#{@source}>. #{length(values)}
+    values across three ontologies:
 
     #{Enum.join(counts, "\n")}
 
-    Every atom here is created at compile time, so `from_string/1` and its siblings
-    can turn untrusted prover output into an atom without `String.to_atom/1` being
-    reachable from input. That is a security property of this library, not a style
-    preference; see `Tptp.Token` for the same discipline and the Credo check that
-    enforces it.
+    Every atom is created at compile time, so `from_string/1` and its counterparts
+    convert untrusted prover output to an atom without `String.to_atom/1` being
+    reachable from input. This is a security property rather than a stylistic one;
+    see `Tptp.Token` for the same constraint and the Credo check enforcing it.
 
-    ## The `isa` hierarchy is deliberately absent
+    ## The `isa` hierarchy is not modelled
 
     There is no `parent/1` or `descendant?/2`. The SZS ontologies are hierarchies —
-    an `EquivalentTheorem` isa `Equivalent` isa `Satisfiable` — but that hierarchy is
-    published only as three diagrams (`Success.png`, `NoSuccess.png`, `Data.png` at
-    the URL above) and appears nowhere in the page's text. Copying a dense diagram
-    out by eye would put unverifiable relations into a library whose contract is
-    faithfulness to what the sources actually say, so what is here is the partition
-    the text does state: which ontology a value belongs to, and which subontology of
-    `Success`. If a machine-readable ontology is published, this module gains the
-    hierarchy in one regeneration.
+    `EquivalentTheorem` isa `Equivalent` isa `Satisfiable` — but the hierarchy is
+    published only as three diagrams (`Success.png`, `NoSuccess.png` and `Data.png`
+    at the URL above) and does not appear in the text of the page. Transcribing a
+    diagram by inspection would introduce unverifiable relations into a library
+    whose contract is fidelity to its sources. What is provided is the partition
+    the text does state: the ontology a value belongs to, and its subontology
+    within `Success`. Publication of a machine-readable ontology would allow the
+    hierarchy to be added by regeneration.
 
-    ## Case is meaningful
+    ## Ordering
 
-    `SAT` is `Satisfiable`; `Sat` is `Saturation`. `from_mnemonic/1` is case
-    sensitive for that reason. The lower-case three-letter form that appears inside
-    a TPTP `status(...)` annotation has its own entry point, `from_status_value/1`,
-    which searches only the success ontology — the only place `<status_value>` draws
-    from, as the generator checks on every run.
+    There is no `compare/2` and no precedence table, for the same reason: the page
+    publishes none. A consumer comparing two prover results nonetheless requires a
+    basis for the comparison, and an invented ranking admits precedence inversions,
+    in which a `Timeout` from the longest-running system outranks a `Theorem`. Two
+    published properties suffice:
+
+      * `success?/1`. A `Success` value constitutes an answer and a `NoSuccess`
+        value its absence. Prefer `Success`. This is the whole of the ordering the
+        text supports; no `NoSuccess` value is preferable to any `Success` value.
+      * `subontology/1`. Within `Success`, this identifies the group a value
+        belongs to, allowing two answers to be compared as claims of the same or
+        different kinds without assuming a strength ordering.
+
+    A further consideration concerns provenance. An explicit `% SZS status` line is
+    the system's own statement of its conclusion, whereas an implementation-specific
+    output pattern is an inference drawn by the reader. Prefer the line.
+    `Tptp.Szs.status/1` returns `:none` where a run emitted none, which is the
+    condition under which a pattern may be used.
+
+    ## Case sensitivity
+
+    `SAT` is `Satisfiable` and `Sat` is `Saturation`, so `from_mnemonic/1` is case
+    sensitive. The lower-case three-letter form occurring inside a TPTP
+    `status(...)` annotation has a separate entry point, `from_status_value/1`,
+    which searches the success ontology alone, that being the only source
+    `<status_value>` draws from, as the generator verifies on each run.
+
+    `Ass` and `ASS` are a second such pair: `Ass` is `Assurance` in the data
+    ontology and `ASS` is `Assumed` in the no-success ontology.
+
+    ## Arguments of `Assumed`
+
+    Every mnemonic on the page is three letters except one. `Assumed` is
+    `ASS(U,S)`: the success value `S` was assumed because the actual result is
+    unknown for the no-success reason `U`, where `U` is drawn from the subontology
+    beneath `Unknown`. `mnemonic(:assumed)` returns `"ASS"` and `from_mnemonic/1`
+    accepts `"ASS"` alone, since a pair of arguments is not a member of a closed
+    set of atoms.
+
+    A consumer reading such a status line must decompose it: take the text
+    preceding the first `(`, resolve it here, and resolve the two arguments, which
+    are themselves mnemonics, with further calls. The page does not state how the
+    form is written in a `% SZS status` line, and the TPTP BNF cannot express it:
+    `<status_value>` is a list of plain words, so `status(ass(...))` has no
+    derivation. Treat `ASS(...)` as a form to recognise rather than to emit.
     """
   end
 
   @spec types([Extract.value()]) :: binary()
   defp types(values) do
-    union = values |> Enum.map(&atom_literal(&1.name)) |> Enum.join(" | ")
+    union = Enum.map_join(values, " | ", &atom_literal(&1.name))
 
     """
       @typedoc "One SZS status value. A closed set of #{length(values)} compile-time atoms."
@@ -269,7 +344,7 @@ defmodule Tptp.Szs.Generator do
           "  def from_mnemonic(#{inspect(mnemonic)}), do: {:ok, #{atom_literal(value.name)}}"
 
         {mnemonic, shared} ->
-          atoms = shared |> Enum.map(&atom_literal(&1.name)) |> Enum.join(", ")
+          atoms = Enum.map_join(shared, ", ", &atom_literal(&1.name))
 
           "  def from_mnemonic(#{inspect(mnemonic)}), do: {:ambiguous, [#{atoms}]}"
       end)
@@ -456,7 +531,7 @@ defmodule Tptp.Szs.Generator do
   defp clauses(values, fun), do: Enum.map_join(values, "\n", fun)
 
   @spec atom(binary()) :: binary()
-  defp atom(name), do: Macro.underscore(name)
+  defp atom(name), do: Map.get(@name_atom_overrides, name) || Macro.underscore(name)
 
   @spec atom_literal(binary()) :: binary()
   defp atom_literal(name), do: ":#{atom(name)}"

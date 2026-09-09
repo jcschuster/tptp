@@ -8,13 +8,13 @@ defmodule Mix.Tasks.Tptp.Format do
       mix tptp.format "Axioms/**/*.ax"
       mix tptp.format --check Problems/**/*.p
 
-  Only white space moves. The token sequence is unchanged, which `Tptp.Printer.Format`
-  explains and a test asserts over the corpus, so this cannot silently rewrite a
-  formula into a different one.
+  Only white space is altered. The token sequence is unchanged, as
+  `Tptp.Printer.Format` describes and a corpus test asserts, so this cannot rewrite
+  one formula into another.
 
-  A file whose tokens do not lex cleanly is left alone and reported, because a
-  formatter is reached for exactly when a file is in a bad state and rewriting one
-  it cannot read is how it loses someone's work.
+  A file whose tokens do not lex is left unmodified and reported. A formatter is
+  invoked precisely when a file is in an inconsistent state, and rewriting one it
+  cannot read risks discarding content.
 
   ## Options
 

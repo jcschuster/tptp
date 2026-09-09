@@ -6,6 +6,7 @@ defmodule TptpTest do
   doctest Tptp.Statement
 
   alias Tptp.Diagnostic
+  alias Tptp.Statement.Include
 
   @tmp Path.join(System.tmp_dir!(), "tptp-api-test")
 
@@ -150,7 +151,7 @@ defmodule TptpTest do
       path = write!("includer.p", "include('absent-on-purpose.ax').\nfof(a, axiom, p).\n")
       {:ok, file, []} = Tptp.from_file(path)
 
-      assert file |> Tptp.File.includes() |> Enum.map(&Tptp.Statement.Include.path/1) ==
+      assert file |> Tptp.File.includes() |> Enum.map(&Include.path/1) ==
                ["absent-on-purpose.ax"]
     end
   end
@@ -276,8 +277,8 @@ defmodule TptpTest do
       {:ok, file, []} = Tptp.from_string("include('a.ax', [b]).")
       detached = file.statements |> hd() |> Tptp.detach()
 
-      assert Tptp.Statement.Include.path(detached) == "a.ax"
-      assert Tptp.Statement.Include.selected(detached) == ["b"]
+      assert Include.path(detached) == "a.ax"
+      assert Include.selected(detached) == ["b"]
     end
   end
 end

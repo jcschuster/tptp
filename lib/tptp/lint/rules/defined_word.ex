@@ -1,15 +1,15 @@
 defmodule Tptp.Lint.Rules.DefinedWord do
   @moduledoc """
-  A `$`-word outside the vocabularies the `:==` layer names.
+  A `$`-word outside the vocabularies named by the `:==` conditions.
 
-  `$` is reserved for the TPTP language itself, so `$wibble` is not a symbol a
-  problem may introduce — `$$wibble` is the system-specific escape hatch, and it is
-  deliberately not checked. The lists come from `Tptp.Bnf.Vocabulary`, generated
-  from the same BNF as the grammar, so they cannot drift from it.
+  The `$` prefix is reserved to the TPTP language, so `$wibble` is not a symbol a
+  problem may introduce. `$$wibble` is the system-specific form and is not checked.
+  The vocabularies come from `Tptp.Bnf.Vocabulary`, generated from the same BNF as
+  the grammar, so the two cannot diverge.
 
-  A warning: an unknown `$`-word is almost always a typo, but a prover extension
-  that has not made it into the BNF yet is a real thing and not this library's
-  business to refuse.
+  A warning rather than an error: an unrecognised `$`-word is usually a
+  misspelling, but a prover extension not yet incorporated into the BNF is also
+  possible.
   """
 
   @behaviour Tptp.Lint.Rule

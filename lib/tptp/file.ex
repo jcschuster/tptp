@@ -1,30 +1,29 @@
 defmodule Tptp.File do
   @moduledoc """
-  One TPTP file, read: its statements, its comments and everything the library has
-  to say about it.
+  A TPTP file as read: its statements, its comments and its diagnostics.
 
-  ## The source is retained, and that is deliberate
+  ## Source retention
 
-  Every leaf's `text` is a sub-binary of `source`, so the file binary must outlive
-  the tree — which it does, because it is right here. That is the whole point of
-  the arrangement: reading a 4 MB problem costs one 4 MB binary plus a tree of
-  offsets, rather than a copy of every symbol. `Tptp.detach/1` is the way out for a
-  consumer that wants to keep a handful of statements and let the file go.
+  Every leaf's `text` is a sub-binary of `source`, so the source must outlive the
+  tree and is retained here. Reading a 4 MB problem therefore costs one 4 MB binary
+  and a tree of offsets rather than a copy of every symbol. `Tptp.detach/1` returns
+  a copy owning its own binaries, for consumers retaining a small number of
+  statements from a large file.
 
-  ## Comments are beside the statements, not in them
+  ## Comments
 
-  The BNF allows a comment between any two tokens, and they are not white space, so
-  they cannot live in the tree without polluting every node's children. They are
-  kept as an ordered list of spans, which is what the format-preserving printer
-  needs to re-attach them by position and what everything else needs to ignore
-  them.
+  The BNF permits a comment between any two tokens and does not treat comments as
+  white space, so they cannot be placed in the tree without appearing among the
+  children of arbitrary nodes. They are held as an ordered list of spans, which is
+  the form the format-preserving printer requires in order to reattach them by
+  position.
 
-  ## What is computed on demand
+  ## Computed properties
 
-  `line_index/1` and `digest/1` are functions, not fields. Both are O(bytes), both
-  are needed rarely — the first only to render a position for a human, the second
-  only to key a cache — and a caller that needs either repeatedly should hold the
-  result rather than have every file pay for it.
+  `line_index/1` and `digest/1` are functions rather than fields. Both are linear in
+  the size of the source and both are required infrequently — the first to render a
+  position, the second to key a cache. Callers needing either repeatedly should
+  retain the result.
   """
 
   alias Tptp.Diagnostic
@@ -142,5 +141,38 @@ defmodule Tptp.File do
       nil -> nil
       statement -> statement |> Statement.roots() |> Enum.find_value(&Node.at(&1, offset))
     end
+  end
+
+  defimpl Inspect do
+    @moduledoc false
+    import Inspect.Algebra
+
+    # A file holds its whole source and every node that points into it, so the derived
+    # inspect prints a 455 MB binary and several million nodes into whatever asked —
+    # an IEx prompt, a logger line, an exception report. This prints what identifies
+    # the file and what it cost. `inspect(file, structs: false)` still shows the map.
+    @impl true
+    def inspect(file, opts) do
+      concat([
+        "#Tptp.File<",
+        to_doc(file.path || file.id, opts),
+        ", ",
+        count(length(file.statements), "statement"),
+        ", ",
+        bytes(byte_size(file.source)),
+        diagnostics(file.diagnostics),
+        ">"
+      ])
+    end
+
+    defp count(1, noun), do: "1 #{noun}"
+    defp count(n, noun), do: "#{n} #{noun}s"
+
+    defp bytes(n) when n < 1024, do: "#{n} B"
+    defp bytes(n) when n < 1024 * 1024, do: "#{Float.round(n / 1024, 1)} KB"
+    defp bytes(n), do: "#{Float.round(n / (1024 * 1024), 1)} MB"
+
+    defp diagnostics([]), do: ""
+    defp diagnostics(list), do: ", " <> count(length(list), "diagnostic")
   end
 end

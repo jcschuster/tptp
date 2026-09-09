@@ -1,43 +1,43 @@
 defmodule Tptp.Resolver do
   @moduledoc """
-  How an `include` name becomes bytes.
+  The behaviour by which an `include` name is resolved to bytes.
 
-  An `include` directive names a file, and following it means reading something the
-  caller did not name — possibly from anywhere on the filesystem, possibly over the
-  network. That is a decision for the caller, not for a parser, so it is expressed
-  as a value they pass in rather than a default they have to notice and turn off.
+  An `include` directive names a file, and resolving it reads something the caller
+  did not name, potentially from anywhere on the filesystem or over the network.
+  That decision belongs to the caller, so it is expressed as a value passed in
+  rather than as a default.
 
-  ## Choosing one
+  ## Available implementations
 
   | Resolver | Reads |
   |----------|-------|
-  | `Tptp.Resolver.Fs` | the including file's directory, then `$TPTP_ROOT`, `$TPTP`, the cwd |
+  | `Tptp.Resolver.Fs` | the including file's directory, then `$TPTP_ROOT`, `$TPTP`, the working directory |
   | `Tptp.Resolver.Http` | tptp.org over HTTPS, through a local cache |
   | `Tptp.Resolver.Cascade` | each of a list in turn |
   | `Tptp.Resolver.Map` | an in-memory map, for tests and Livebook |
-  | `Tptp.Resolver.None` | nothing; records the directive and stops |
+  | `Tptp.Resolver.None` | nothing; records the directive |
 
-  A resolver is a module, or a module with options:
+  A resolver is a module, optionally paired with options:
 
       Tptp.Unit.from_file("problem.p", resolver: Tptp.Resolver.Fs)
       Tptp.Unit.from_file("problem.p", resolver: {Tptp.Resolver.Fs, root: "/opt/TPTP"})
 
-  ## Writing one
+  ## Implementing one
 
-  `c:resolve/3` gets the name exactly as it appeared in the source with its quotes
-  removed and escapes undone, the path of the including file when there is one, and
-  whatever options were passed alongside the module. Three answers:
+  `c:resolve/3` receives the name as it appeared in the source with quotes removed
+  and escapes undone, the path of the including file where one exists, and the
+  options supplied alongside the module. It returns one of:
 
-    * `{:ok, path, contents}` — the bytes, and a path to identify them by. The path
-      is what memoisation keys on, so two routes to the same file must agree on it;
-      an absolute canonical path is the safe choice.
-    * `{:error, reason}` — a sentence for the diagnostic, not a term to match on.
-    * `:not_followed` — a deliberate decline. No diagnostic is raised, because
-      nothing went wrong.
+    * `{:ok, path, contents}` — the bytes and a path identifying them. Memoisation
+      is keyed on this path, so two routes to one file must agree on it; an
+      absolute canonical path satisfies this.
+    * `{:error, reason}` — a description for the diagnostic, not a term to match
+      on.
+    * `:not_followed` — a deliberate decline, producing no diagnostic.
 
-  A resolver must not raise. `Tptp.Include` catches what escapes anyway and turns
-  it into a diagnostic, because a badly behaved resolver should not take down a
-  parse, but a resolver that relies on that is passing its bugs to its caller.
+  A resolver must not raise. `Tptp.Include` converts an escaping exception into a
+  diagnostic so that a defective resolver cannot terminate a parse, but an
+  implementation should not depend on this.
   """
 
   @typedoc "A resolver module, optionally paired with its options."

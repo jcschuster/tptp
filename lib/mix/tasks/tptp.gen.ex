@@ -12,31 +12,33 @@ defmodule Mix.Tasks.Tptp.Gen do
       mix tptp.gen
       mix tptp.gen --check
 
-  `--check` regenerates into memory and fails if the result differs from what is
-  on disk, which is what keeps "generated but committed" from quietly becoming
-  "hand-edited".
+  `--check` regenerates into memory and fails if the result differs from the
+  committed output, which is what prevents a generated file from being hand-edited.
 
-  The task prints the departures it made from a mechanical translation. Those
-  three lines are the review surface for a BNF bump: if a release adds a fourth,
-  it should be a conscious decision rather than a silent one.
+  The task prints the departures made from a mechanical translation. That list comes
+  from `Tptp.Bnf.Generator.departures/0`, which renders it from the constants
+  producing it, so a release requiring a further departure is reported rather than
+  absorbed into the grammar.
 
-  ## Recovering from a broken `.yrl`
+  ## Recovering from an uncompilable grammar
 
   Mix runs the `:yecc` compiler before `:elixir`, so a `src/tptp_parser.yrl` that
-  does not compile stops the very task that would rewrite it — a hand-edit or a
-  half-finished merge leaves the generator unreachable through its own output.
-  **Delete the file and run the task again.** With no `.yrl` present there is
-  nothing for yecc to choke on, `Tptp.Parser`'s calls into `:tptp_parser` are only
-  an undefined-module warning at that point, and the task regenerates all five
-  outputs from the vendored sources. It is worth knowing rather than worth
-  engineering around: the generated grammar is a pure function of the BNF, so
-  throwing it away costs nothing.
+  does not compile prevents the task that would rewrite it from running. A manual
+  edit or an incomplete merge therefore renders the generator unreachable through
+  its own output.
+
+  Delete the file and run the task again. With no `.yrl` present there is nothing
+  for yecc to compile, `Tptp.Parser`'s calls into `:tptp_parser` produce only an
+  undefined-module warning, and the task regenerates all five outputs from the
+  vendored sources. The generated grammar is a function of the BNF alone, so
+  discarding it loses nothing.
   """
 
   use Mix.Task
 
   alias Tptp.Bnf
   alias Tptp.Bnf.Generator
+  alias Tptp.Bnf.Oracle
   alias Tptp.Szs
 
   @requirements ["app.config"]
@@ -56,7 +58,7 @@ defmodule Mix.Tasks.Tptp.Gen do
     {vocabulary, entries} = Generator.vocabularies(bnf_path)
     {shapes, shape_count} = Generator.shapes(bnf_path)
 
-    {oracle, pattern_count} = Tptp.Bnf.Oracle.table(bnf_path)
+    {oracle, pattern_count} = Oracle.table(bnf_path)
     szs_path = Szs.vendored_path!()
     {ontology, value_count} = Szs.Generator.ontology(szs_path)
 
@@ -109,16 +111,17 @@ defmodule Mix.Tasks.Tptp.Gen do
     shell.info("")
     shell.info("closed :== vocabularies:")
 
-    Enum.each(entries, fn {name, words} ->
-      shell.info("  <#{name}> #{length(words)}")
+    Enum.each(entries, fn
+      {"reserved_word", words} ->
+        shell.info("  $-words collected from the whole BNF: #{length(words)} (not a :== rule)")
+
+      {name, words} ->
+        shell.info("  <#{name}> #{length(words)}")
     end)
 
     shell.info("")
-    shell.info("departures from a mechanical translation:")
-    shell.info("  dropped alternative  <source> ::= unknown")
-    shell.info("  injected #{report.injected} productions admitting keywords as <atomic_word>")
-    shell.info("  reserved the six $-keywords")
-    shell.info("  kept the five $-language markers as children of <formula_data>")
+    shell.info("departures from a mechanical translation (#{length(report.departures)}):")
+    Enum.each(report.departures, &shell.info("  #{&1}"))
 
     if report.pruned != [] do
       shell.info("")

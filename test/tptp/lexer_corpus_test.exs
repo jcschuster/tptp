@@ -21,7 +21,7 @@ defmodule Tptp.LexerCorpusTest do
   alias Tptp.Test.Corpus
 
   @moduletag :corpus
-  @moduletag timeout: 900_000
+  @moduletag timeout: Corpus.timeout()
 
   setup_all do
     files = Corpus.files(every: 3)
@@ -63,14 +63,11 @@ defmodule Tptp.LexerCorpusTest do
     assert total > 100_000, "expected a substantial corpus, counted #{total} statements"
   end
 
-  defp stream(files, fun) do
-    Task.async_stream(files, fun,
-      max_concurrency: System.schedulers_online(),
-      timeout: 300_000,
-      ordered: false
-    )
-    |> Enum.map(fn {:ok, result} -> result end)
-  end
+  # Lexing stops at the token stream — about five times the source, against a CST's
+  # hundreds — so this gate can afford more workers over the same module share than
+  # the parsing gates. It asks for the workers and not for a bigger ceiling; see
+  # `Tptp.Test.Corpus.stream/3` for why that distinction is load-bearing.
+  defp stream(files, fun), do: Corpus.values(files, fun, timeout: 300_000, concurrency: 4)
 
   defp diagnostics(path) do
     {_statements, _comments, diagnostics} = Lexer.statements(File.read!(path))
