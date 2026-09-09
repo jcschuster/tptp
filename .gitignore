@@ -31,5 +31,5 @@ tptp-*.tar
 /src/*.erl
 /priv/plts/
 
-# The nightly corpus workflow writes these; the committed one is CORPUS.md.
+# The nightly corpus workflow writes these; the committed one is reports/CORPUS.md.
 /corpus-*.md

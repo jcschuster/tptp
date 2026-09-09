@@ -155,7 +155,7 @@ statements in each. Both fail with `TPTP0301`.
 
 **What the library does:** nothing. The grammar is generated from the BNF and is not
 patched to accept more than the BNF describes. The four files are listed in
-`Mix.Tasks.Tptp.Corpus.known_failures/0`, explained once in `CORPUS.md`, and
+`Mix.Tasks.Tptp.Corpus.known_failures/0`, explained once in [CORPUS.md](CORPUS.md), and
 `Tptp.CorpusTest` asserts that each of them *still* fails, so the exception cannot
 outlive the defect.
 
@@ -240,9 +240,22 @@ grep -rhoE '\$modal_(system|axiom)_[A-Za-z0-9]+' $TPTP_ROOT/Problems $TPTP_ROOT/
   sort | uniq -c | sort -rn
 ```
 
-Note that `$modal_system_T` (17 files) and `$modal_system_S5U` (26 files) appear in
-that count and are named by neither source; both occur only in the `% Syntax` header
-comments the lexer does not reach, so neither is a finding.
+`$modal_system_S5U` (26 files) and `$modal_system_T` (17 files) also appear in that
+count and are absent from the affected total, but for different reasons. `S5U` is the
+sixteenth value of the page's set, and so is in the table above, among the ten the BNF
+omits; `T` is named by neither source. What keeps both out of the count is the same:
+every occurrence of either is inside the `% Comments` field of a problem header, where
+an embedding tool has recorded the logic specification it was given. The lexer never
+reaches it, and the files parse clean.
+
+```
+for f in $(grep -rlE '\$modal_system_(S5U|T)([^A-Za-z0-9]|$)' \
+             $TPTP_ROOT/Problems $TPTP_ROOT/Axioms); do
+  n=$(grep -nE '\$modal_system_(S5U|T)([^A-Za-z0-9]|$)' "$f" | head -1 | cut -d: -f1)
+  head -n "$n" "$f" | grep -oE '^% [A-Za-z ]+ +:' | tail -1
+done | sort | uniq -c
+#  43 % Comments :
+```
 
 ---
 

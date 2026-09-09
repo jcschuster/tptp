@@ -21,7 +21,7 @@ moves when TPTP moves, not when this library does.
   `:tptp_lint`.
 - `Tptp.Lint.scan/2`, the one traversal `run/2`, `run_unit/2` and `table/1` are
   now projections of — the symbol table is no longer rebuilt by a second walk.
-- `mix tptp.census` and `CENSUS.md`: where the library uses applied type
+- `mix tptp.census` and `reports/CENSUS.md`: where the library uses applied type
   constructors, and in which dialects. The report divides the THF heuristic's files
   by dialect, an all-TH1 distribution indicating that the heuristic is identifying
   types; heads the
@@ -59,7 +59,7 @@ moves when TPTP moves, not when this library does.
   printed the whole source binary and every node that points into it — into an IEx
   prompt, a `Logger` line or an exception report. Each now prints a summary in
   constant time, and `inspect(term, structs: false)` still shows the map.
-- `TPTP-DEFECTS.md`, the register of places where the published TPTP sources
+- `reports/TPTP-DEFECTS.md`, the register of places where the published TPTP sources
   disagree with each other. Five entries, each with its citation, the files it
   affects and a command that reproduces the count, so they can be reported upstream
   as they stand, plus two notes on things that look like defects and are not. The
@@ -129,6 +129,34 @@ moves when TPTP moves, not when this library does.
   longer usable as a sort comparator; `rank/1` is.
 
 ### Fixed
+
+- Every reference to the three committed reports follows them into `reports/`.
+  The move left `mix docs` failing outright — `extras:` still named
+  `TPTP-DEFECTS.md` at the root — and three quieter breakages behind it: the
+  package's `files:` list no longer shipped any of the reports, `mix tptp.corpus`
+  and `mix tptp.census` defaulted `--out` to the old root paths, so a plain run
+  wrote a second copy at the root and `--check` failed on a file it could not read
+  rather than on a stale one. `Tptp.Lint.Rules.DefinedWord` also pointed four
+  directories up where it needed five, which ExDoc hid by resolving extras on
+  basename alone; the link only broke when read on GitHub.
+- `Tptp.Checks.NoDynamicAtoms` listed `String.to_charlist_atom` among the calls it
+  forbids. No such function exists, so the entry could never fire, and a check that
+  never fires reports a clean tree exactly as convincingly as a clean tree does.
+  Removed, `:erlang.binary_to_term/1` added — it builds atoms out of a serialised
+  term — and a test now asserts that every entry in the list names a function the
+  runtime exports, so the next typo fails the suite instead of quietly widening the
+  gap between what the check claims to cover and what it covers.
+- `mix dialyzer` passes under `MIX_ENV=test`, which is the environment `mix check`
+  uses. `Tptp.Test.Corpus.timeout/0` was specced as `timeout()` while only ever
+  answering `:infinity`, and two functions that exist to raise lacked a
+  `no_return()` spec.
+- `TPTP-3`'s reproduce note in `reports/TPTP-DEFECTS.md` said `$modal_system_S5U`
+  was "named by neither source", contradicting the entry's own table two paragraphs
+  above, which lists `S5U` among the ten values the BNF omits and the language page
+  defines. `T` is named by neither; `S5U` is named by the page. Both are absent from
+  the affected count for the same reason, now stated with the command that shows it:
+  all 43 occurrences sit in the `% Comments` field of a problem header, not in the
+  `% Syntax` field the note named.
 
 - The corpus gates' heap budget no longer divides by ExUnit's `max_cases`. It
   divided both the budget and the worker count, on the reasoning that dividing both
@@ -211,7 +239,7 @@ First release. Generated from TPTP BNF v9.3.1.2 and the SZS ontology as publishe
   112 published SZS values.
 - Diagnostics on every stage, tiered by code, never raised at the caller.
 - `mix tptp.corpus`, which reads a local TPTP library through the parser and writes
-  [CORPUS.md](CORPUS.md). A nightly workflow sweeps the library entire; a pull
+  [CORPUS.md](reports/CORPUS.md). A nightly workflow sweeps the library entire; a pull
   request sweeps one file in five.
 
 ### Notes

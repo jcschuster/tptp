@@ -19,7 +19,7 @@ defmodule Tptp.Lint.Rules.DefinedWord do
   TPTP language page states sixteen and ten. `Tptp.Bnf.Generator` corrects both
   lists against that page, and the corrected values enter `<reserved_word>`, which
   is the list this rule consults. See
-  [TPTP-DEFECTS.md](../../../reports/TPTP-DEFECTS.md), entry `TPTP-3`.
+  [TPTP-DEFECTS.md](../../../../reports/TPTP-DEFECTS.md), entry `TPTP-3`.
   """
 
   @behaviour Tptp.Lint.Rule

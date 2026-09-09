@@ -19,10 +19,22 @@ defmodule Tptp.Checks.NoDynamicAtomsTest do
     for call <- [
           "String.to_atom(functor)",
           "List.to_atom(chars)",
-          ":erlang.binary_to_atom(name, :utf8)"
+          ":erlang.binary_to_atom(name, :utf8)",
+          ":erlang.list_to_atom(chars)",
+          ":erlang.binary_to_term(payload)"
         ] do
       assert [_issue] = issues("def f(x), do: #{call}"),
              "#{call} should have been flagged"
+    end
+  end
+
+  test "every forbidden call names a function that exists" do
+    for {module, function} <- NoDynamicAtoms.forbidden() do
+      {:module, ^module} = Code.ensure_loaded(module)
+
+      assert Enum.any?(module.module_info(:exports), fn {name, _arity} -> name == function end),
+             "#{inspect(module)}.#{function} is not a real function, so the check can " <>
+               "never fire on it and its presence in the list is misleading"
     end
   end
 

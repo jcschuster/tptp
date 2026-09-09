@@ -26,11 +26,27 @@ defmodule Tptp.Checks.NoDynamicAtoms do
 
   @forbidden [
     {String, :to_atom},
-    {String, :to_charlist_atom},
     {List, :to_atom},
     {:erlang, :binary_to_atom},
-    {:erlang, :list_to_atom}
+    {:erlang, :list_to_atom},
+    {:erlang, :binary_to_term}
   ]
+
+  @doc """
+  The calls this check refuses, as `{module, function}` pairs.
+
+  Exposed so the test suite can assert that each one names a function that exists.
+  A misspelling here is invisible in the worst way: the check goes on reporting no
+  issues, which is what a clean tree looks like. `String.to_charlist_atom` sat in
+  this list until 2026-09-09 and could never have fired.
+
+  `:erlang.binary_to_term/1` is here because it creates atoms from a serialised
+  term. `Module.concat/1,2` creates them too and is deliberately absent: its uses
+  in this repository are all over compile-time alias AST, and a check that flags
+  its own implementation teaches contributors to ignore it.
+  """
+  @spec forbidden() :: [{module(), atom()}]
+  def forbidden, do: @forbidden
 
   @impl Credo.Check
   def run(%SourceFile{} = source_file, params) do
@@ -60,12 +76,9 @@ defmodule Tptp.Checks.NoDynamicAtoms do
 
   defp issue_for(issue_meta, line, module, function) do
     format_issue(issue_meta,
-      message: "#{inspect(module_label(module))}.#{function} creates atoms from input",
-      trigger: "#{function}",
+      message: "#{inspect(name_of(module))}.#{function} creates atoms from input",
+      trigger: Atom.to_string(function),
       line_no: line
     )
   end
-
-  defp module_label({:__aliases__, _meta, parts}), do: Module.concat(parts)
-  defp module_label(atom), do: atom
 end

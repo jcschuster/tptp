@@ -69,7 +69,7 @@ defmodule Mix.Tasks.Tptp.Corpus do
       Larger tiers scale down from it.
     * `--heap BYTES` — peak heap across all workers, default 6 GB. Lowering it on a
       smaller machine makes the sweep slower rather than incorrect.
-    * `--out PATH` — output path, default `CORPUS.md`.
+    * `--out PATH` — output path, default `reports/CORPUS.md`.
     * `--check` — write nothing and fail if the committed report's results differ
       from this run. Timings are excluded from the comparison, so only a change in
       what parses can fail it.
@@ -77,7 +77,7 @@ defmodule Mix.Tasks.Tptp.Corpus do
 
   use Mix.Task
 
-  @default_out "CORPUS.md"
+  @default_out "reports/CORPUS.md"
   @conventional "/opt/TPTP"
   @default_timeout 60_000
   @default_max_bytes 20_000_000

@@ -19,7 +19,7 @@ defmodule Tptp.Lint.Rules.Role do
 
   `Tptp.Bnf.Generator` corrects the vocabulary against the page defining the value,
   under a build check that fails once the BNF lists it. See
-  [TPTP-DEFECTS.md](TPTP-DEFECTS.md), entry `TPTP-1`, for both citations.
+  [TPTP-DEFECTS.md](../../../../reports/TPTP-DEFECTS.md), entry `TPTP-1`, for both citations.
 
   What remains is the rule applied to an actual misspelling: `fof(a, axim, p).` is
   well-formed TPTP and semantically incorrect.

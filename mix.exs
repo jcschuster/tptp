@@ -89,7 +89,7 @@ defmodule Tptp.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
       files: ~w(lib src/tptp_parser.yrl priv/bnf priv/szs mix.exs README.md LICENSE NOTICE
-           CHANGELOG.md CORPUS.md CENSUS.md TPTP-DEFECTS.md examples .formatter.exs)
+           CHANGELOG.md reports examples .formatter.exs)
     ]
   end
 
@@ -100,9 +100,9 @@ defmodule Tptp.MixProject do
       source_ref: "v#{@version}",
       extras: [
         "README.md",
-        "TPTP-DEFECTS.md",
-        "CORPUS.md",
-        "CENSUS.md",
+        "reports/TPTP-DEFECTS.md",
+        "reports/CORPUS.md",
+        "reports/CENSUS.md",
         "CHANGELOG.md",
         "NOTICE",
         "LICENSE"

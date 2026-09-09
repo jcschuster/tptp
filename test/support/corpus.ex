@@ -182,7 +182,7 @@ defmodule Tptp.Test.Corpus do
   The outer bound belongs where it can see the whole run: `timeout-minutes` on the CI
   job, which is 330 for the corpus workflow. Locally, the sweep prints as it goes.
   """
-  @spec timeout() :: timeout()
+  @spec timeout() :: :infinity
   def timeout, do: :infinity
 
   @budget 6 * 1024 * 1024 * 1024
@@ -350,6 +350,7 @@ defmodule Tptp.Test.Corpus do
     {Enum.reverse(values), Enum.reverse(skipped)}
   end
 
+  @spec raise_outcome(Path.t(), {:exit, term()}) :: no_return()
   defp raise_outcome(_path, {:exit, {exception, stacktrace}}) when is_exception(exception) do
     reraise(exception, stacktrace)
   end

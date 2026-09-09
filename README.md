@@ -93,7 +93,7 @@ parser is incorrect, being generated from the published BNF, and correcting it b
 hand would make it a parser for something else. Where the published sources
 disagree with each other — the grammar rejecting a file the TPTP distributes, or
 one page contradicting another — the disagreement is recorded rather than worked
-around. [TPTP-DEFECTS.md](TPTP-DEFECTS.md) is that register: five entries, each
+around. [TPTP-DEFECTS.md](reports/TPTP-DEFECTS.md) is that register: five entries, each
 with its citation, the affected files and a command reproducing the count, together
 with three notes on apparent defects that are not.
 
@@ -101,9 +101,9 @@ The 65 problems above 20 MB — 64 `HWV` and `LCL680+1.020.p`, 3.7 GB between th
 are read by `stream_file!/2` rather than by this sweep. The size limit is a property
 of the report rather than of the parser.
 
-`mix tptp.corpus` writes [CORPUS.md](CORPUS.md), from which these figures are taken
+`mix tptp.corpus` writes [CORPUS.md](reports/CORPUS.md), from which these figures are taken
 and which the nightly workflow regenerates. `mix tptp.census` writes
-[CENSUS.md](CENSUS.md), recording where the library applies a type constructor and
+[CENSUS.md](reports/CENSUS.md), recording where the library applies a type constructor and
 in which dialects — a question about the corpus rather than the parser, and one an
 elaborator built on this library must answer.
 
@@ -177,8 +177,8 @@ mix test --include corpus
 mix test --include network   # re-checks the vendored files against tptp.org
 mix check              # format, compile --warnings-as-errors, credo, test, dialyzer
 mix run bench/parse.exs
-mix tptp.corpus        # sweep a local TPTP library, rewrite CORPUS.md
-mix tptp.census        # the same library's type applications, rewrite CENSUS.md
+mix tptp.corpus        # sweep a local TPTP library, rewrite reports/CORPUS.md
+mix tptp.census        # the same library's type applications, rewrite reports/CENSUS.md
 ```
 
 Both sweeps parse each file in a separate process under a `max_heap_size` ceiling,

@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Tptp.Census do
   <type_functor>(<tff_type_arguments>)` and, in THF, an apply spine in type
   position. Whether the library actually uses it, how widely and in which
   dialects, is a fact worth having written down rather than guessed. The report is
-  committed and kept current the way `CORPUS.md` is: counts, not conclusions.
+  committed and kept current the way `reports/CORPUS.md` is: counts, not conclusions.
 
   ## What is exact and what is a heuristic
 
@@ -66,7 +66,7 @@ defmodule Mix.Tasks.Tptp.Census do
     * `--concurrency N` — workers in the smallest size tier, default 4.
     * `--heap BYTES` — peak heap across all workers, default 6 GB. See
       `mix help tptp.corpus` for why the budget is heap rather than bytes of source.
-    * `--out PATH` — where to write, default `CENSUS.md`.
+    * `--out PATH` — where to write, default `reports/CENSUS.md`.
     * `--check` — write nothing; fail if the committed report's results differ
       from this run's.
   """
@@ -75,7 +75,7 @@ defmodule Mix.Tasks.Tptp.Census do
 
   alias Mix.Tasks.Tptp.Corpus
 
-  @default_out "CENSUS.md"
+  @default_out "reports/CENSUS.md"
   @default_concurrency 4
   @base_dialects [:unknown, :cnf, :fof, :tf0, :th0]
 

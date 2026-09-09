@@ -79,6 +79,7 @@ defmodule Tptp.Test.Analyzers do
     def dialects, do: :any
 
     @impl true
+    @spec analyze(Tptp.Analysis.t(), keyword()) :: no_return()
     def analyze(_analysis, _options), do: raise("boom")
   end
 end

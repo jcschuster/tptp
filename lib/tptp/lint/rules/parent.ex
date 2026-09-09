@@ -16,7 +16,7 @@ defmodule Tptp.Lint.Rules.Parent do
 
   Before v9.3.1.2 a `<source>` was a `<general_term>`. That expansion is also what
   renders four library files unparseable; see
-  [TPTP-DEFECTS.md](TPTP-DEFECTS.md), entry `TPTP-2`.
+  [TPTP-DEFECTS.md](../../../../reports/TPTP-DEFECTS.md), entry `TPTP-2`.
   """
 
   @behaviour Tptp.Lint.Rule
