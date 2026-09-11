@@ -98,8 +98,10 @@ section on types — so this is an error rather than a style point. The file dec
 so it is presumably a typo for `ql`. `TPTP0501` reports it.
 
 The statement parses, but the file did not, so no sweep ever linted it. Swept as
-units with includes resolved, it is the only undeclared symbol in any of the 4,918
-THF-named problems under 1 MB. It is listed in the lint corpus test's
+units with includes resolved, it is the only undeclared symbol in any of the 5,275
+THF problems checked: the 4,918 THF-named ones under 1 MB, and 357 of the 361 between
+1 and 20 MB whose `SPC` names TH0 or TH1, the remaining four having exceeded the
+sweep's heap share. No THF problem exceeds 20 MB. It is listed in the lint corpus test's
 `@known_undeclared`, so that gate does not fail when the file leaves
 `known_failures/0`.
 
@@ -220,7 +222,15 @@ and `$true` and `$false`, which are terms of type `$o` and reach the same positi
 
 With all five, every one of the 252 is read correctly, and nothing else moves: no
 false positive among the 2,060 TF0, 590 TF1 and 60 TX1 problems in the same sweep.
-Fifteen TF0 `ITP` units exceed the sweep's heap share and were not classified.
+
+Repeating the sweep over the 821 problems between 1 and 20 MB whose `SPC` names a TF,
+TX or TH dialect carries that across the rest of the library: all 88 TX0 and all 88
+TX1 there are read correctly, as are 191 TF0, 89 TF1, 180 TH1 and 177 TH0, with no
+mismatch of any kind. Every one of the library's 340 TX0 problems is therefore read
+correctly, against 2,251 TF0, 679 TF1 and 148 TX1 that are not. Nothing above 20 MB is
+TXF or THF — those 62 files are 30 TF0, 19 CNF and 13 FOF — so this covers the TX
+population exactly rather than merely widely. Twenty-three units exceed their sweep's
+heap share and were not classified, nineteen TF0 and four TH0.
 
 `SYO561_1.p` was the last of the 252 to be read correctly. It uses no FOOL at all —
 `$distinct(apple,microsoft)` is its only construct above TF0, and it is the library's
@@ -289,9 +299,12 @@ grep -rH 'Number of X terms' $TPTP_ROOT/Problems $TPTP_ROOT/Axioms |
   target exists. Four use a selection — the four `SYN000*2.p` files — and every name
   they select exists in its target. The corpus gates build units and discard the
   unit diagnostics, so this is the first check of it.
-- **Every THF-named problem under 1 MB**, 4,918, linted as a unit with includes
-  resolved and `TPTP0501` alone: 4,917 clean and finding 2. Thirteen ITP units
-  exceed a 1.5 GB heap and were rerun one at a time under 6 GB, all clean.
+- **Every THF problem in the library**, 5,275 of the 5,279, linted as a unit with
+  includes resolved and `TPTP0501` alone: 5,274 clean and finding 2. That is the
+  4,918 THF-named problems under 1 MB — thirteen ITP units among them exceed a 1.5 GB
+  heap and were rerun one at a time under 6 GB, all clean — together with the 361
+  between 1 and 20 MB whose `SPC` names TH0 or TH1, four of which exceeded the heap
+  share and went unchecked. No THF problem exceeds 20 MB.
 - **The new `<distinct_object>` rule.** v9.3.1.3 requires at least one `<do_char>`.
   No library file contains an empty `""`: the four lines a search for `""` finds
   outside comments are `"A \"Microsoft \\ escape\""` in the `SYN000*2.p` files, an

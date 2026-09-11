@@ -172,9 +172,10 @@ misspelling.
   form has a node kind of its own, each being an ordinary TFF node standing where TF0
   also admits one. A `$o` variable, a formula or `$true`/`$false` in a term position,
   a declared `$o` argument type, `$ite` and `$distinct` now carry it. Against TPTP's
-  own `SPC` headers over the problems under 1 MB, 51 of the 252 TX0 problems were
-  classified correctly before and all 252 are now, with no false positive among the
-  2,060 TF0, 590 TF1 and 60 TX1 problems beside them.
+  own `SPC` headers, 51 of the 252 TX0 problems under 1 MB were classified correctly
+  before; all 340 in the library are now, with no false positive among the 2,251 TF0,
+  679 TF1 and 148 TX1 problems beside them. No problem above 20 MB is TXF, so that is
+  the whole population and not a sample of it.
 - `TPTP0504` no longer reports the literal `unknown` source as a missing parent.
   `<source> ::= … | unknown` is a literal, which the grammar reads as a `<name>` —
   the first of the generator's departures, the two being otherwise
