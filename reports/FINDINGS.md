@@ -19,9 +19,9 @@ those files.
 | [1](#1-syn000_2p-writes-introduced2) | `SYN000_2.p` writes `introduced/2` | TPTP | Reported 2026-09-11 |
 | [2](#2-syn0002p-uses-an-undeclared-symbol) | `SYN000^2.p` uses the undeclared `qll` | TPTP | Reported 2026-09-11 |
 | [3](#3-the-literal-unknown-source-is-also-a-name) | `unknown` is both a `<source>` literal and a `<name>` | TPTP, cosmetic | Reported 2026-09-11 |
-| [4](#4-tptp0501-reported-legal-default-typed-symbols) | `TPTP0501` reported legal default-typed symbols | This library | Fixed in 0.1.1 |
-| [5](#5-tptp0504-reported-the-literal-unknown-as-a-parent) | `TPTP0504` reported the literal `unknown` as a parent | This library | Fixed in 0.1.1 |
-| [6](#6-tptpquery-read-most-txf-files-as-tf0) | `Tptp.Query` read most TXF files as TF0 | This library | Fixed in 0.1.1 |
+| [4](#4-tptp0501-reported-legal-default-typed-symbols) | `TPTP0501` reported legal default-typed symbols | This library | Fixed in 0.1.0 |
+| [5](#5-tptp0504-reported-the-literal-unknown-as-a-parent) | `TPTP0504` reported the literal `unknown` as a parent | This library | Fixed in 0.1.0 |
+| [6](#6-tptpquery-read-most-txf-files-as-tf0) | `Tptp.Query` read most TXF files as TF0 | This library | Fixed in 0.1.0 |
 | [7](#7-the-pages-txf-paragraph-omits-distinct) | The language page's TXF paragraph omits `$distinct` | TPTP, cosmetic | Reported 2026-09-11 |
 | [8](#8-a-miscounted-number-of-x-terms-header) | `SYO561_1.p`'s `Number of X terms` header miscounts | TPTP | Reported 2026-09-11 |
 

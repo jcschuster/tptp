@@ -100,7 +100,7 @@ incorrect, being generated from the published BNF, and correcting it by hand wou
 make it a parser for something else. Where the published sources disagree with each
 other — the grammar rejecting a file the TPTP distributes, or one page contradicting
 another — the disagreement is reported upstream rather than worked around. Six such
-disagreements were carried here through 0.1.0; BNF v9.3.1.3 and the SZS ontology's
+disagreements were carried here during development; BNF v9.3.1.3 and the SZS ontology's
 move to [szs.tptp.org][szs] resolve all of them, and the register that held them is
 gone with them.
 

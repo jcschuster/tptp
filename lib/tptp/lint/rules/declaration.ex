@@ -12,8 +12,8 @@ defmodule Tptp.Lint.Rules.Declaration do
   > must be declared before use.
 
   So an undeclared symbol in TFF, TXF, TCF or NXF has a type, and reporting it
-  reports legal TPTP. Up to 0.1.0 this rule did, on seventeen library files and 517
-  occurrences, every one of which is default-typed and well formed. FOF and CNF
+  reports legal TPTP. Until this was found the rule did, on seventeen library files
+  and 517 occurrences, every one of which is default-typed and well formed. FOF and CNF
   have no declarations at all.
 
   What default typing does make an error — a symbol whose later declaration differs

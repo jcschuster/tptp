@@ -26,9 +26,9 @@ defmodule Tptp.LintCorpusTest do
   `TPTP0501` fires freely on a THF axiom file linted *alone*, because its
   declarations are in a file it does not include; that is why the gate lints units.
   It applies to THF only. The first-order typed dialects give an undeclared symbol a
-  default type, which the rule ignored until 0.1.1, and so it reported 517 legal
-  occurrences across seventeen files that this gate carried as true. The one library
-  file it is right about is listed in `@known_undeclared` with the reason.
+  default type, which the rule ignored until this was found, and so it reported 517
+  legal occurrences across seventeen files that this gate carried as true. The one
+  library file it is right about is listed in `@known_undeclared` with the reason.
 
   `TPTP0505` is gone. It reported a symbol applied at two arities, and it fired on
   eleven library files, ten of which were doing something the TPTP explicitly permits
