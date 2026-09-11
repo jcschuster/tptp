@@ -150,12 +150,63 @@ defmodule Tptp.Lint.Collect do
     if language in @typed, do: Table.feature(table, :typed), else: table
   end
 
+  # FOOL, the logic TXF adds to TFF, has four forms with no node kind of their own:
+  # a `$o` variable; a formula, `$true` or `$false` standing where a term is
+  # expected; a declared `$o` argument ("The argument types … cannot be $o in TFF,
+  # but can be $o in TXF", the TPTP language page); and `$ite`, which the BNF writes
+  # as a defined functor (`<txf_conditional> :== $ite(...)`). Since
+  # `<tff_term> ::= <tff_logic_formula> | ...`, the grammar admits a formula in any
+  # term position, and only a non-atomic one there says the file is TXF. `$distinct`
+  # is TXF's as well — "$distinct is part of the TXF and THF languages", where the
+  # BNF gives `<defined_predicate>` — and is likewise a defined functor here.
+  @formula_kinds ~w(
+    tff_and_formula tff_or_formula tff_binary_nonassoc tff_prefix_unary tff_infix_unary
+    tff_quantified_formula tff_unitary_formula tff_unitary_term tff_defined_infix
+  )a
+
+  defp note_feature(table, %Node{
+         kind: :tff_typed_variable,
+         children: [_variable, %Node{kind: :defined_type, text: "$o"}]
+       }),
+       do: Table.feature(table, :fool)
+
+  defp note_feature(table, %Node{
+         kind: :tff_defined_plain,
+         children: [%Node{kind: :defined_functor, text: "$ite"} | _arguments]
+       }),
+       do: Table.feature(table, :let_or_ite)
+
+  defp note_feature(table, %Node{
+         kind: :tff_defined_plain,
+         children: [%Node{kind: :defined_functor, text: "$distinct"} | _arguments]
+       }),
+       do: Table.feature(table, :distinct)
+
+  defp note_feature(table, %Node{kind: kind, children: children})
+       when kind in [:tff_arguments, :tff_defined_infix] do
+    if Enum.any?(children, &formula?/1), do: Table.feature(table, :fool), else: table
+  end
+
+  defp note_feature(table, %Node{kind: :tff_mapping_type, children: [argument, _range]}) do
+    if boolean_type?(argument), do: Table.feature(table, :fool), else: table
+  end
+
+  defp note_feature(table, %Node{kind: :tff_xprod_type, children: factors}) do
+    if Enum.any?(factors, &boolean_type?/1), do: Table.feature(table, :fool), else: table
+  end
+
   defp note_feature(table, %Node{kind: kind}) do
     case Map.fetch(@features, kind) do
       {:ok, feature} -> Table.feature(table, feature)
       :error -> table
     end
   end
+
+  defp formula?(%Node{kind: :defined_constant, text: text}), do: text in ["$true", "$false"]
+  defp formula?(%Node{kind: kind}), do: kind in @formula_kinds
+
+  defp boolean_type?(%Node{kind: :defined_type, text: "$o"}), do: true
+  defp boolean_type?(_node), do: false
 
   # What a type quantifier binds says which of two different things it is doing.
   # `!>[A: $tType]` abstracts over a type and is polymorphism; `!>[A: nat]` abstracts

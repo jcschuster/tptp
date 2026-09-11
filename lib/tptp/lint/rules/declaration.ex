@@ -1,10 +1,28 @@
 defmodule Tptp.Lint.Rules.Declaration do
   @moduledoc """
-  A symbol used without a declaration.
+  A symbol used without a declaration, in a dialect that has no default typing.
 
-  Applies to the typed dialects only. TFF, TCF and THF require every symbol to be
-  declared by a `type` statement before use; FOF and CNF have no declarations, so
-  applying the rule to them would report every symbol they contain.
+  Applies to the higher-order dialects only — TH0, TH1, DH0, DH1 and NHF, every
+  dialect written with the `thf` keyword. The TPTP language page is explicit that
+  the first-order typed dialects are different:
+
+  > A useful feature of TFF is default typing for symbols that are not explicitly
+  > declared: predicates default to `($i,...,$i) > $o`, and functions default to
+  > `($i,...,$i) > $i`. […] THF does not admit default typing — all symbol types
+  > must be declared before use.
+
+  So an undeclared symbol in TFF, TXF, TCF or NXF has a type, and reporting it
+  reports legal TPTP. Up to 0.1.0 this rule did, on seventeen library files and 517
+  occurrences, every one of which is default-typed and well formed. FOF and CNF
+  have no declarations at all.
+
+  What default typing does make an error — a symbol whose later declaration differs
+  from its assumed type, or a default-typed symbol applied to an argument that is
+  not `$i` — is a question about types, which this library does not answer.
+
+  A unit mixing `thf` with first-order statements is treated as higher-order
+  throughout, since the table records which dialects a unit uses and not which
+  statement each use sits in.
 
   ## Requires a unit
 
@@ -27,11 +45,11 @@ defmodule Tptp.Lint.Rules.Declaration do
   def severity, do: :warning
 
   @impl true
-  def describe, do: "a symbol used in a typed dialect without a `type` declaration"
+  def describe, do: "a symbol used without a `type` declaration where there is no default typing"
 
   @impl true
   def review(%Table{} = table, _context) do
-    if Table.feature?(table, :typed) do
+    if Table.feature?(table, :thf) do
       Enum.flat_map(table.symbols, &undeclared/1)
     else
       []
@@ -48,7 +66,8 @@ defmodule Tptp.Lint.Rules.Declaration do
           severity(),
           first,
           "#{inspect(name)} is used but never declared",
-          hint: "a typed dialect wants `<name>, type, #{name}: <type>` first"
+          hint:
+            "THF admits no default typing; declare it with `thf(<name>, type, #{name}: <type>)`"
         )
       ]
     end

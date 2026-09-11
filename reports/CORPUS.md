@@ -51,7 +51,9 @@ what the comparison above is over.
 | `SYN000^2.p` | TPTP0301 |
 | `SYN000_2.p` | TPTP0301 |
 
-**`SYN000+2.p`, `SYN000-2.p`, `SYN000^2.p`, `SYN000_2.p`** use `theory(equality)` as an inference parent. v9.3.1.2 expanded `<source> ::= <general_term>` into a list of alternatives and `theory(...)` is not among them, so the shipped grammar does not admit it. A gap between the BNF release and the library, not a parser one. These are the same demonstration of the annotated-formula syntax written once per dialect, and all four carry the same two statements.
+**`SYN000+2.p`, `SYN000-2.p`, `SYN000^2.p`** use `theory(equality)` as an inference parent, which `<source>` has not derived since v9.3.1.2 replaced `<source> ::= <general_term>` with a list of alternatives. Fixed upstream on 10/09/26 — see <https://tptp.org/TPTP/Distribution/BuggedProblems-v9.3.1.txt> — and the three parse once that edit reaches the distributed tarball. They are the same demonstration of the annotated-formula syntax written once per dialect, and all three carry the same two statements.
+
+**`SYN000_2.p`** writes `introduced(assumption,[from,the,world,[]])`, which is `introduced(<intro_type>,<useful_info>)` where both the BNF and the TPTP language page state `introduced(<intro_type>,<useful_info>,<parents>)`. The bracket belongs one place to the left: the other three dialects' copies of this file write `introduced(assumption,[from,the,world],[])`. Distinct from, and not covered by, the `theory(equality)` fix of 10/09/26 — this file carries both, and the second was reachable only once the first was resolved. Unreported upstream as of 2026-09-10.
 <!-- end results -->
 
 ## This run
@@ -59,28 +61,29 @@ what the comparison above is over.
 | | |
 |---|---|
 | TPTP | v9.3.1, at `/opt/TPTP` |
-| Elixir | 1.20.3 |
+| Elixir | 1.20.4 |
 | OTP | 28 |
-| Schedulers | 16 |
-| Workers | 16 |
+| Schedulers | 8 |
+| Workers | 8 on 28125, 4 on 913, 2 on 320 |
+| Heap ceiling | 6.0 GB |
 | Per-file budget | 60.0 s |
 | Size cap | 19.1 MB |
 | Thinning | none — every file |
-| Wall clock | 531.6 s |
+| Wall clock | 886.5 s |
 | Read | 5428.1 MB |
-| Throughput | 10.2 MB/s |
+| Throughput | 6.1 MB/s |
 
 ### Slowest files
 
 | File | Bytes | ms |
 |---|---:|---:|
-| `SYN842-1.p` | 16140604 | 43535.5 |
-| `SYN852-1.p` | 16425608 | 39880.3 |
-| `SYN839-1.p` | 14596647 | 39492.3 |
-| `SYN841-1.p` | 14703297 | 39452.2 |
-| `SYN840-1.p` | 14533552 | 37961.6 |
-| `SYN854-1.p` | 16214076 | 37928.4 |
-| `SYN853-1.p` | 16223754 | 37210.5 |
-| `SYN855-1.p` | 15651631 | 37120.5 |
-| `SWV535-1.010.p` | 8504216 | 37048.2 |
-| `SWV546-1.010.p` | 8504178 | 36621.1 |
+| `SWV536-1.010.p` | 8504170 | 13420.2 |
+| `SYN854-1.p` | 16214076 | 13409.3 |
+| `SYN852-1.p` | 16425608 | 13076.6 |
+| `SYN853-1.p` | 16223754 | 12997.9 |
+| `SYN839-1.p` | 14596647 | 12226.2 |
+| `SWV545-1.010.p` | 8504445 | 12185.7 |
+| `SWV535-1.010.p` | 8504216 | 12024.3 |
+| `SWV546-1.010.p` | 8504178 | 12022.8 |
+| `SYN841-1.p` | 14703297 | 11822.9 |
+| `SYN855-1.p` | 15651631 | 11616.7 |

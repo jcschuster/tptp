@@ -42,6 +42,28 @@ defmodule Tptp.QueryTest do
       assert dialect("tff(a, axiom, [x, y] = z).") == :tx0
     end
 
+    test "FOOL makes a TFF file TXF, though none of its forms is a node of its own" do
+      # TPTP's own SPC headers call 252 library problems under 1 MB TX0. 201 of them
+      # read as TF0 while only tuples, `$let` and sequents were recognised.
+      assert dialect("tff(a, axiom, ! [X: $o] : (X | ~ X)).") == :tx0
+      assert dialect("tff(a, axiom, p((q))).") == :tx0
+      assert dialect("tff(a, axiom, p(q & r)).") == :tx0
+      assert dialect("tff(a, axiom, f(a) = (p | q)).") == :tx0
+      assert dialect("tff(a, axiom, p($ite(q, a, b))).") == :tx0
+      assert dialect("tff(a, axiom, p($true)).") == :tx0
+      assert dialect("tff(t, type, says: ($i * $o) > $o).") == :tx0
+      assert dialect("tff(t, type, p: $o > $o).") == :tx0
+
+      assert dialect("tff(a, axiom, p(f(a), b) & (a = b)).") == :tf0
+      assert dialect("tff(t, type, h: ($i * $i) > $o).") == :tf0
+    end
+
+    test "$distinct is TXF's and THF's, not TFF's" do
+      # The library's one live use, `SYO561_1.p`, carries an SPC header of TX0.
+      assert dialect("tff(a, axiom, $distinct(apple, microsoft)).") == :tx0
+      assert dialect("tff(a, axiom, $less(1, 2)).") == :tf0
+    end
+
     test "a non-classical connective outranks everything" do
       assert dialect("tff(a, axiom, [.] p).") == :nxf
       assert dialect("thf(a, axiom, {$box} @ p).") == :nhf

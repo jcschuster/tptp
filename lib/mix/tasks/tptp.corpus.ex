@@ -83,18 +83,29 @@ defmodule Mix.Tasks.Tptp.Corpus do
   @default_max_bytes 20_000_000
   @default_heap 6 * 1024 * 1024 * 1024
   @tier_bounds [1_048_576, 4_194_304]
-  @theory "use `theory(equality)` as an inference parent. v9.3.1.2 expanded " <>
-            "`<source> ::= <general_term>` into a list of alternatives and `theory(...)` " <>
-            "is not among them, so the shipped grammar does not admit it. A gap between " <>
-            "the BNF release and the library, not a parser one. These are the same " <>
-            "demonstration of the annotated-formula syntax written once per dialect, " <>
-            "and all four carry the same two statements."
+  @theory "use `theory(equality)` as an inference parent, which `<source>` has not " <>
+            "derived since v9.3.1.2 replaced `<source> ::= <general_term>` with a list " <>
+            "of alternatives. Fixed upstream on 10/09/26 — see " <>
+            "<https://tptp.org/TPTP/Distribution/BuggedProblems-v9.3.1.txt> — and the " <>
+            "three parse once that edit reaches the distributed tarball. They are the " <>
+            "same demonstration of the annotated-formula syntax written once per " <>
+            "dialect, and all three carry the same two statements."
+
+  @introduced "writes `introduced(assumption,[from,the,world,[]])`, which is " <>
+                "`introduced(<intro_type>,<useful_info>)` where both the BNF and the " <>
+                "TPTP language page state `introduced(<intro_type>,<useful_info>," <>
+                "<parents>)`. The bracket belongs one place to the left: the other " <>
+                "three dialects' copies of this file write " <>
+                "`introduced(assumption,[from,the,world],[])`. Distinct from, and " <>
+                "not covered by, the `theory(equality)` fix of 10/09/26 — this file " <>
+                "carries both, and the second was reachable only once the first was " <>
+                "resolved. Unreported upstream as of 2026-09-10."
 
   @known %{
     "SYN000-2.p" => @theory,
     "SYN000+2.p" => @theory,
-    "SYN000_2.p" => @theory,
-    "SYN000^2.p" => @theory
+    "SYN000^2.p" => @theory,
+    "SYN000_2.p" => @introduced
   }
 
   @open "<!-- results -->"

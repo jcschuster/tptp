@@ -83,66 +83,6 @@ defmodule Tptp.Bnf.Generator do
 
   @dropped_alternatives [{"source", [{:literal, "unknown"}]}]
 
-  # A `:==` list the BNF states incompletely, corrected against another published
-  # TPTP source. `values` is the set that source publishes, quoted in full rather
-  # than reduced to the difference, so that the entry is a citation rather than a
-  # derivation; `add_documented/1` supplies the difference and `check_documented!/3`
-  # fails the build once the BNF covers the set. See `vocabularies/1` for the
-  # standard an entry has to meet.
-  @language_page "https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml"
-
-  @documented_values %{
-    "formula_role" => %{
-      values: ~w(
-        axiom hypothesis definition assumption lemma theorem corollary conjecture
-        negated_conjecture plain type interpretation logic unknown
-      ),
-      source: @language_page,
-      because:
-        "the prose of the TPTP language page lists fourteen roles including `logic`, " <>
-          "and describes it — \"logic formulae are used for defining the logic in " <>
-          "non-classical logics\" — while the `:==` rule quoted further down the same " <>
-          "page lists thirteen and omits it"
-    },
-    "ntf_modal_system" => %{
-      values:
-        Enum.map(
-          ~w(K KB K4 K5 K45 KB5 D DB D4 D5 D45 M B S4 S5 S5U),
-          &("$modal_system_" <> &1)
-        ),
-      source: @language_page,
-      because:
-        "the Non-classical Logics section of the TPTP language page states that " <>
-          "`$modalities` may be a system name of the form `$modal_system_Sys` with " <>
-          "Sys drawn from a set of sixteen, while the `:==` rule on the same page " <>
-          "lists six"
-    },
-    "defined_functor" => %{
-      values: ~w(
-        $uminus $sum $difference $product
-        $quotient $quotient_e $quotient_t $quotient_f
-        $remainder_e $remainder_t $remainder_f
-        $floor $ceiling $truncate $round $abs
-        $to_int $to_rat $to_real
-      ),
-      source: @language_page,
-      because:
-        "the arithmetic table of the TPTP language page defines `$abs/1` over " <>
-          "`$int`, `$rat` and `$real`, while the `:==` rule on the same page omits it. " <>
-          "The other extended arithmetic symbols on that page — `$min`, `$max`, " <>
-          "`$sqrt`, `$pi` and the rest — sit inside HTML comments and are not " <>
-          "published, so they are not added"
-    },
-    "ntf_modal_axiom" => %{
-      values: Enum.map(~w(K M B D 4 5 CD BoxM C4 C), &("$modal_axiom_" <> &1)),
-      source: @language_page,
-      because:
-        "the same section states that `$modalities` may be a tuple of axiom names " <>
-          "of the form `$modal_axiom_Ax` with Ax drawn from a set of ten, while the " <>
-          "`:==` rule lists six"
-    }
-  }
-
   @injected_productions [
     {"atomic_word", :kw_inference},
     {"atomic_word", :kw_introduced},
@@ -276,52 +216,18 @@ defmodule Tptp.Bnf.Generator do
   and semantically incorrect, and that difference is reported as a warning rather
   than a parse failure.
 
-  ## Corrections against a second TPTP source
-
-  `@documented_values` supplies values that a `:==` rule omits and another published
-  TPTP page defines. Each entry quotes the set that page publishes in full, so that
-  the entry is a citation rather than a derivation; `add_documented/1` supplies the
-  difference against the BNF and `check_documented!/3` fails the build once the BNF
-  covers the set.
-
-  All three current entries come from
-  <https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml>, and each is a
-  contradiction within that single document, whose prose and embedded `:==` rules
-  disagree.
-
-  | Rule | BNF | Page | Omitted |
-  |---|---:|---:|---|
-  | `<formula_role>` | 13 | 14 | `logic` |
-  | `<ntf_modal_system>` | 6 | 16 | `KB`, `K4`, `K5`, `K45`, `KB5`, `DB`, `D4`, `D5`, `D45`, `S5U` |
-  | `<ntf_modal_axiom>` | 6 | 10 | `CD`, `BoxM`, `C4`, `C` |
-
-  The prose lists fourteen roles, including `logic`, and states that "logic formulae
-  are used for defining the logic in non-classical logics". The Non-classical Logics
-  section states that `$modalities` may be a system name of the form
-  `$modal_system_Sys` with Sys drawn from sixteen values, or a tuple of axiom names
-  of the form `$modal_axiom_Ax` with Ax drawn from ten. The `:==` rules reproduced
-  further down the same page list thirteen, six and six.
-
-  The BNF remains this library's source for syntax. Where two published TPTP sources
-  contradict each other on a point of semantics, the prose defining a value is
-  preferred to a list omitting it: 354 problems carry the `logic` role and 76 carry
-  one of the omitted modal systems, and reporting them attributes a defect in the
-  grammar to the file.
-
-  The corrections are narrow, cited and checked. Their `$`-words also enter
-  `<reserved_word>`, since `Tptp.Lint.Rules.DefinedWord` consults that list alone.
-  This is not a mechanism for adjusting vocabularies to preference; an entry
-  requires a citation to a TPTP source.
-
-  Note that the same section describes a third form, `$modal_axiom_AxTm` with Tm in
-  `{+, -}`, which no grammar can represent: `<dollar_word> ::- <dollar><alpha_numeric>*`
-  excludes `+`, so `$modal_axiom_K+` lexes as two tokens and does not parse. No
-  library file uses it, and it is recorded in the defect register rather than
-  corrected here.
-
   Emitted as multi-clause functions over binary literals, which the compiler turns
   into a direct dispatch — faster than a `MapSet`, and every atom involved stays a
   compile-time one.
+
+  One value set the TPTP defines cannot appear here at all. The Non-classical Logics
+  section of <https://tptp.org/UserDocs/TPTPLanguage/TPTPLanguage.shtml> describes a
+  temporal modal axiom as `$modal_axiom_`*Ax**Tm* with *Tm* in `{+, -}`, and no
+  grammar can state it: `<dollar_word> ::- <dollar><alpha_numeric>*` excludes `+`, so
+  `$modal_axiom_K+` lexes as two tokens and the statement does not parse. Resolving
+  it needs a change to the BNF's token rules, which its maintainer has said will
+  follow the first temporal logic formalised in the TPTP World. No library file uses
+  the form.
 
   One entry is not a `:==` rule and is labelled as such in the generated module.
   `<reserved_word>` does not exist in the BNF — the word "reserved" does not occur in
@@ -342,10 +248,9 @@ defmodule Tptp.Bnf.Generator do
       |> Enum.filter(fn {_lhs, words} -> words != nil end)
       |> Enum.sort()
 
-    reserved = Enum.uniq(reserved_words(rules) ++ documented_dollar_words())
-    corrected = Enum.map(entries, &add_documented/1) ++ [{"reserved_word", reserved, 0}]
+    entries = entries ++ [{"reserved_word", reserved_words(rules)}]
 
-    {render_vocabulary(corrected, bnf_path), Enum.map(corrected, &{elem(&1, 0), elem(&1, 1)})}
+    {render_vocabulary(entries, bnf_path), entries}
   end
 
   @doc """
@@ -463,48 +368,6 @@ defmodule Tptp.Bnf.Generator do
         do: word
   end
 
-  # A `$`-word another TPTP source defines is a word the language defines, so the
-  # corrections in `@documented_values` belong in `<reserved_word>` as well as in
-  # their own list. Without this, `Tptp.Lint.Rules.DefinedWord` — which consults
-  # `<reserved_word>` alone, since many defined words appear in no closed list —
-  # would continue to report them.
-  @spec documented_dollar_words() :: [binary()]
-  defp documented_dollar_words do
-    for {_name, %{values: values}} <- @documented_values,
-        word <- values,
-        String.starts_with?(word, "$"),
-        uniq: true,
-        do: word
-  end
-
-  @spec add_documented({binary(), [binary()]}) :: {binary(), [binary()], non_neg_integer()}
-  defp add_documented({name, words}) do
-    case Map.fetch(@documented_values, name) do
-      {:ok, %{values: published}} ->
-        added = check_documented!(name, words, published)
-        {name, words ++ added, length(added)}
-
-      :error ->
-        {name, words, 0}
-    end
-  end
-
-  # The published set is quoted in full, so the values to add are those the BNF does
-  # not already list. An empty difference means the BNF now states the whole set and
-  # the entry has become a no-op, which is the point at which it should be removed.
-  @spec check_documented!(binary(), [binary()], [binary()]) :: [binary()]
-  defp check_documented!(name, words, published) do
-    case published -- words do
-      [] ->
-        raise "the BNF's <#{name}> now lists every value in @documented_values, so " <>
-                "the entry for it is dead. Drop it; the corresponding diagnostic " <>
-                "stops firing either way."
-
-      missing ->
-        missing
-    end
-  end
-
   defp closed_words(alternatives) do
     {words, others} =
       alternatives
@@ -601,11 +464,9 @@ defmodule Tptp.Bnf.Generator do
         separates a well-formed statement from a merely parseable one, and it is
         checked by `Tptp.Lint` at warning severity rather than by the parser.
 
-        Every list here is a `:==` rule of the BNF, with two classes of exception.
+        Every list here is a `:==` rule of the BNF, with one exception.
         `<reserved_word>` is this library's own: the BNF has no such rule, and the
-        list is every `$`-prefixed literal appearing in it. The lists marked below
-        as corrected carry values the BNF omits and another published TPTP source
-        defines. See `Tptp.Bnf.Generator` for the citations.
+        list is every `$`-prefixed literal appearing in it.
         \"\"\"
       """,
       Enum.map(entries, &render_vocabulary_entry/1),
@@ -614,20 +475,18 @@ defmodule Tptp.Bnf.Generator do
     |> IO.iodata_to_binary()
   end
 
-  defp render_vocabulary_entry({"reserved_word" = name, words, _added}) do
+  defp render_vocabulary_entry({"reserved_word" = name, words}) do
     render_vocabulary_entry(
       name,
       words,
-      "The #{length(words)} `$`-words TPTP defines.\n\n" <>
-        "  Not a `:==` rule: the BNF has no `<reserved_word>`. This is every `$`-prefixed\n" <>
-        "  literal collected from every alternative of the BNF, together with the values\n" <>
-        "  of `@documented_values` that another TPTP source defines and the BNF omits. A\n" <>
-        "  superset of the words appearing in any closed list, which is what\n" <>
-        "  `Tptp.Lint.Rules.DefinedWord` requires."
+      "The #{length(words)} `$`-words the BNF mentions anywhere.\n\n" <>
+        "  Not a `:==` rule — the BNF has no `<reserved_word>` — but every `$`-prefixed\n" <>
+        "  literal collected from every alternative of it. A superset of the words the\n" <>
+        "  language defines, which is what `Tptp.Lint.Rules.DefinedWord` wants."
     )
   end
 
-  defp render_vocabulary_entry({name, words, 0}) do
+  defp render_vocabulary_entry({name, words}) do
     render_vocabulary_entry(
       name,
       words,
@@ -635,21 +494,7 @@ defmodule Tptp.Bnf.Generator do
     )
   end
 
-  defp render_vocabulary_entry({name, words, added}) do
-    %{source: source} = Map.fetch!(@documented_values, name)
-
-    render_vocabulary_entry(
-      name,
-      words,
-      "The #{length(words)} values defined for `<#{name}>`.\n\n" <>
-        "  Corrected: #{length(words) - added} are listed by the BNF's `:==` rule and the\n" <>
-        "  other #{added} come from the TPTP language page, which defines them where the\n" <>
-        "  BNF does not. See `Tptp.Bnf.Generator.vocabularies/1` for the citation.\n\n" <>
-        "  <#{source}>"
-    )
-  end
-
-  defp predicate_subject("reserved_word"), do: "`$`-words TPTP defines"
+  defp predicate_subject("reserved_word"), do: "`$`-words the BNF mentions"
   defp predicate_subject(name), do: "`<#{name}>` values"
 
   defp render_vocabulary_entry(name, words, summary) do

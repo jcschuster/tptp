@@ -10,8 +10,27 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-10
+
+Two things at once. `Tptp.analyze/2` and the `Tptp.Analyzer` behaviour give an
+editor integration everything it needs from one traversal, `mix tptp.lint` puts the
+diagnostics in a shell, and `Tptp.Query` learned the dependently typed dialects.
+Separately, the library is adapted to TPTP BNF v9.3.1.3 and to the SZS ontology's
+move to szs.tptp.org, which between them resolve every disagreement found between
+the TPTP's published sources while 0.1.0 was in use.
+
+One breaking change to note in each half: `Tptp.Query.within?/2` is a partial order
+and no longer a sort comparator, and one SZS value's published name lost a
+misspelling.
+
 ### Added
 
+- `reports/FINDINGS.md`: what the four unparseable `SYN000*2.p` files were hiding.
+  With the announced fix applied to copies, two further defects in those files
+  surfaced, and a sweep of the library for anything else a skipped file could
+  conceal showed three rules of this library's to be wrong. Each finding carries its
+  citation and a command reproducing it, and the checks that found nothing are
+  recorded with them.
 - `Tptp.analyze/2` and `Tptp.Analysis`: the file, its diagnostics, the symbol
   table and the dialect from a single traversal, with an opt-in line index for
   turning span offsets into line and column once rather than once per diagnostic.
@@ -59,11 +78,6 @@ moves when TPTP moves, not when this library does.
   printed the whole source binary and every node that points into it — into an IEx
   prompt, a `Logger` line or an exception report. Each now prints a summary in
   constant time, and `inspect(term, structs: false)` still shows the map.
-- `reports/TPTP-DEFECTS.md`, the register of places where the published TPTP sources
-  disagree with each other. Five entries, each with its citation, the files it
-  affects and a command that reproduces the count, so they can be reported upstream
-  as they stand, plus two notes on things that look like defects and are not. The
-  library works around none of them.
 - `Tptp.Query.rank/1` and `Tptp.Query.dialects/0`, the total listing order that
   `within?/2` used to be mistaken for.
 - `Tptp.Bnf.Generator.departures/0`, so `mix tptp.gen` prints the departures from
@@ -73,6 +87,12 @@ moves when TPTP moves, not when this library does.
 
 ### Removed
 
+- `reports/TPTP-DEFECTS.md`, the register of places where the published TPTP
+  sources disagreed with each other. It never shipped: it was written during this
+  cycle, all six entries were reported upstream, and BNF v9.3.1.3 together with the
+  SZS ontology's move resolved every one of them. The mechanisms it documented —
+  `@documented_values` and `@name_atom_overrides` — are gone with it, and the
+  vendored files are transcribed rather than corrected again.
 - `Tptp.Lint.Rules.Arity` and `TPTP0505`, which reported a symbol applied at two
   arities. The premise was false. The TPTP language page, in the section on logical
   formulae that governs every dialect, says: "Symbols may be overloaded with different
@@ -92,35 +112,51 @@ moves when TPTP moves, not when this library does.
 
 ### Changed
 
-- The modal system and axiom vocabularies are corrected against the TPTP language
-  page, so `TPTP0402` no longer fires on the 76 library occurrences of a system name
-  the BNF omits. The Non-classical Logics section states that `$modalities` may be a
-  system name of the form `$modal_system_Sys` with Sys drawn from sixteen values, or
-  a tuple of axiom names `$modal_axiom_Ax` with Ax drawn from ten; the `:==` rules on
-  the same page name six of each. The library previously recorded this as the two
-  sources agreeing against the corpus, which was wrong: the first check grepped the
-  page for literal `$modal_system_X` strings, and the page states the values as a
-  schema, so the only literals found were those in its own embedded BNF.
+- **The vendored BNF is TPTP v9.3.1.3**, which resolves every disagreement this
+  library had recorded between the TPTP's own published sources. `<formula_role>`
+  gains `logic`, `<ntf_modal_system>` the ten systems it omitted, `<ntf_modal_axiom>`
+  the four axioms it omitted, and `<defined_functor>` gains `$abs`. Each had been
+  defined by the prose of the TPTP language page and absent from the `:==` rule
+  quoted further down that same page; the library carried them as cited corrections
+  under `Tptp.Bnf.Generator`'s `@documented_values`, and that mechanism is gone
+  because there is nothing left for it to correct. `TPTP0401` fired on 354 library
+  problems and `TPTP0402` on 80 occurrences before those corrections; both now fire
+  on nothing in the library, and now do so by transcription rather than by
+  correction.
 
-  `@documented_values` now quotes the set a cited source publishes in full rather
-  than the difference against the BNF, so an entry is a citation; `add_documented/1`
-  computes the difference and the build fails once the BNF covers the set. Corrected
-  `$`-words also enter `<reserved_word>`, which is the list
-  `Tptp.Lint.Rules.DefinedWord` consults.
-- `$abs` is now accepted as a defined functor, so `TPTP0402` no longer fires on the
-  four occurrences in `ARI763_1.p`. The arithmetic table of the TPTP language page
-  defines it over `$int`, `$rat` and `$real`; the `:==` rule on the same page omits
-  it. The other extended arithmetic symbols visible on that page — `$min`, `$max`,
-  `$sqrt`, `$pi` and fifteen more — are inside HTML comments and are not published,
-  so they are not added.
-- `logic` is now accepted as a formula role, so `TPTP0401` no longer fires on the 354
-  library problems that carry one. The TPTP language page lists fourteen roles
-  including `logic` and describes what it is for; the `:==` rule quoted further down
-  the same page lists thirteen and omits it. `Tptp.Bnf.Generator` corrects the list
-  against the prose under `@documented_values`, with the citation and a build check
-  that fails when the BNF catches up — the same discipline the misspelled SZS value
-  gets. It is not a general licence to edit the vocabularies: an entry needs a
-  citation to a TPTP source.
+  `Tptp.bnf_version/0` answers `"9.3.1.3"`. The grammar, the vocabularies, the
+  printer shapes and the lexer oracle are regenerated from it; the node kinds are
+  unchanged, so a tree cached under `"9.3.1.2"` is still readable.
+- **`<distinct_object>` now requires at least one `<do_char>`**, matching
+  `<single_quoted>`, so `""` is no longer admitted by the BNF. The lexer emits the
+  token as before and `TPTP0107` — until now "empty quoted atom", now reported for
+  either quoting — fires on it as it already did on `''`. The asymmetry between the
+  two rules was an open question in the register and this is its answer.
+- **The SZS ontology moved to <https://szs.tptp.org>.** The former address serves a
+  notice pointing there. The page is re-vendored as
+  `priv/szs/SZSOntology-2026-09-10.html`, `Tptp.Szs.Extract` reads its new markup,
+  and `Tptp.Szs.Ontology.source/0`, `vendored/0` and `digest/0` answer accordingly.
+  The 112 values, their mnemonics, ontologies, subontologies and descriptions are
+  unchanged but for the spelling below.
+
+  The new page carries per-response script nonces and signed image URLs, so two
+  fetches of an unchanged page do not agree byte for byte. The `:network` test that
+  checked the vendored copy against the live page by digest now compares the
+  ontology the two yield, value for value; `NOTICE` records why.
+- **`TPTP0501` applies to the higher-order dialects only.** The TPTP language page
+  gives TFF default typing — an undeclared predicate is `($i,...,$i) > $o` and an
+  undeclared function `($i,...,$i) > $i` — and says that THF "does not admit default
+  typing". The rule reported undeclared symbols in every typed dialect, so it fired
+  on 517 legal occurrences across seventeen TFF, TXF, TCF and NXF library files,
+  which the corpus gate carried as true findings. It now fires only in a unit
+  containing a `thf` statement. The README's claim that the typed dialects require a
+  declaration for every symbol is corrected with it.
+- **Breaking, for a consumer comparing SZS names as strings.**
+  `Tptp.Szs.Ontology.name(:counter_tautology_preserving)` answers
+  `"CounterTautologyPreserving"`, and `from_string/1` admits that spelling alone.
+  The page had spelled it `CounterTautologyyPreserving`, with a doubled `y`, and the
+  move corrected it. The atom is unchanged; `Tptp.Szs.Generator`'s
+  `@name_atom_overrides`, which had supplied it, is gone.
 - `Tptp.Query.within?/2` is now a **partial** order and no longer a position
   comparison in a single list. The dialects are not a line — TCF and the
   non-classical languages are branches — and the old reading answered `true` for
@@ -130,9 +166,24 @@ moves when TPTP moves, not when this library does.
 
 ### Fixed
 
-- Every reference to the three committed reports follows them into `reports/`.
-  The move left `mix docs` failing outright — `extras:` still named
-  `TPTP-DEFECTS.md` at the root — and three quieter breakages behind it: the
+- `Tptp.Query.dialect/1` recognises TXF by its FOOL constructs, and no longer reads
+  four TXF files in five as TF0. It recognised a tuple, a `$let` and a sequent, each
+  of which has a node kind; but the rest of what TXF adds to TFF is FOOL, and no FOOL
+  form has a node kind of its own, each being an ordinary TFF node standing where TF0
+  also admits one. A `$o` variable, a formula or `$true`/`$false` in a term position,
+  a declared `$o` argument type, `$ite` and `$distinct` now carry it. Against TPTP's
+  own `SPC` headers over the problems under 1 MB, 51 of the 252 TX0 problems were
+  classified correctly before and all 252 are now, with no false positive among the
+  2,060 TF0, 590 TF1 and 60 TX1 problems beside them.
+- `TPTP0504` no longer reports the literal `unknown` source as a missing parent.
+  `<source> ::= … | unknown` is a literal, which the grammar reads as a `<name>` —
+  the first of the generator's departures, the two being otherwise
+  indistinguishable — and the rule went looking for a formula called `unknown`.
+  Four library files write it, the `SYN000*2.p` demonstrations, and the rule fired
+  twice on each; their parse failures had kept that out of every sweep.
+- Every reference to the committed reports follows them into `reports/`.
+  The move left `mix docs` failing outright — `extras:` still named a report at the
+  root — and three quieter breakages behind it: the
   package's `files:` list no longer shipped any of the reports, `mix tptp.corpus`
   and `mix tptp.census` defaulted `--out` to the old root paths, so a plain run
   wrote a second copy at the root and `--check` failed on a file it could not read
@@ -150,14 +201,6 @@ moves when TPTP moves, not when this library does.
   uses. `Tptp.Test.Corpus.timeout/0` was specced as `timeout()` while only ever
   answering `:infinity`, and two functions that exist to raise lacked a
   `no_return()` spec.
-- `TPTP-3`'s reproduce note in `reports/TPTP-DEFECTS.md` said `$modal_system_S5U`
-  was "named by neither source", contradicting the entry's own table two paragraphs
-  above, which lists `S5U` among the ten values the BNF omits and the language page
-  defines. `T` is named by neither; `S5U` is named by the page. Both are absent from
-  the affected count for the same reason, now stated with the command that shows it:
-  all 43 occurrences sit in the `% Comments` field of a problem header, not in the
-  `% Syntax` field the note named.
-
 - The corpus gates' heap budget no longer divides by ExUnit's `max_cases`. It
   divided both the budget and the worker count, on the reasoning that dividing both
   leaves each worker the share it would have had alone — but the worker count floors
@@ -200,15 +243,25 @@ moves when TPTP moves, not when this library does.
   enough for a rule that asks only whether a name was ever declared, and is not
   the same as modelling scope.
 
-### Changed
+### Notes
 
-- The SZS value the ontology page spells `CounterTautologyyPreserving` is now
-  `:counter_tautology_preserving`, not `:counter_tautologyy_preserving`.
-  `Tptp.Szs.Ontology.name/1` still answers the page's spelling, doubled `y` and
-  all, and `from_string/1` still admits that spelling and no other — the name
-  quotes the source, while the atom is this library's own identifier and every
-  consumer has to pattern match on it. `Tptp.Szs.Generator` carries the override in
-  `@name_atom_overrides` and fails the build if the page stops needing it.
+- Four library files still do not parse, and both reasons are defects in the files.
+  `SYN000-2.p`, `SYN000+2.p` and `SYN000^2.p` use `theory(equality)` as an inference
+  parent, which `<source>` has not derived since v9.3.1.2; that was fixed upstream on
+  10/09/26 — see <https://tptp.org/TPTP/Distribution/BuggedProblems-v9.3.1.txt> — and
+  all three parse against the corrected text, so they leave
+  `Mix.Tasks.Tptp.Corpus.known_failures/0` when the distributed tarball carries the
+  edit. `SYN000_2.p` carries a second and independent one, reachable only once the
+  first was resolved: it writes `introduced(assumption,[from,the,world,[]])` where
+  both the BNF and the TPTP language page state
+  `introduced(<intro_type>,<useful_info>,<parents>)`, and the other three dialects'
+  copies of the same file write `introduced(assumption,[from,the,world],[])`. Not
+  reported upstream as of 2026-09-10.
+- `SYN000^2.p` carries a further defect that only surfaces once it parses: its
+  `let_tuple_4` applies `qll @ a @ b`, and nothing declares `qll`. THF admits no
+  default typing, so that is an error, and `TPTP0501` reports it. `ql`, declared as
+  `$int > $int > $o`, has exactly the type the use needs, so it is presumably a
+  typo. Not reported upstream as of 2026-09-10.
 
 ## [0.1.0]
 
@@ -251,5 +304,6 @@ First release. Generated from TPTP BNF v9.3.1.2 and the SZS ontology as publishe
   diagrams, and guessing at it would put unverifiable relations into a library whose
   contract is faithfulness.
 
-[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/jcschuster/tptp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jcschuster/tptp/releases/tag/v0.1.0

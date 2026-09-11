@@ -17,9 +17,11 @@ defmodule Tptp do
 
   ## Scope
 
-  The typed dialects of TPTP require a declaration for every symbol and a type
-  annotation on every bound variable. No type inference is therefore required to
-  read them, and none is performed. Explicit type arguments are recorded verbatim
+  THF requires a declaration for every symbol and a type on every bound variable,
+  and the first-order typed dialects fix a default for whatever they leave out —
+  `$i` for an untyped variable, `($i * ... * $i) > $i` or `> $o` for an undeclared
+  function or predicate. No type inference is therefore required to read any of
+  them, and none is performed. Explicit type arguments are recorded verbatim
   and in source order: in `f @ $i @ a`, the `$i` is retained as an argument of the
   application with its own span.
 
@@ -275,7 +277,7 @@ defmodule Tptp do
   code cannot interpret.
 
       iex> Tptp.bnf_version()
-      "9.3.1.2"
+      "9.3.1.3"
   """
   @spec bnf_version() :: binary()
   def bnf_version, do: @bnf_version

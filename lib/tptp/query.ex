@@ -321,7 +321,9 @@ defmodule Tptp.Query do
   defp has?(set, feature), do: MapSet.member?(set, feature)
 
   defp tfx?(set) do
-    has?(set, :tff) and (has?(set, :tuple) or has?(set, :let_or_ite) or has?(set, :subtype))
+    has?(set, :tff) and
+      (has?(set, :fool) or has?(set, :tuple) or has?(set, :let_or_ite) or
+         has?(set, :subtype) or has?(set, :distinct))
   end
 
   defp statements(subject), do: Tptp.Lint.statements(subject)

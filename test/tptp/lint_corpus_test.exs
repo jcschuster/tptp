@@ -11,12 +11,11 @@ defmodule Tptp.LintCorpusTest do
   fact about TPTP rather than left as noise:
 
     * `TPTP0503` is the only rule that fires on a conforming library at all.
-      `TPTP0401` and `TPTP0402` were two more until the role list and the modal
-      vocabularies were corrected against the TPTP language page: 354 problems
-      carrying a `logic` role and 76 carrying one of ten modal systems the BNF omits
-      and the page defines. Both now fire on nothing in the library. See
-      [TPTP-DEFECTS.md](../../reports/TPTP-DEFECTS.md), entries `TPTP-1` and
-      `TPTP-3`.
+      `TPTP0401` and `TPTP0402` were two more under the BNF up to v9.3.1.2, whose
+      role list omitted `logic` and whose modal vocabularies named six systems and
+      six axioms where the TPTP language page stated sixteen and ten: 354 problems
+      carry the role and 76 carry one of the omitted systems. v9.3.1.3 completed
+      all three lists and both rules now fire on nothing in the library.
     * `TPTP0503` fires on the machine-generated ITP axiom sets, which repeat
       declarations across files, so a problem pulling in thirty of them defines one
       name thirty times. Ambiguous, and true.
@@ -24,14 +23,12 @@ defmodule Tptp.LintCorpusTest do
       not a finding about the file being wrong — a satisfiability problem asks
       nothing on purpose — it is the count a consumer would otherwise make itself.
 
-  `TPTP0501` fires freely on an axiom file linted *alone*, because its declarations
-  are in a file it does not include; that is why the gate lints units. Over whole
-  units it fires 517 times across seventeen files, listed in `@known_undeclared`
-  with the reason for each — fourteen `TX0` problems that declare one symbol and
-  use six, two modal problems, and the TCF syntax demonstration. It fired on 39
-  more until `Tptp.Lint.Collect` learned that a `$let` binding declares the name it
-  binds, which is the difference between a fact about TPTP and a bug in a rule. The
-  full sweep is what found both: at `every: 17` not one of the 56 was ever sampled.
+  `TPTP0501` fires freely on a THF axiom file linted *alone*, because its
+  declarations are in a file it does not include; that is why the gate lints units.
+  It applies to THF only. The first-order typed dialects give an undeclared symbol a
+  default type, which the rule ignored until 0.1.1, and so it reported 517 legal
+  occurrences across seventeen files that this gate carried as true. The one library
+  file it is right about is listed in `@known_undeclared` with the reason.
 
   `TPTP0505` is gone. It reported a symbol applied at two arities, and it fired on
   eleven library files, ten of which were doing something the TPTP explicitly permits
@@ -53,33 +50,23 @@ defmodule Tptp.LintCorpusTest do
   @moduletag :corpus
   @moduletag timeout: Corpus.timeout()
 
-  # The seventeen library files that really do use a symbol nothing declares — 517
-  # occurrences between them, and every one of them true. The full sweep is what
-  # found them: at `every: 17` not one was ever sampled.
+  # The library files that really do use a symbol nothing declares, in a dialect
+  # where that is an error. There is one.
   #
-  #   * Fourteen are `TX0`. The `SWX` thirteen are SystemOnTPTP verification
-  #     problems; they declare a symbol or two and then use `head`, `cons`, `pair2`,
-  #     `proj1pair` and the rest with nothing declaring them, `SWX229_1.p` sixty-five
-  #     times. `LCL977_1.p` applies `f(X)` the same way, and its own header agrees —
-  #     "Number of functors : 0 ( 0 usr; 0 con)".
-  #   * `MSC034_1.p` and `MSC035_1.p` are `$modal` problems whose propositional atoms
-  #     are never declared. The non-classical extension is the same corner of the BNF
-  #     the non-classical extension, the same corner of the BNF `TPTP-3` concerns.
-  #   * `SYN000-3.p` is the TCF syntax demonstration: eight `tcf` statements and no
-  #     `type` statement at all. TCF is a typed dialect, so the rule is right about
-  #     it, and the file is a demonstration of syntax rather than a problem.
+  #   * `SYN000^2.p`, the THF syntax demonstration. Its `let_tuple_4` applies
+  #     `qll @ a @ b` and nothing declares `qll`, while `ql: $int > $int > $o` is
+  #     declared with exactly the type that use needs. It is also in
+  #     `Mix.Tasks.Tptp.Corpus.known_failures/0` until the `theory(equality)` fix of
+  #     10/09/26 reaches the distributed tarball, and is listed here so that this gate
+  #     does not start failing on the day it leaves that list.
   #
-  # A further 39 `SWW` files were here until `Tptp.Lint.Collect` learned that a
-  # `$let` binding declares its names. Those were the rule being wrong, and are
-  # fixed rather than listed. The difference between the two groups is the whole
-  # point of chasing each one down instead of excluding the lot.
-  @known_undeclared ~w(
-    LCL977_1.p
-    MSC034_1.p MSC035_1.p
-    SWX216+1.p SWX228_1.p SWX229_1.p SWX230_1.p SWX231_1.p SWX232_1.p SWX233_1.p
-    SWX234_1.p SWX235_1.p SWX236_1.p SWX237_1.p SWX238_1.p SWX239_1.p
-    SYN000-3.p
-  )
+  # Seventeen first-order files — 517 occurrences across thirteen `SWX` problems,
+  # `LCL977_1.p`, `MSC034_1.p`, `MSC035_1.p` and `SYN000-3.p` — sat here as true
+  # findings until the TPTP language page was read on default typing: TFF, TXF, TCF
+  # and NXF give an undeclared symbol a type, and the rule now applies to THF alone.
+  # 39 `SWW` files sat here before that, until `Tptp.Lint.Collect` learned that a
+  # `$let` binding declares its names.
+  @known_undeclared ~w(SYN000^2.p)
 
   setup_all do
     root = Corpus.root()

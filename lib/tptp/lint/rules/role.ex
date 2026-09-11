@@ -9,17 +9,13 @@ defmodule Tptp.Lint.Rules.Role do
 
   ## Coverage over the TPTP library
 
-  This rule reports nothing on TPTP v9.3.1, and previously reported 354 files.
-  Each of those carried a `logic` role, as in `thf(simple_s5, logic, ...)`, by which
-  the non-classical extension introduces its semantics. The vendored BNF's `:==`
-  rule lists thirteen roles and omits `logic`; the prose of the TPTP language page
-  lists fourteen and includes it, several paragraphs above the rule. The role is
-  therefore defined by TPTP and absent from the grammar, and a diagnostic reporting
-  it attributed a defect in the grammar to the file.
-
-  `Tptp.Bnf.Generator` corrects the vocabulary against the page defining the value,
-  under a build check that fails once the BNF lists it. See
-  [TPTP-DEFECTS.md](../../../../reports/TPTP-DEFECTS.md), entry `TPTP-1`, for both citations.
+  This rule reports nothing on TPTP v9.3.1, and reported 354 files under the BNF up
+  to v9.3.1.2. Each of those carried a `logic` role, as in
+  `thf(simple_s5, logic, ...)`, by which the non-classical extension introduces its
+  semantics. That `:==` rule listed thirteen roles and omitted `logic` while the
+  prose of the TPTP language page listed fourteen and included it, so a diagnostic
+  reporting one of those files attributed a defect in the grammar to the file.
+  v9.3.1.3 added the value, and the vocabulary is a transcription of the rule again.
 
   What remains is the rule applied to an actual misspelling: `fof(a, axim, p).` is
   well-formed TPTP and semantically incorrect.

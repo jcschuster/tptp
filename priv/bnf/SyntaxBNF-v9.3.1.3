@@ -7,6 +7,22 @@
 % v9.3.1.2 - Fixed typos in comments (thanks to Jiazhen)
 %          - Changed { and } to < and > in ...
 %            <comment_block>        ::: <slash_char><star><not_star_slash><star><star>*<slash_char>
+% v9.3.1.3 - Added logic to <formula_role> semantic rule.
+%          - Completed the <ntf_modal_system> list:
+%            $modal_system_K | $modal_system_KB | $modal_system_K4 |
+%            $modal_system_K5 | $modal_system_K45 | $modal_system_KB5 |
+%            $modal_system_D | $modal_system_DB | $modal_system_D4 |
+%            $modal_system_D5 | $modal_system_D45 | $modal_system_M |
+%            $modal_system_B | $modal_system_S4 | $modal_system_S5 |
+%            $modal_system_S5U
+%          - Completed the <ntf_modal_axiom> list:
+%            $modal_axiom_K | $modal_axiom_M | $modal_axiom_B | $modal_axiom_D |
+%            $modal_axiom_4 | $modal_axiom_5 | $modal_axiom_CD | $modal_axiom_BoxM |
+%            $modal_axiom_C4 | $modal_axiom_C
+%          - Added $abs to <defined_functor> semantic rule.
+%          - Fixed <distinct_object> to require at least one <do_char> ...
+%            <double_quote><do_char><do_char>*<double_quote>
+%          - Thanks to Johannes Schuster for finding the flaws!
 %--------------------------------------------------------------------------------------------------
 %----README ... this header provides important meta- and usage information
 %----
@@ -59,7 +75,7 @@
 <formula_role>         ::= <lower_word> | <lower_word>-<general_term>
 <formula_role>         :== axiom | hypothesis | definition | assumption | lemma | theorem |
                            corollary | conjecture | negated_conjecture | plain | type |
-                           interpretation | unknown
+                           interpretation | logic | unknown
 %----"axiom"s are accepted, without proof. There is no guarantee that the axioms of a problem are
 %----consistent. "hypothesis"s are assumed to be true for a particular problem, and are used like
 %----"axiom"s. "definition"s are intended to define symbols. They are either universally quantified
@@ -121,7 +137,6 @@
 %----! [X:foo] a = X is formatted as ! [X:foo] (a = X) to save the lives of parsers that would
 %----parse it as (! [X:foo] a) = X and throw an error.
 <thf_defined_infix>    ::= <thf_unitary_term> <defined_infix_pred> <thf_unitary_term>
-% <thf_defined_infix>    ::= <thf_unitary_term> <defined_infix_pred> <thf_unitary_term>
 %----Defined terms can't be formulae. See TFF. FIX HERE.
 <thf_system_atomic>    ::= <system_constant>
 
@@ -342,10 +357,15 @@
                            <tff_atomic_type> <identical> <ntf_time_value>
 <ntf_time_type_list>   :== <ntf_time_type> | <ntf_time_type>,<ntf_time_type_list>
 
-<ntf_modal_system>     :== $modal_system_K | $modal_system_M | $modal_system_B | $modal_system_D |
-                           $modal_system_S4 | $modal_system_S5
+<ntf_modal_system>     :== $modal_system_K | $modal_system_KB | $modal_system_K4 |
+                           $modal_system_K5 | $modal_system_K45 | $modal_system_KB5 |
+                           $modal_system_D | $modal_system_DB | $modal_system_D4 |
+                           $modal_system_D5 | $modal_system_D45 | $modal_system_M | 
+                           $modal_system_B | $modal_system_S4 | $modal_system_S5 |
+                           $modal_system_S5U
 <ntf_modal_axiom>      :== $modal_axiom_K | $modal_axiom_M | $modal_axiom_B | $modal_axiom_D |
-                           $modal_axiom_4 | $modal_axiom_5
+                           $modal_axiom_4 | $modal_axiom_5 | $modal_axiom_CD | $modal_axiom_BoxM |
+                           $modal_axiom_C4 | $modal_axiom_C
 %----Top of Page-----------------------------------------------------------------------------------
 %----TCF formulae.
 <tcf_formula>          ::= <tcf_logic_formula> | <tff_atom_typing>
@@ -494,7 +514,7 @@
 <defined_functor>      :== $uminus | $sum | $difference | $product |
                            $quotient | $quotient_e | $quotient_t | $quotient_f |
                            $remainder_e | $remainder_t | $remainder_f |
-                           $floor | $ceiling | $truncate | $round |
+                           $floor | $ceiling | $truncate | $round | $abs |
                            $to_int | $to_rat | $to_real
 <system_constant>      ::= <system_functor>
 <system_functor>       ::= <atomic_system_word>
@@ -641,8 +661,8 @@
 %----'cat' and cat are the same. See <atomic_word> for information about stripping the quotes.
 <back_quoted>          ::- <back_quote><upper_word>
 
-<distinct_object>      ::- <double_quote><do_char>*<double_quote>
-%---Space and visible characters upto ~, except " and \ distinct_object>s contain visible
+<distinct_object>      ::- <double_quote><do_char><do_char>*<double_quote>
+%---Space and visible characters upto ~, except " and \ <distinct_object>s contain visible
 %----characters. \ is the escape character for " and \, i.e., \" is not the end of the
 %----<distinct_object>. <distinct_object>s are different from (but may be equal to) other tokens,
 %----e.g., "cat" is different from 'cat' and cat. Distinct objects are always interpreted as

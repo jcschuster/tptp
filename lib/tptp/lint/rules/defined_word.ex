@@ -13,13 +13,12 @@ defmodule Tptp.Lint.Rules.DefinedWord do
 
   ## Coverage over the TPTP library
 
-  This rule reports nothing on TPTP v9.3.1, and previously reported 76 occurrences
-  across five modal system names. The BNF's `<ntf_modal_system>` names six systems
-  and its `<ntf_modal_axiom>` six axioms; the Non-classical Logics section of the
-  TPTP language page states sixteen and ten. `Tptp.Bnf.Generator` corrects both
-  lists against that page, and the corrected values enter `<reserved_word>`, which
-  is the list this rule consults. See
-  [TPTP-DEFECTS.md](../../../../reports/TPTP-DEFECTS.md), entry `TPTP-3`.
+  This rule reports nothing on TPTP v9.3.1, and reported 76 occurrences across five
+  modal system names under the BNF up to v9.3.1.2, whose `<ntf_modal_system>` named
+  six systems and `<ntf_modal_axiom>` six axioms where the Non-classical Logics
+  section of the TPTP language page stated sixteen and ten. v9.3.1.3 completed both
+  lists, and their `$`-words reach this rule through `<reserved_word>`, which is
+  what it consults.
   """
 
   @behaviour Tptp.Lint.Rule

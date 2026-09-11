@@ -51,9 +51,9 @@ defmodule Tptp.Lexer do
   Two forms lex without ambiguity but are not admitted by the BNF. Each yields a
   token together with a warning, rather than being silently accepted or rejected:
 
-    * **Empty quoted atom.** `<single_quoted>` requires at least one `<sq_char>`
-      while `<distinct_object>` permits none, so `""` is well formed and `''` is
-      not (`TPTP0107`).
+    * **Empty quoted token.** `<single_quoted>` requires at least one `<sq_char>`
+      and `<distinct_object>` at least one `<do_char>`, so neither `''` nor `""`
+      is admitted (`TPTP0107`).
     * **Redundant leading zero.** `<unsigned_integer>` is `0` or a digit sequence
       beginning `1`–`9`, so `00`, `-007` and `01.5` are not admitted
       (`TPTP0110`). A rational's denominator is a `<positive_integer>`, which may
@@ -110,7 +110,7 @@ defmodule Tptp.Lexer do
   @unterminated_comment "TPTP0104"
   @unbalanced_bracket "TPTP0105"
   @missing_terminator "TPTP0106"
-  @empty_quoted_atom "TPTP0107"
+  @empty_quoted_token "TPTP0107"
   @incomplete_back_quote "TPTP0109"
   @leading_zero "TPTP0110"
   @zero_denominator "TPTP0111"
@@ -543,8 +543,8 @@ defmodule Tptp.Lexer do
         length = body + 2
 
         diagnostics =
-          if body == 0 and category == :single_quoted do
-            [empty_quote(file, offset) | diagnostics]
+          if body == 0 do
+            [empty_quote(category, file, offset) | diagnostics]
           else
             diagnostics
           end
@@ -585,13 +585,13 @@ defmodule Tptp.Lexer do
   defp describe(:single_quoted), do: "quoted atom"
   defp describe(:distinct_object), do: "distinct object"
 
-  defp empty_quote(file, offset) do
+  defp empty_quote(category, file, offset) do
     Diagnostic.new(
-      @empty_quoted_atom,
+      @empty_quoted_token,
       :warning,
       Span.new(file, offset, 2),
-      "empty quoted atom",
-      hint: "`<single_quoted>` requires at least one character between the quotes"
+      "empty #{describe(category)}",
+      hint: "`<#{category}>` requires at least one character between the quotes"
     )
   end
 

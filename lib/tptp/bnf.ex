@@ -45,7 +45,7 @@ defmodule Tptp.Bnf do
   end
 
   @doc """
-  The BNF version, taken from the filename (`SyntaxBNF-v9.3.1.2` -> `"9.3.1.2"`).
+  The BNF version, taken from the filename (`SyntaxBNF-v9.3.1.3` -> `"9.3.1.3"`).
   """
   @spec version!(Path.t()) :: binary()
   def version!(path) do
@@ -56,7 +56,7 @@ defmodule Tptp.Bnf do
       nil ->
         raise ArgumentError,
               "cannot read a BNF version out of #{inspect(Path.basename(path))}; " <>
-                "expected a name like SyntaxBNF-v9.3.1.2"
+                "expected a name like SyntaxBNF-v9.3.1.3"
     end
   end
 

@@ -23,8 +23,8 @@ defmodule Tptp.LexerOracleTest do
 
   The library never rejects input; it emits the token and a diagnostic beside it.
   `''` is the case that matters — `<single_quoted>` requires at least one `<sq_char>`
-  where `<distinct_object>` allows none, so `""` is legal TPTP and `''` is not — and
-  the lexer produces a `:single_quoted` token *and* a `TPTP0107`. `00` is the other
+  and `<distinct_object>` at least one `<do_char>`, so neither `''` nor `""` is
+  admitted — and the lexer produces the token *and* a `TPTP0107`. `00` is the other
   — `<unsigned_integer>` forbids a redundant leading zero, and the diagnostic points
   at the zero rather than at the whole token, which is why the exemption is by
   overlap rather than by an exact span. Excluding tokens a diagnostic already covers
@@ -75,7 +75,7 @@ defmodule Tptp.LexerOracleTest do
       "upper_word" => ~w(X Var_1 XY9),
       "single_quoted" => ["'a name'", "'Axioms/SET007+0.ax'", "'it\\'s'"],
       "back_quoted" => ["`X", "`Var1"],
-      "distinct_object" => ["\"a thing\"", "\"\"", "\"say \\\"hi\\\"\""],
+      "distinct_object" => ["\"a thing\"", "\"say \\\"hi\\\"\""],
       "dollar_word" => ~w($i $o $true $tType),
       "dollar_dollar_word" => ~w($$foo $$bar_1),
       "integer" => ~w(0 7 42 -3 +9),
@@ -166,12 +166,14 @@ defmodule Tptp.LexerOracleTest do
       assert [%{code: "TPTP0107", severity: :warning}] = diagnostics
     end
 
-    test "an empty distinct object is legal, and is not reported" do
+    test "an empty distinct object is emitted as a token and reported" do
       source = "fof(a, axiom, p(\"\"))."
-      {_statements, _comments, diagnostics} = Lexer.statements(source)
+      {statements, _comments, diagnostics} = Lexer.statements(source)
+      texts = statements |> List.flatten() |> Enum.map(&Lexer.text(&1, source))
 
-      assert OracleTable.matches?("distinct_object", "\"\"")
-      assert diagnostics == []
+      assert "\"\"" in texts
+      refute OracleTable.matches?("distinct_object", "\"\"")
+      assert [%{code: "TPTP0107", severity: :warning}] = diagnostics
     end
   end
 

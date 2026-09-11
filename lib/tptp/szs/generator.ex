@@ -8,7 +8,7 @@ defmodule Tptp.Szs.Generator do
   `Tptp.Szs.Ontology.from_string/1` can be a total function over a closed set
   without `String.to_atom/1` ever being reachable from input.
 
-  ## The four checks it refuses to skip
+  ## The three checks it refuses to skip
 
   A generator that silently emits a short table is worse than one that fails, so
   this raises rather than writes if:
@@ -18,9 +18,7 @@ defmodule Tptp.Szs.Generator do
     * two values underscore to the same atom — the `OneWord` names are the identity
       of a value and two of them collapsing would silently merge two rows;
     * a `<status_value>` from the BNF is not a success-ontology mnemonic — the two
-      vendored files disagree, which is a fact about the release, not about us;
-    * an entry in `@name_atom_overrides` names a value the page does not carry —
-      the release it was written for has moved and the entry is now a lie.
+      vendored files disagree, which is a fact about the release, not about us.
 
   The third is the interesting one. `<status_value>` in the BNF is the lower-cased
   three-letter mnemonic, so the grammar and the ontology can be checked against each
@@ -34,35 +32,24 @@ defmodule Tptp.Szs.Generator do
   `from_status_value/1`, which looks only in the success ontology because that is
   the only place the BNF draws from.
 
-  ## The name is the page's; the atom is ours
+  ## The name is the page's
 
-  `@name_atom_overrides` supplies the atom for a value whose published name is
-  misspelled. There is one: the page writes `CounterTautologyyPreserving`, with a
-  doubled `y`, which `Macro.underscore/1` would carry into the API as
-  `:counter_tautologyy_preserving`.
-
-  Only the atom is overridden. `name/1` returns `"CounterTautologyyPreserving"` and
-  `from_string/1` admits that spelling and no other, the name being a quotation of
-  the source, which this library does not correct. The atom is not a quotation: it
-  is the identifier this library introduces to denote the value, it occurs in every
-  consumer's pattern matches, and no fidelity is served by requiring each of them to
-  reproduce a misspelling.
-
-  An override is not a place to rename a value to taste. The entry exists because the
-  page is wrong, the fourth check above fails the build when the page stops being
-  wrong, and the collision check covers the case where a corrected page carries both
-  spellings at once.
+  `name/1` quotes the page and `from_string/1` admits that spelling and no other;
+  the atom is `Macro.underscore/1` of it. Nothing here corrects a published name,
+  and a name whose spelling changes upstream changes here too — which has happened
+  once, `CounterTautologyyPreserving` losing its doubled `y` in the move to
+  <https://szs.tptp.org>. The atom came through that unchanged — it had been
+  supplied by an override, which is now gone because `Macro.underscore/1` of the
+  corrected name produces the same one — but a consumer comparing names against
+  string literals is the case to keep in mind before treating a re-vendoring as
+  mechanical.
   """
 
   alias Tptp.Bnf.Vocabulary
   alias Tptp.Szs.Extract
 
   @minimum 100
-  @source "https://tptp.org/UserDocs/SZSOntology"
-
-  # The page's spelling => the atom to use for it. See "The name is the page's; the
-  # atom is ours" above, and note that removing an entry is a breaking API change.
-  @name_atom_overrides %{"CounterTautologyyPreserving" => "counter_tautology_preserving"}
+  @source "https://szs.tptp.org"
 
   @doc """
   Render the ontology module, and say how many values went into it.
@@ -95,15 +82,6 @@ defmodule Tptp.Szs.Generator do
 
     if stray != [] do
       raise "BNF <status_value>s absent from the SZS success ontology: #{inspect(stray)}"
-    end
-
-    names = MapSet.new(values, & &1.name)
-    dead = Enum.reject(Map.keys(@name_atom_overrides), &MapSet.member?(names, &1))
-
-    if dead != [] do
-      raise "@name_atom_overrides names values #{path} does not carry: #{inspect(dead)}. " <>
-              "If the page has corrected the spelling, drop the entry — and note that " <>
-              "doing so renames a public atom."
     end
 
     :ok
@@ -531,7 +509,7 @@ defmodule Tptp.Szs.Generator do
   defp clauses(values, fun), do: Enum.map_join(values, "\n", fun)
 
   @spec atom(binary()) :: binary()
-  defp atom(name), do: Map.get(@name_atom_overrides, name) || Macro.underscore(name)
+  defp atom(name), do: Macro.underscore(name)
 
   @spec atom_literal(binary()) :: binary()
   defp atom_literal(name), do: ":#{atom(name)}"

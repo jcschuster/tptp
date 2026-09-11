@@ -3,7 +3,7 @@ defmodule Tptp.Szs.Ontology do
   The SZS status values, generated from the vendored ontology page.
 
   Do not edit: `mix tptp.gen` writes this module from
-  `priv/szs/SZSOntology-2026-08-31.html`, fetched from <https://tptp.org/UserDocs/SZSOntology>. 112
+  `priv/szs/SZSOntology-2026-09-10.html`, fetched from <https://szs.tptp.org>. 112
   values across three ontologies:
 
     * `:success` — 53 values
@@ -332,11 +332,11 @@ defmodule Tptp.Szs.Ontology do
 
   @doc "Where the ontology was fetched from."
   @spec source() :: binary()
-  def source, do: "https://tptp.org/UserDocs/SZSOntology"
+  def source, do: "https://szs.tptp.org"
 
   @doc "The vendored copy this module was generated from."
   @spec vendored() :: binary()
-  def vendored, do: "SZSOntology-2026-08-31.html"
+  def vendored, do: "SZSOntology-2026-09-10.html"
 
   @doc """
   A SHA-256 of the vendored page, for consumers that cache across regenerations.
@@ -344,7 +344,7 @@ defmodule Tptp.Szs.Ontology do
   The page carries no version number, so this stands in for one.
   """
   @spec digest() :: binary()
-  def digest, do: "22b1f4f9294331e062a630fc589bef8fd43422f3d3b9c6ac4ce11b3fe949f359"
+  def digest, do: "b1862ce6e38fe3b1a537952e7668fb79d220b96b39626d70f22bc3da3c19c527"
 
   @doc """
   Turn a `OneWord` status value into an atom, without creating one.
@@ -383,7 +383,7 @@ defmodule Tptp.Szs.Ontology do
   def from_string("CounterSatisfiabilityPreserving"),
     do: {:ok, :counter_satisfiability_preserving}
 
-  def from_string("CounterTautologyyPreserving"), do: {:ok, :counter_tautology_preserving}
+  def from_string("CounterTautologyPreserving"), do: {:ok, :counter_tautology_preserving}
   def from_string("EquiCounterSatisfiable"), do: {:ok, :equi_counter_satisfiable}
   def from_string("EquiCounterTautologous"), do: {:ok, :equi_counter_tautologous}
   def from_string("CounterModelExtending"), do: {:ok, :counter_model_extending}
@@ -518,7 +518,7 @@ defmodule Tptp.Szs.Ontology do
   def name(:finite_tautology), do: "FiniteTautology"
   def name(:counter_unsatisfiability_preserving), do: "CounterUnsatisfiabilityPreserving"
   def name(:counter_satisfiability_preserving), do: "CounterSatisfiabilityPreserving"
-  def name(:counter_tautology_preserving), do: "CounterTautologyyPreserving"
+  def name(:counter_tautology_preserving), do: "CounterTautologyPreserving"
   def name(:equi_counter_satisfiable), do: "EquiCounterSatisfiable"
   def name(:equi_counter_tautologous), do: "EquiCounterTautologous"
   def name(:counter_model_extending), do: "CounterModelExtending"

@@ -10,8 +10,8 @@ statement, because THF does not separate a type from a term. "Outside the base
 languages" means a dialect other than `cnf`, `fof`, `tf0` or `th0`.
 
 Each `—` row refines the row above it. The TFF rows are taken over the exact
-set and do not describe the heuristic's; the heuristic's files are instead divided
-by dialect, which indicates whether it is identifying types.
+set and do not describe the heuristic's; the heuristic's files are instead
+divided by dialect, which indicates whether it is identifying types.
 
 A constructor applied at arity ≥ 2 over a type variable is the one shape an
 elaborator cannot monomorphise into a fresh sort: `list($i)` is a sort,
@@ -34,7 +34,9 @@ results below have gone stale against the library on this machine.
 | — of those, at arity ≥ 2 over a type variable | 884 |
 | — of those, at arity ≥ 2 over a nested type variable | 884 |
 | With an apply spine in a THF type (heuristic) | 939 |
-| — of those, TH1 | 939 |
+| — of those, TH1 | 807 |
+| — of those, DH0 | 86 |
+| — of those, DH1 | 46 |
 | Using `!>` | 2092 |
 
 ## Constructors (TFF)
@@ -123,7 +125,7 @@ arity ≥ 2, `Var nested` where one appeared anywhere beneath an argument.
 
 | | |
 |---|---|
-| BNF | 9.3.1.2 |
+| BNF | 9.3.1.3 |
 
 <!-- end results -->
 
@@ -137,4 +139,4 @@ arity ≥ 2, `Var nested` where one appeared anywhere beneath an argument.
 | Schedulers | 8 |
 | Workers | 4 on 28125, 2 on 913, 1 on 320 |
 | Thinning | none — every file |
-| Wall clock | 2756.3 s |
+| Wall clock | 3977.7 s |

@@ -10,21 +10,31 @@ the MIT licence in LICENSE.
 
 The redistributed files, both attributed to the TPTP and both carried unmodified:
 
-    priv/bnf/SyntaxBNF-v9.3.1.2
-        The TPTP syntax BNF, version 9.3.1.2, taken as plain text from
+    priv/bnf/SyntaxBNF-v9.3.1.3
+        The TPTP syntax BNF, version 9.3.1.3, taken as plain text from
         https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html
-        sha256 2c8d5be6e4feee13279c34de6dadd37904283d505c086e2fe2e2da18efaf54ee
+        sha256 17970a57e950d8dd768c2c691f0f493dd98d623669c5a39ca17c7e12993086d6
 
-    priv/szs/SZSOntology-2026-08-31.html
-        The SZS ontology page, fetched on 2026-08-31 from
-        https://tptp.org/UserDocs/SZSOntology
-        sha256 22b1f4f9294331e062a630fc589bef8fd43422f3d3b9c6ac4ce11b3fe949f359
+    priv/szs/SZSOntology-2026-09-10.html
+        The SZS ontology page, fetched on 2026-09-10 from
+        https://szs.tptp.org
+        sha256 b1862ce6e38fe3b1a537952e7668fb79d220b96b39626d70f22bc3da3c19c527
 
 Both are vendored so that installing this package needs no network access. The BNF
 is the text content of its page character for character, with no trailing newline;
 the ontology is its page's markup byte for byte. Nothing in this repository edits
 either file. The files under lib/ and src/ that are derived from them are produced
 by `mix tptp.gen` and are regenerated rather than hand-maintained.
+
+The SZS ontology moved to https://szs.tptp.org during 2026; the former address,
+https://tptp.org/UserDocs/SZSOntology, now serves a notice pointing there. The new
+page is a Google Sites document, and two consequences follow for the digest above.
+It is the digest of one fetch: the page carries per-response script nonces and
+signed image URLs, so two fetches of an unchanged page do not agree byte for byte
+and no vendored copy can be re-verified against the live page by digest. What the
+`:network` test compares instead is the ontology the two yield — every value, its
+mnemonic, description, ontology and subontology — which is the content the TPTP
+licence covers and the only part this library reads.
 
 Note that the BNF served by SeeTPTP under Category=Documents lags the UserDocs page:
 at the time of writing it is version 9.3.0.4. The UserDocs page above is the source

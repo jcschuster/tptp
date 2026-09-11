@@ -1,7 +1,7 @@
 defmodule Tptp.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @source_url "https://github.com/jcschuster/tptp"
 
   def project do
@@ -100,9 +100,9 @@ defmodule Tptp.MixProject do
       source_ref: "v#{@version}",
       extras: [
         "README.md",
-        "reports/TPTP-DEFECTS.md",
         "reports/CORPUS.md",
         "reports/CENSUS.md",
+        "reports/FINDINGS.md",
         "CHANGELOG.md",
         "NOTICE",
         "LICENSE"

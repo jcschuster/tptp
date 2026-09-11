@@ -32,9 +32,11 @@ end
 The library performs no type checking, no normalisation and no elaboration, and
 attaches no semantics to the operators it recognises.
 
-The typed dialects of TPTP require a declaration for every symbol and a type
-annotation on every bound variable, so no type inference is required to read them
-and none is performed. Explicit type arguments are recorded verbatim, in source
+THF requires a declaration for every symbol and a type on every bound variable, and
+the first-order typed dialects fix a default for whatever they leave out — `$i` for
+an untyped variable, `($i * ... * $i) > $i` or `> $o` for an undeclared function or
+predicate — so no type inference is required to read any of them, and none is
+performed. Explicit type arguments are recorded verbatim, in source
 order and with spans: in `f @ $i @ a` the `$i` is retained as an argument of the
 application.
 
@@ -77,29 +79,39 @@ through the parser alone: no `include` resolved and no lint rule applied.
 | Axioms | 2433 | 2433 | 0 | 0 |
 | Total | 29358 | 29354 | 4 | 0 |
 
-5.4 GB in 532 seconds on sixteen workers, under a 60-second per-file budget that
+5.4 GB in 887 seconds on eight workers, under a 60-second per-file budget that
 no file reached. The preceding toolchain recorded 628 timeouts and 221 parse
 failures over the TH0/TH1 subset alone.
 
 The four failures are `SYN000-2.p`, `SYN000+2.p`, `SYN000_2.p` and `SYN000^2.p`,
-the annotated-formula demonstration written once per dialect, and they fail for one
-reason: each uses `theory(equality)` as an inference parent. v9.3.1.2 replaced
-`<source> ::= <general_term>` with a list of alternatives that does not include
-`theory(...)`, so the shipped grammar does not admit it.
+the annotated-formula demonstration written once per dialect, and they are defects
+in the files rather than in the parser. Three use `theory(equality)` as an inference
+parent, which `<source>` has not derived since v9.3.1.2 replaced
+`<source> ::= <general_term>` with a list of alternatives; that was
+[fixed upstream][bugged] on 10/09/26 and the three parse once the edit reaches the
+distributed tarball. `SYN000_2.p` carries a second, independent one — it writes
+`introduced(assumption,[from,the,world,[]])` where both the BNF and the language
+page state `introduced(<intro_type>,<useful_info>,<parents>)`, the other three
+dialects' copies writing `introduced(assumption,[from,the,world],[])`.
+[CORPUS.md](reports/CORPUS.md) carries the citation for each.
 
-That is a defect in the TPTP release rather than in this parser, and it is not the
-only one. The TPTP is this library's ground truth: where the two disagree, the
-parser is incorrect, being generated from the published BNF, and correcting it by
-hand would make it a parser for something else. Where the published sources
-disagree with each other — the grammar rejecting a file the TPTP distributes, or
-one page contradicting another — the disagreement is recorded rather than worked
-around. [TPTP-DEFECTS.md](reports/TPTP-DEFECTS.md) is that register: five entries, each
-with its citation, the affected files and a command reproducing the count, together
-with three notes on apparent defects that are not.
+The TPTP is this library's ground truth: where the two disagree, the parser is
+incorrect, being generated from the published BNF, and correcting it by hand would
+make it a parser for something else. Where the published sources disagree with each
+other — the grammar rejecting a file the TPTP distributes, or one page contradicting
+another — the disagreement is reported upstream rather than worked around. Six such
+disagreements were carried here through 0.1.0; BNF v9.3.1.3 and the SZS ontology's
+move to [szs.tptp.org][szs] resolve all of them, and the register that held them is
+gone with them.
 
 The 65 problems above 20 MB — 64 `HWV` and `LCL680+1.020.p`, 3.7 GB between them —
 are read by `stream_file!/2` rather than by this sweep. The size limit is a property
 of the report rather than of the parser.
+
+[FINDINGS.md](reports/FINDINGS.md) records what the four failures were hiding from
+the stages after the parser, and what a sweep of the library turned up once they
+were patched out of a copy: two further defects in those files, and three rules of
+this library's that were wrong.
 
 `mix tptp.corpus` writes [CORPUS.md](reports/CORPUS.md), from which these figures are taken
 and which the nightly workflow regenerates. `mix tptp.census` writes
@@ -114,10 +126,10 @@ requires neither Python, nor awk, nor the BNF, nor network access:
 
 | Generated | From |
 |---|---|
-| `src/tptp_parser.yrl` | `priv/bnf/SyntaxBNF-v9.3.1.2` |
+| `src/tptp_parser.yrl` | `priv/bnf/SyntaxBNF-v9.3.1.3` |
 | `lib/tptp/bnf/vocabulary.ex` | the same, `:==` rules |
 | `lib/tptp/printer/shapes.ex` | the same, `::=` rules |
-| `lib/tptp/szs/ontology.ex` | `priv/szs/SZSOntology-2026-08-31.html` |
+| `lib/tptp/szs/ontology.ex` | `priv/szs/SZSOntology-2026-09-10.html` |
 | `test/support/bnf_oracle.ex` | the same BNF, `::-` and `:::` rules |
 
 Regeneration is a maintainer action performed on a TPTP release, and the resulting
@@ -174,7 +186,7 @@ cells. Open it in Livebook, or read it as Markdown.
 ```
 mix test               # unit and property tests
 mix test --include corpus
-mix test --include network   # re-checks the vendored files against tptp.org
+mix test --include network   # re-checks the vendored files against their pages
 mix check              # format, compile --warnings-as-errors, credo, test, dialyzer
 mix run bench/parse.exs
 mix tptp.corpus        # sweep a local TPTP library, rewrite reports/CORPUS.md
@@ -231,9 +243,9 @@ The lexer is the only stage not derived from the BNF, so `mix tptp.gen` also wri
 anchored regular expressions. The property asserted is not that the lexer matches
 the BNF but that every token the lexer emits without a diagnostic satisfies its BNF
 pattern, so a departure is admissible only where the lexer reports it. There are
-two, both warnings: an empty quoted atom, which `<single_quoted>` forbids where
-`<distinct_object>` admits `""`, and a redundant leading zero, as in `00`, `-007`
-and `1/02`.
+two, both warnings: an empty quoted token, which `<single_quoted>` and — since
+v9.3.1.3 — `<distinct_object>` both forbid, and a redundant leading zero, as in
+`00`, `-007` and `1/02`.
 
 ### Documentation and static analysis
 
@@ -253,8 +265,8 @@ them from input. This is a security property and is enforced mechanically.
 
 This library is MIT licensed. See [LICENSE](LICENSE).
 
-Two redistributed files are not. `priv/bnf/SyntaxBNF-v9.3.1.2` is the text of
-[the TPTP syntax page][bnf] and `priv/szs/SZSOntology-2026-08-31.html` is [the SZS
+Two redistributed files are not. `priv/bnf/SyntaxBNF-v9.3.1.3` is the text of
+[the TPTP syntax page][bnf] and `priv/szs/SZSOntology-2026-09-10.html` is [the SZS
 ontology page][szs], both carried unmodified so that installation requires no
 network access. The TPTP's terms permit this:
 
@@ -267,6 +279,7 @@ Neither file is modified. See [NOTICE](NOTICE) for the attribution and the diges
 and [tptp.org][tptp] for the TPTP itself.
 
 [bnf]: https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html
-[szs]: https://tptp.org/UserDocs/SZSOntology
+[szs]: https://szs.tptp.org
+[bugged]: https://tptp.org/TPTP/Distribution/BuggedProblems-v9.3.1.txt
 
 [tptp]: https://www.tptp.org

@@ -10,13 +10,14 @@ defmodule Tptp.Lint.Rules.Parent do
   `<source>` is a `<dag_source>`, an `<internal_source>`, an `<external_source>`,
   the literal `unknown`, or a bracketed list of sources, and `<name>` is reachable
   through more than one of these: the rule of an `<inference_record>` and the file
-  name of a `<file_source>` are not formula names and are not resolved as such. The
-  rule also declines unless the unit names at least one formula, so it reports
-  nothing for a problem containing no derivation.
+  name of a `<file_source>` are not formula names and are not resolved as such.
+  Neither is the literal `unknown`, which the grammar reads as a `<name>` — the
+  first of `Tptp.Bnf.Generator`'s departures — and which is therefore never
+  reported as a missing parent. The rule also declines unless the unit names at
+  least one formula, so it reports nothing for a problem containing no derivation.
 
-  Before v9.3.1.2 a `<source>` was a `<general_term>`. That expansion is also what
-  renders four library files unparseable; see
-  [TPTP-DEFECTS.md](../../../../reports/TPTP-DEFECTS.md), entry `TPTP-2`.
+  Before v9.3.1.2 a `<source>` was a `<general_term>`, which admitted anything at
+  all in the position this rule resolves.
   """
 
   @behaviour Tptp.Lint.Rule
@@ -39,7 +40,7 @@ defmodule Tptp.Lint.Rules.Parent do
       []
     else
       Enum.flat_map(table.parents, fn {name, span} ->
-        if Map.has_key?(table.names, name) do
+        if name == "unknown" or Map.has_key?(table.names, name) do
           []
         else
           [

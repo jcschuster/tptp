@@ -22,19 +22,24 @@ defmodule Tptp.VendoredTest do
   page ends with a long run of `&nbsp;<P>` padding so that its anchors have
   somewhere to scroll to, and 43 spaces of scroll room are not part of the grammar.
 
-  The SZS page needs none of that. It is vendored as its own markup, byte for byte,
-  so the check is the digest and nothing else — and a difference there is a fact
-  about the release rather than about how the copy was taken.
+  The SZS page is vendored as its own markup, byte for byte, and against the local
+  copy the check is the digest and nothing else. Against the live page it cannot
+  be: since the move to szs.tptp.org the page is a Google Sites document carrying
+  per-response script nonces and signed image URLs, so two fetches of an unchanged
+  page differ. What that test compares is the ontology the two yield, value for
+  value, which is what this library reads and all that a re-vendoring has to
+  preserve. `NOTICE` records why.
   """
 
   use ExUnit.Case, async: true
 
   alias Tptp.Resolver.Http
+  alias Tptp.Szs.Extract
   alias Tptp.Szs.Ontology
 
   @notice Path.join(__DIR__, "../../NOTICE") |> Path.expand()
-  @bnf Path.join(__DIR__, "../../priv/bnf/SyntaxBNF-v9.3.1.2") |> Path.expand()
-  @szs Path.join(__DIR__, "../../priv/szs/SZSOntology-2026-08-31.html") |> Path.expand()
+  @bnf Path.join(__DIR__, "../../priv/bnf/SyntaxBNF-v9.3.1.3") |> Path.expand()
+  @szs Path.join(__DIR__, "../../priv/szs/SZSOntology-2026-09-10.html") |> Path.expand()
 
   @external_resource @notice
 
@@ -54,7 +59,7 @@ defmodule Tptp.VendoredTest do
 
     assert map_size(recorded) == 2
     assert Map.has_key?(recorded, "https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html")
-    assert Map.has_key?(recorded, "https://tptp.org/UserDocs/SZSOntology")
+    assert Map.has_key?(recorded, "https://szs.tptp.org")
   end
 
   test "the vendored BNF is the file NOTICE attributes" do
@@ -62,7 +67,7 @@ defmodule Tptp.VendoredTest do
   end
 
   test "the vendored SZS ontology is the file NOTICE attributes" do
-    assert digest(@szs) == digests()["https://tptp.org/UserDocs/SZSOntology"]
+    assert digest(@szs) == digests()["https://szs.tptp.org"]
   end
 
   test "the generated ontology was built from the vendored page" do
@@ -79,9 +84,9 @@ defmodule Tptp.VendoredTest do
 
   @tag :network
   test "the vendored SZS ontology still matches its page upstream" do
-    assert {:ok, page} = fetch("https://tptp.org/UserDocs/SZSOntology")
+    assert {:ok, page} = fetch("https://szs.tptp.org")
 
-    assert :sha256 |> :crypto.hash(page) |> Base.encode16(case: :lower) == digest(@szs),
+    assert Extract.parse!(page) == Extract.values!(@szs),
            "the SZS page has changed; re-vendor it, run `mix tptp.gen`, and update NOTICE"
   end
 

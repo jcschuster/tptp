@@ -2,7 +2,7 @@ defmodule Tptp.Bnf.OracleTable do
   @moduledoc """
   The BNF's token layer as anchored regular expressions. Generated; do not edit.
 
-  `mix tptp.gen` writes this from `SyntaxBNF-v9.3.1.2`, one entry per
+  `mix tptp.gen` writes this from `SyntaxBNF-v9.3.1.3`, one entry per
   `::-` and `:::` rule, with every `<name>` reference inlined. It exists so that
   the hand-written `Tptp.Lexer` has something independent to be checked against;
   see `Tptp.Bnf.Oracle` for why that is worth generating and what the checking
@@ -42,7 +42,7 @@ defmodule Tptp.Bnf.OracleTable do
       ),
     "distinct_object" =>
       Regex.compile!(
-        "\\A(?:(?:[\"])(?:([\\40-\\41\\43-\\133\\135-\\176]|([\\\\][\"\\\\])))*(?:[\"]))\\z"
+        "\\A(?:(?:[\"])(?:([\\40-\\41\\43-\\133\\135-\\176]|([\\\\][\"\\\\])))(?:([\\40-\\41\\43-\\133\\135-\\176]|([\\\\][\"\\\\])))*(?:[\"]))\\z"
       ),
     "do_char" => Regex.compile!("\\A(?:([\\40-\\41\\43-\\133\\135-\\176]|([\\\\][\"\\\\])))\\z"),
     "dollar" => Regex.compile!("\\A(?:[$])\\z"),

@@ -31,8 +31,8 @@ defmodule Tptp.LintTest do
        "tff(a, type, p: $i > $o)."},
       {Tptp.Lint.Rules.Rank1, "TPTP0404", "thf(a, type, f: ($i > !>[A: $tType]: A) > $o).",
        "thf(a, type, g: !>[A: $tType]: (A > A))."},
-      {Tptp.Lint.Rules.Declaration, "TPTP0501", "tff(a, axiom, p(b)).",
-       "tff(t1, type, p: $i > $o). tff(t2, type, b: $i). tff(a, axiom, p(b))."},
+      {Tptp.Lint.Rules.Declaration, "TPTP0501", "thf(a, axiom, p @ b).",
+       "thf(t1, type, p: $i > $o). thf(t2, type, b: $i). thf(a, axiom, p @ b)."},
       {Tptp.Lint.Rules.DuplicateName, "TPTP0503", "fof(a, axiom, p). fof(a, axiom, q).",
        "fof(a, axiom, p). fof(b, axiom, q)."},
       {Tptp.Lint.Rules.Parent, "TPTP0504", "fof(a, axiom, p, inference(r, [], [ghost])).",
@@ -252,15 +252,13 @@ defmodule Tptp.LintTest do
 
     test "a $let binding declares the name it binds" do
       # `$let` introduces a local declaration inside an ordinary axiom, so the rule
-      # must not report the bound name as undeclared. 39 library files turned on
-      # this, all of them TFX.
+      # must not report the bound name as undeclared. 39 TXF library files turned on
+      # this before the rule was confined to THF, which has the same construct.
       source = """
-      tff(arr, type, array: $tType > $tType).
-      tff(e, type, elt: $tType).
-      tff(mk, type, mk_array: elt > array(elt)).
-      tff(p, type, permut: ( array(elt) * array(elt) ) > $o).
-      tff(x, type, x: elt).
-      tff(a, axiom, $let(a: array(elt), a := mk_array(x), permut(a, a))).
+      thf(e, type, elt: $tType).
+      thf(x, type, x: elt).
+      thf(p, type, p: elt > elt > $o).
+      thf(a, axiom, $let(a: elt, a := x, p @ a @ a)).
       """
 
       assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == []
@@ -268,13 +266,25 @@ defmodule Tptp.LintTest do
 
     test "a $let binding does not declare a name used outside it" do
       source = """
-      tff(e, type, elt: $tType).
-      tff(x, type, x: elt).
-      tff(p, type, p: elt > $o).
-      tff(a, axiom, $let(b: elt, b := x, p(b)) & p(c)).
+      thf(e, type, elt: $tType).
+      thf(x, type, x: elt).
+      thf(p, type, p: elt > $o).
+      thf(a, axiom, $let(b: elt, b := x, p @ b) & (p @ c)).
       """
 
       assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == ["TPTP0501"]
+    end
+
+    test "an undeclared symbol in the first-order typed dialects is default-typed" do
+      # "A useful feature of TFF is default typing for symbols that are not
+      # explicitly declared" — the TPTP language page. THF has none.
+      for source <- [
+            "tff(a, axiom, ! [X] : (p(X) => q(f(X)))).",
+            "tcf(a, axiom, ~ p(X) | q(f(X))).",
+            "tff(a, axiom, $let(b: $i, b := c, p(b)))."
+          ] do
+        assert codes(source, only: [Tptp.Lint.Rules.Declaration]) == [], source
+      end
     end
 
     test "the two spellings are one symbol in the table" do
@@ -292,6 +302,14 @@ defmodule Tptp.LintTest do
 
     test "a parent named with quotes finds its statement" do
       source = "fof(a, axiom, p). fof(b, plain, q, inference(r, [], ['a']))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Parent]) == []
+    end
+
+    test "the literal unknown source is not a parent" do
+      # `<source> ::= ... | unknown` is a literal, which the grammar reads as a
+      # `<name>`. The TPTP's own SYN000*2.p demonstrations write it.
+      source = "fof(a, axiom, p). fof(b, axiom, q, unknown)."
 
       assert codes(source, only: [Tptp.Lint.Rules.Parent]) == []
     end
@@ -415,7 +433,7 @@ defmodule Tptp.LintTest do
     end
 
     test "linting the root alone reports what the include would have declared" do
-      {:ok, file, []} = Tptp.from_string("include('sig.ax'). tff(a, axiom, p(c)).")
+      {:ok, file, []} = Tptp.from_string("include('sig.ax'). thf(a, axiom, p @ c).")
 
       assert "TPTP0501" in (file |> Lint.run() |> Enum.map(& &1.code))
     end

@@ -121,9 +121,10 @@ defmodule Tptp.LexerTest do
       assert [{:distinct_object, 0, 8}] = tokens_of(~S("a\"b\\"))
     end
 
-    test "a distinct object may be empty but a quoted atom may not" do
+    test "neither a distinct object nor a quoted atom may be empty" do
       assert [{:distinct_object, 0, 2}] = tokens_of(~S(""))
-      assert codes(~S("")) == ["TPTP0106"]
+      assert [empty] = filter_codes(~S(""), "TPTP0107")
+      assert empty.severity == :warning
 
       assert [{:single_quoted, 0, 2}] = tokens_of("''")
       assert [empty] = filter_codes("''", "TPTP0107")

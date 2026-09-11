@@ -86,19 +86,18 @@ defmodule Tptp.SzsTest do
       assert String.length(Ontology.digest()) == 64
     end
 
-    test "the page's own typo is kept in the name and overridden in the atom" do
-      # The name quotes the source, so it keeps the doubled `y`; the atom is this
-      # library's own identifier and does not have to spell one.
-      assert Ontology.name(:counter_tautology_preserving) == "CounterTautologyyPreserving"
+    test "a name the page corrected is carried at its current spelling alone" do
+      # The page spelled this `CounterTautologyyPreserving` until the move to
+      # szs.tptp.org. The name quotes the source, so the old spelling is gone; the
+      # atom was and is the library's own identifier and did not move with it.
+      assert Ontology.name(:counter_tautology_preserving) == "CounterTautologyPreserving"
       assert Ontology.from_status_value("ctp") == {:ok, :counter_tautology_preserving}
       assert Ontology.from_mnemonic("CTP") == {:ok, :counter_tautology_preserving}
 
-      # Only the page's spelling parses. A corrected spelling is a name the
-      # published ontology does not carry, so this ontology cannot claim it.
-      assert Ontology.from_string("CounterTautologyyPreserving") ==
+      assert Ontology.from_string("CounterTautologyPreserving") ==
                {:ok, :counter_tautology_preserving}
 
-      assert Ontology.from_string("CounterTautologyPreserving") == :error
+      assert Ontology.from_string("CounterTautologyyPreserving") == :error
     end
 
     test "the one value whose mnemonic takes arguments is here, under its bare code" do
@@ -121,25 +120,28 @@ defmodule Tptp.SzsTest do
       markup = File.read!(Path.join(["priv", "szs", Ontology.vendored()]))
 
       listed =
-        ~r{<LI>\s*<TT>([A-Za-z0-9]+)</TT>}i |> Regex.scan(markup) |> Enum.map(&Enum.at(&1, 1))
+        ~r{<li\b[^>]*>\s*<p\b[^>]*>\s*<span\b[^>]*Courier[^>]*>([A-Za-z0-9]+)</span>}i
+        |> Regex.scan(markup)
+        |> Enum.map(&Enum.at(&1, 1))
 
       recovered = Enum.map(Ontology.values(), &Ontology.name/1)
 
+      assert length(listed) == length(recovered)
       assert listed -- recovered == []
     end
 
     test "a listed value the pattern cannot read raises rather than going missing" do
       markup =
-        "<H3> The <TT>Success</TT> Ontology </H3>" <>
-          "<H3> The <TT>NoSuccess</TT> Ontology </H3>" <>
-          "<H3> The <TT>Data</TT> Ontology </H3>" <>
-          "<UL><LI> <TT>Proof</TT> (<TT>Prf</TT>):<BR>A proof." <>
-          "<LI> <TT>Puzzling</TT> (<TT>PZL(</TT><EM>Q</EM><TT>)</TT>):<BR>Unclear.</UL>"
+        "<h3>The Success Ontology</h3><h3>The NoSuccess Ontology</h3>" <>
+          "<h3>The Data Ontology</h3><ul>" <>
+          "<li><p>#{monospace("Proof")}<span> (Prf):</span><span><br></span>" <>
+          "<span>A proof.</span></p></li>" <>
+          "<li><p>#{monospace("Puzzling")}<span> (PZL(Q)):</span><span><br></span>" <>
+          "<span>Unclear.</span></p></li></ul>"
 
-      assert [%{name: "Proof"}, %{name: "Puzzling", mnemonic: "PZL"}] =
-               Extract.parse!(markup)
+      assert [%{name: "Proof"}, %{name: "Puzzling", mnemonic: "PZL"}] = Extract.parse!(markup)
 
-      broken = String.replace(markup, "(<TT>Prf</TT>)", "")
+      broken = String.replace(markup, "<span> (Prf):</span>", "")
 
       assert_raise RuntimeError, ~r/Proof/, fn -> Extract.parse!(broken) end
     end
@@ -292,5 +294,9 @@ defmodule Tptp.SzsTest do
 
       assert digest == Ontology.digest()
     end
+  end
+
+  defp monospace(name) do
+    ~s(<span style="font-family: 'Courier New', Arial;">#{name}</span>)
   end
 end

@@ -70,6 +70,18 @@ defmodule Tptp.ParserTest do
       assert statement.source |> Node.select(:name) |> Enum.map(& &1.text) == ["b", "c"]
     end
 
+    test "an internal source takes all three of its arguments" do
+      # `<internal_source> ::= introduced(<intro_type>,<useful_info>,<parents>)`, so
+      # the two-argument form is not a source. `SYN000_2.p` writes it, which is why
+      # that file is in `Mix.Tasks.Tptp.Corpus.known_failures/0`.
+      statement = parse!("fof(a, axiom, p, introduced(assumption, [from, the, world], [])).")
+
+      assert statement.source.kind == :internal_source
+
+      assert codes("fof(a, axiom, p, introduced(assumption, [from, the, world, []])).") ==
+               ["TPTP0301"]
+    end
+
     test "useful_info arrives as its own subtree" do
       statement = parse!("fof(a, axiom, p, unknown, [description('why')]).")
 

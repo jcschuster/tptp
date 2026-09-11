@@ -150,8 +150,8 @@ defmodule Tptp.LintTaskTest do
 
   describe "includes" do
     setup %{dir: dir} do
-      write(dir, "Axioms/sig.ax", "tff(t1, type, p: $i > $o).\ntff(t2, type, c: $i).\n")
-      path = write(dir, "problem.p", "include('Axioms/sig.ax').\ntff(a, axiom, p(c)).\n")
+      write(dir, "Axioms/sig.ax", "thf(t1, type, p: $i > $o).\nthf(t2, type, c: $i).\n")
+      path = write(dir, "problem.p", "include('Axioms/sig.ax').\nthf(a, axiom, p @ c).\n")
 
       %{problem: path}
     end
