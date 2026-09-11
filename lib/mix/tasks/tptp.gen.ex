@@ -2,8 +2,8 @@ defmodule Mix.Tasks.Tptp.Gen do
   @shortdoc "Regenerate src/tptp_parser.yrl from the vendored TPTP BNF"
 
   @moduledoc """
-  Regenerates the committed sources from the two vendored files: the TPTP BNF at
-  `priv/bnf/SyntaxBNF-v*` and the SZS ontology page at `priv/szs/SZSOntology-*`.
+  Regenerates the committed sources from the vendored TPTP BNF at
+  `priv/bnf/SyntaxBNF-v*`.
 
   This is a maintainer action, taken when a new TPTP release changes the BNF. The
   generated `.yrl` is committed, so an installing user needs nothing but OTP —
@@ -29,9 +29,12 @@ defmodule Mix.Tasks.Tptp.Gen do
 
   Delete the file and run the task again. With no `.yrl` present there is nothing
   for yecc to compile, `Tptp.Parser`'s calls into `:tptp_parser` produce only an
-  undefined-module warning, and the task regenerates all five outputs from the
-  vendored sources. The generated grammar is a function of the BNF alone, so
+  undefined-module warning, and the task regenerates all four outputs from the
+  vendored BNF. The generated grammar is a function of the BNF alone, so
   discarding it loses nothing.
+
+  `Tptp.Szs.Ontology` is not among them. The SZS ontology is a prose page of 112
+  entries that is written out by hand; that module explains why.
   """
 
   use Mix.Task
@@ -39,14 +42,12 @@ defmodule Mix.Tasks.Tptp.Gen do
   alias Tptp.Bnf
   alias Tptp.Bnf.Generator
   alias Tptp.Bnf.Oracle
-  alias Tptp.Szs
 
   @requirements ["app.config"]
 
   @grammar_path "src/tptp_parser.yrl"
   @vocabulary_path "lib/tptp/bnf/vocabulary.ex"
   @shapes_path "lib/tptp/printer/shapes.ex"
-  @ontology_path "lib/tptp/szs/ontology.ex"
   @oracle_path "test/support/bnf_oracle.ex"
 
   @impl Mix.Task
@@ -59,20 +60,16 @@ defmodule Mix.Tasks.Tptp.Gen do
     {shapes, shape_count} = Generator.shapes(bnf_path)
 
     {oracle, pattern_count} = Oracle.table(bnf_path)
-    szs_path = Szs.vendored_path!()
-    {ontology, value_count} = Szs.Generator.ontology(szs_path)
 
     action = if options[:check], do: &check/2, else: &write/2
     action.(@grammar_path, grammar)
     action.(@vocabulary_path, format(vocabulary))
     action.(@shapes_path, format(shapes))
-    action.(@ontology_path, format(ontology))
     action.(@oracle_path, format(oracle))
     Mix.shell().info("#{shape_count} printer shapes")
     Mix.shell().info("#{pattern_count} token oracle patterns")
-    Mix.shell().info("#{value_count} SZS status values")
 
-    describe(bnf_path, szs_path, report, entries)
+    describe(bnf_path, report, entries)
   end
 
   defp format(source), do: Code.format_string!(source) |> IO.iodata_to_binary() |> Kernel.<>("\n")
@@ -96,11 +93,10 @@ defmodule Mix.Tasks.Tptp.Gen do
     end
   end
 
-  defp describe(bnf_path, szs_path, report, entries) do
+  defp describe(bnf_path, report, entries) do
     shell = Mix.shell()
     shell.info("")
     shell.info("BNF          #{Path.basename(bnf_path)} (v#{Bnf.version!(bnf_path)})")
-    shell.info("SZS          #{Path.basename(szs_path)}")
     shell.info("rules        #{report.rules} reachable from <TPTP_input>")
     shell.info("productions  #{report.productions}")
     shell.info("nonterminals #{report.nonterminals}")

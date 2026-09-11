@@ -8,33 +8,28 @@ the MIT licence in LICENSE.
 
         -- https://tptp.org/cgi-bin/SeeTPTP?Category=Documents&File=ReadMe
 
-The redistributed files, both attributed to the TPTP and both carried unmodified:
+The redistributed file, attributed to the TPTP and carried unmodified:
 
     priv/bnf/SyntaxBNF-v9.3.1.3
         The TPTP syntax BNF, version 9.3.1.3, taken as plain text from
         https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html
         sha256 17970a57e950d8dd768c2c691f0f493dd98d623669c5a39ca17c7e12993086d6
 
-    priv/szs/SZSOntology-2026-09-10.html
-        The SZS ontology page, fetched on 2026-09-10 from
-        https://szs.tptp.org
-        sha256 b1862ce6e38fe3b1a537952e7668fb79d220b96b39626d70f22bc3da3c19c527
+It is vendored so that installing this package needs no network access, and is the
+text content of its page character for character, with no trailing newline. Nothing
+in this repository edits it. The files under lib/ and src/ that are derived from it
+are produced by `mix tptp.gen` and are regenerated rather than hand-maintained.
 
-Both are vendored so that installing this package needs no network access. The BNF
-is the text content of its page character for character, with no trailing newline;
-the ontology is its page's markup byte for byte. Nothing in this repository edits
-either file. The files under lib/ and src/ that are derived from them are produced
-by `mix tptp.gen` and are regenerated rather than hand-maintained.
+A second piece of TPTP material is carried without being redistributed as a file.
+lib/tptp/szs/ontology.ex transcribes the SZS ontology published at
+https://szs.tptp.org: the 112 value names, their mnemonics, their ontology and
+subontology, and the description of each, the last of these quoted from the page
+in the TPTP's own words. The transcription is maintained by hand and was last
+checked against the page on 2026-09-10. It is offered as attributed verbatim
+quotation of the published text; no wording is altered.
 
 The SZS ontology moved to https://szs.tptp.org during 2026; the former address,
-https://tptp.org/UserDocs/SZSOntology, now serves a notice pointing there. The new
-page is a Google Sites document, and two consequences follow for the digest above.
-It is the digest of one fetch: the page carries per-response script nonces and
-signed image URLs, so two fetches of an unchanged page do not agree byte for byte
-and no vendored copy can be re-verified against the live page by digest. What the
-`:network` test compares instead is the ontology the two yield — every value, its
-mnemonic, description, ontology and subontology — which is the content the TPTP
-licence covers and the only part this library reads.
+https://tptp.org/UserDocs/SZSOntology, now serves a notice pointing there.
 
 Note that the BNF served by SeeTPTP under Category=Documents lags the UserDocs page:
 at the time of writing it is version 9.3.0.4. The UserDocs page above is the source

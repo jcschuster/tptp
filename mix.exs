@@ -88,7 +88,7 @@ defmodule Tptp.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
-      files: ~w(lib src/tptp_parser.yrl priv/bnf priv/szs mix.exs README.md LICENSE NOTICE
+      files: ~w(lib src/tptp_parser.yrl priv/bnf mix.exs README.md LICENSE NOTICE
            CHANGELOG.md reports examples .formatter.exs)
     ]
   end
@@ -174,9 +174,7 @@ defmodule Tptp.MixProject do
           Tptp.Bnf.Rule,
           Tptp.Bnf.Vocabulary,
           Tptp.Bnf.Generator,
-          Tptp.Bnf.Oracle,
-          Tptp.Szs.Extract,
-          Tptp.Szs.Generator
+          Tptp.Bnf.Oracle
         ]
       ]
     ]

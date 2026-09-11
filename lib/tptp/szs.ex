@@ -34,7 +34,7 @@ defmodule Tptp.Szs do
 
   ## Atom creation
 
-  Every status and dataform name resolves through the generated tables in
+  Every status and dataform name resolves through the tables in
   `Tptp.Szs.Ontology`, whose atoms exist at compile time. Prover output is
   untrusted input, and an unrecognised value is returned as `{:error, word}` with
   the word as a binary rather than converted to an atom.
@@ -60,30 +60,6 @@ defmodule Tptp.Szs do
   @status ~r{^\s*%\s*SZS\s+status\s+(\S+)\s+for\s+(\S+)\s*(?::\s*(.*?))?\s*$}im
   @start ~r{^\s*%\s*SZS\s+output\s+start\s+(\S+)\s+for\s+(\S+)\s*(?::.*)?$}im
   @stop ~r{^\s*%\s*SZS\s+output\s+end\s+(\S+)\s+for\s+(\S+)\s*(?::.*)?$}im
-
-  @doc """
-  The vendored SZS ontology page.
-
-  Raises unless exactly one is present, the way `Tptp.Bnf.vendored_path!/0` does,
-  because two would mean a regeneration read a file no system chose.
-  """
-  @spec vendored_path!() :: Path.t()
-  def vendored_path! do
-    pattern = Path.join([Application.app_dir(:tptp, "priv"), "szs", "SZSOntology-*"])
-
-    case Path.wildcard(pattern) do
-      [path] ->
-        path
-
-      [] ->
-        raise ArgumentError, "no SZS ontology found at #{pattern}"
-
-      many ->
-        raise ArgumentError,
-              "expected exactly one vendored SZS ontology, found #{length(many)}: " <>
-                Enum.map_join(many, ", ", &Path.basename/1)
-    end
-  end
 
   @doc """
   The status a system reported, taken from the last status line it printed.

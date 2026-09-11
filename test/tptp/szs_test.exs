@@ -1,26 +1,26 @@
 defmodule Tptp.SzsTest do
   @moduledoc """
-  The SZS layer: the generated ontology, and the reader for what provers print.
+  The SZS layer: the ontology, and the reader for what provers print.
 
-  The gate the plan asks for here is narrower than the earlier phases' because the
-  vocabulary is generated rather than written. What is worth asserting is that the
-  generation agreed with the *other* vendored file — every `<status_value>` the BNF
-  admits inside a `status(...)` annotation resolves to a success-ontology value —
-  and that the reader survives the shapes real prover output comes in.
+  The ontology is transcribed by hand from the published page, so these tests carry
+  what a generator used to check on every run. The load-bearing one is agreement
+  with the *other* published source — every `<status_value>` the BNF admits inside
+  a `status(...)` annotation resolves to a success-ontology value — since that is a
+  cross-check a transcription cannot perform on itself. The rest assert the
+  internal consistency a table has to have, and that the reader survives the shapes
+  real prover output comes in.
   """
 
   use ExUnit.Case, async: true
 
   doctest Tptp.Szs
   doctest Tptp.Szs.Ontology
-  doctest Tptp.Szs.Extract
 
   alias Tptp.Bnf.Vocabulary
   alias Tptp.Szs
-  alias Tptp.Szs.Extract
   alias Tptp.Szs.Ontology
 
-  describe "the generated ontology" do
+  describe "the ontology" do
     test "holds the three ontologies, and nothing has escaped its own" do
       values = Ontology.values()
 
@@ -81,14 +81,36 @@ defmodule Tptp.SzsTest do
     end
 
     test "it says where it came from" do
-      assert Ontology.source() =~ "tptp.org"
-      assert Ontology.vendored() =~ "SZSOntology"
-      assert String.length(Ontology.digest()) == 64
+      assert Ontology.source() == "https://szs.tptp.org"
+    end
+
+    test "every value answers every lookup, so no entry is half-transcribed" do
+      for value <- Ontology.values() do
+        assert Ontology.name(value) =~ ~r/^[A-Za-z0-9]+$/
+        assert Ontology.mnemonic(value) =~ ~r/^[A-Za-z]+$/
+        assert Ontology.describe(value) != ""
+        assert Ontology.subontology(value) in Ontology.values()
+      end
+    end
+
+    test "the values list and the lookups agree on membership" do
+      assert length(Ontology.values()) == Ontology.count()
+      assert length(Enum.uniq(Ontology.values())) == Ontology.count()
+
+      for value <- Ontology.values() do
+        assert Ontology.value?(value)
+      end
+    end
+
+    test "no two values share a name" do
+      names = Enum.map(Ontology.values(), &Ontology.name/1)
+
+      assert length(Enum.uniq(names)) == length(names)
     end
 
     test "a name the page corrected is carried at its current spelling alone" do
       # The page spelled this `CounterTautologyyPreserving` until the move to
-      # szs.tptp.org. The name quotes the source, so the old spelling is gone; the
+      # szs.tptp.org. The name quotes the page, so the old spelling is gone; the
       # atom was and is the library's own identifier and did not move with it.
       assert Ontology.name(:counter_tautology_preserving) == "CounterTautologyPreserving"
       assert Ontology.from_status_value("ctp") == {:ok, :counter_tautology_preserving}
@@ -112,38 +134,6 @@ defmodule Tptp.SzsTest do
       assert Ontology.from_mnemonic("ASS") == {:ok, :assumed}
       assert Ontology.from_mnemonic("Ass") == {:ok, :assurance}
       assert Ontology.ontology(:assurance) == :data
-    end
-  end
-
-  describe "reading the page" do
-    test "every value the page lists is recovered" do
-      markup = File.read!(Path.join(["priv", "szs", Ontology.vendored()]))
-
-      listed =
-        ~r{<li\b[^>]*>\s*<p\b[^>]*>\s*<span\b[^>]*Courier[^>]*>([A-Za-z0-9]+)</span>}i
-        |> Regex.scan(markup)
-        |> Enum.map(&Enum.at(&1, 1))
-
-      recovered = Enum.map(Ontology.values(), &Ontology.name/1)
-
-      assert length(listed) == length(recovered)
-      assert listed -- recovered == []
-    end
-
-    test "a listed value the pattern cannot read raises rather than going missing" do
-      markup =
-        "<h3>The Success Ontology</h3><h3>The NoSuccess Ontology</h3>" <>
-          "<h3>The Data Ontology</h3><ul>" <>
-          "<li><p>#{monospace("Proof")}<span> (Prf):</span><span><br></span>" <>
-          "<span>A proof.</span></p></li>" <>
-          "<li><p>#{monospace("Puzzling")}<span> (PZL(Q)):</span><span><br></span>" <>
-          "<span>Unclear.</span></p></li></ul>"
-
-      assert [%{name: "Proof"}, %{name: "Puzzling", mnemonic: "PZL"}] = Extract.parse!(markup)
-
-      broken = String.replace(markup, "<span> (Prf):</span>", "")
-
-      assert_raise RuntimeError, ~r/Proof/, fn -> Extract.parse!(broken) end
     end
   end
 
@@ -281,22 +271,5 @@ defmodule Tptp.SzsTest do
         assert Szs.status(line) == {:ok, value, "X", nil}
       end
     end
-  end
-
-  describe "the vendored page" do
-    test "there is exactly one, and it is what the ontology was built from" do
-      path = Szs.vendored_path!()
-
-      assert Path.basename(path) == Ontology.vendored()
-
-      digest =
-        path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
-
-      assert digest == Ontology.digest()
-    end
-  end
-
-  defp monospace(name) do
-    ~s(<span style="font-family: 'Courier New', Arial;">#{name}</span>)
   end
 end

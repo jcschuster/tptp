@@ -1,20 +1,17 @@
 defmodule Tptp.VendoredTest do
   @moduledoc """
-  The two vendored TPTP World files, against what `NOTICE` says about them.
+  The vendored TPTP World file, against what `NOTICE` says about it.
 
   `NOTICE` is the package's attribution, and the TPTP's terms permit redistribution
   only of *verbatim* copies — so "unmodified" is a claim with legal weight, not a
-  nicety. These tests read the digests out of `NOTICE` itself rather than repeating
-  them, so the file cannot drift from the bytes it describes: editing a vendored
+  nicety. These tests read the digest out of `NOTICE` itself rather than repeating
+  it, so the file cannot drift from the bytes it describes: editing the vendored
   file without updating its attribution fails here, and so does the reverse.
 
-  The `:network` tests are the other half, excluded by default because a test suite
-  should not need tptp.org to pass. Run them when bumping a TPTP release:
+  The `:network` test is the other half, excluded by default because a test suite
+  should not need tptp.org to pass. Run it when bumping a TPTP release:
 
       mix test --include network
-
-  There is one per vendored file, because `NOTICE` makes the same verbatim claim for
-  both and a claim checked on one of two files is checked on neither.
 
   The BNF is reconstructed the way a browser copy does — `<BR>` to newline, tags
   stripped, entities and `&nbsp;` undone — because that is exactly how the vendored
@@ -22,24 +19,17 @@ defmodule Tptp.VendoredTest do
   page ends with a long run of `&nbsp;<P>` padding so that its anchors have
   somewhere to scroll to, and 43 spaces of scroll room are not part of the grammar.
 
-  The SZS page is vendored as its own markup, byte for byte, and against the local
-  copy the check is the digest and nothing else. Against the live page it cannot
-  be: since the move to szs.tptp.org the page is a Google Sites document carrying
-  per-response script nonces and signed image URLs, so two fetches of an unchanged
-  page differ. What that test compares is the ontology the two yield, value for
-  value, which is what this library reads and all that a re-vendoring has to
-  preserve. `NOTICE` records why.
+  The SZS ontology was vendored here too until it was transcribed into
+  `Tptp.Szs.Ontology` by hand; `NOTICE` attributes the transcription, and there is
+  no longer a file to digest.
   """
 
   use ExUnit.Case, async: true
 
   alias Tptp.Resolver.Http
-  alias Tptp.Szs.Extract
-  alias Tptp.Szs.Ontology
 
   @notice Path.join(__DIR__, "../../NOTICE") |> Path.expand()
   @bnf Path.join(__DIR__, "../../priv/bnf/SyntaxBNF-v9.3.1.3") |> Path.expand()
-  @szs Path.join(__DIR__, "../../priv/szs/SZSOntology-2026-09-10.html") |> Path.expand()
 
   @external_resource @notice
 
@@ -54,25 +44,15 @@ defmodule Tptp.VendoredTest do
     path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
   end
 
-  test "NOTICE names both vendored files" do
+  test "NOTICE names the vendored file" do
     recorded = digests()
 
-    assert map_size(recorded) == 2
+    assert map_size(recorded) == 1
     assert Map.has_key?(recorded, "https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html")
-    assert Map.has_key?(recorded, "https://szs.tptp.org")
   end
 
   test "the vendored BNF is the file NOTICE attributes" do
     assert digest(@bnf) == digests()["https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html"]
-  end
-
-  test "the vendored SZS ontology is the file NOTICE attributes" do
-    assert digest(@szs) == digests()["https://szs.tptp.org"]
-  end
-
-  test "the generated ontology was built from the vendored page" do
-    assert Ontology.digest() == digest(@szs)
-    assert Path.basename(@szs) == Ontology.vendored()
   end
 
   @tag :network
@@ -80,14 +60,6 @@ defmodule Tptp.VendoredTest do
     assert {:ok, page} = fetch("https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html")
 
     assert String.trim_trailing(File.read!(@bnf)) == plain_text(page)
-  end
-
-  @tag :network
-  test "the vendored SZS ontology still matches its page upstream" do
-    assert {:ok, page} = fetch("https://szs.tptp.org")
-
-    assert Extract.parse!(page) == Extract.values!(@szs),
-           "the SZS page has changed; re-vendor it, run `mix tptp.gen`, and update NOTICE"
   end
 
   defp plain_text(page) do

@@ -150,9 +150,9 @@ suspect |> Tptp.Lint.run() |> Enum.map(&{&1.code, &1.severity, &1.message})
 
 ## SZS
 
-The status lines a prover prints, over a generated ontology of the 111 published
-values. An unrecognised word comes back as a binary — no atom is ever created from
-prover output.
+The status lines a prover prints, over an ontology of the 112 published values. An
+unrecognised word comes back as a binary — no atom is ever created from prover
+output.
 
 ```elixir
 output = """

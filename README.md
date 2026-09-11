@@ -24,8 +24,8 @@ end
 5. **Check** the `:==` well-formedness conditions and the cross-statement
    conditions.
 6. **Print** a tree back to TPTP: canonical, pretty, or format-preserving.
-7. **Read** the SZS status lines emitted by ATP systems, over a generated ontology
-   of the 112 published values.
+7. **Read** the SZS status lines emitted by ATP systems, over an ontology of the
+   112 published values.
 
 ## Scope
 
@@ -121,7 +121,7 @@ elaborator built on this library must answer.
 
 ## Generated sources
 
-Five files are generated from two vendored sources and committed, so installation
+Four files are generated from the vendored BNF and committed, so installation
 requires neither Python, nor awk, nor the BNF, nor network access:
 
 | Generated | From |
@@ -129,14 +129,13 @@ requires neither Python, nor awk, nor the BNF, nor network access:
 | `src/tptp_parser.yrl` | `priv/bnf/SyntaxBNF-v9.3.1.3` |
 | `lib/tptp/bnf/vocabulary.ex` | the same, `:==` rules |
 | `lib/tptp/printer/shapes.ex` | the same, `::=` rules |
-| `lib/tptp/szs/ontology.ex` | `priv/szs/SZSOntology-2026-09-10.html` |
 | `test/support/bnf_oracle.ex` | the same BNF, `::-` and `:::` rules |
 
 Regeneration is a maintainer action performed on a TPTP release, and the resulting
 diff constitutes the review of that release.
 
 ```
-mix tptp.gen           # regenerate all five
+mix tptp.gen           # regenerate all four
 mix tptp.gen --check   # fail if any committed output is stale
 ```
 
@@ -145,8 +144,11 @@ which would otherwise constitute an LALR(1) conflict. The list is produced by
 `Tptp.Bnf.Generator.departures/0` from the constants causing it, so a release
 requiring a fifth is reported rather than absorbed silently.
 
-The generator also cross-checks the two vendored sources against each other: every
-`<status_value>` the BNF admits within a `status(...)` annotation must be a
+`lib/tptp/szs/ontology.ex` is **not** generated. The SZS ontology is a prose page
+of 112 entries that changes rarely, so it is transcribed by hand and edited when
+the page changes; the module records why, and `NOTICE` attributes the descriptions
+quoted from the page. The cross-check the generator used to perform is a test:
+every `<status_value>` the BNF admits within a `status(...)` annotation must be a
 success-ontology mnemonic. All 34 are.
 
 The SZS `isa` hierarchy is not modelled. It is published only as three diagrams, so
@@ -265,18 +267,18 @@ them from input. This is a security property and is enforced mechanically.
 
 This library is MIT licensed. See [LICENSE](LICENSE).
 
-Two redistributed files are not. `priv/bnf/SyntaxBNF-v9.3.1.3` is the text of
-[the TPTP syntax page][bnf] and `priv/szs/SZSOntology-2026-09-10.html` is [the SZS
-ontology page][szs], both carried unmodified so that installation requires no
-network access. The TPTP's terms permit this:
+Redistributed TPTP material is not. `priv/bnf/SyntaxBNF-v9.3.1.3` is the text of
+[the TPTP syntax page][bnf], carried unmodified so that installation requires no
+network access, and `lib/tptp/szs/ontology.ex` quotes the value descriptions from
+[the SZS ontology page][szs]. The TPTP's terms permit this:
 
 > The TPTP is copyrighted 1993-onwards, by Geoff Sutcliffe & Christian Suttner.
 > Verbatim redistribution of the TPTP and parts of the TPTP is permitted provided
 > that the redistribution is clearly attributed to the TPTP. Distribution of any
 > modified version or modified part of the TPTP requires permission.
 
-Neither file is modified. See [NOTICE](NOTICE) for the attribution and the digests,
-and [tptp.org][tptp] for the TPTP itself.
+Neither is modified. See [NOTICE](NOTICE) for the attribution and the digest, and
+[tptp.org][tptp] for the TPTP itself.
 
 [bnf]: https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html
 [szs]: https://szs.tptp.org

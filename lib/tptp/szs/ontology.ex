@@ -1,10 +1,9 @@
 defmodule Tptp.Szs.Ontology do
   @moduledoc """
-  The SZS status values, generated from the vendored ontology page.
+  The SZS status values, transcribed from <https://szs.tptp.org>.
 
-  Do not edit: `mix tptp.gen` writes this module from
-  `priv/szs/SZSOntology-2026-09-10.html`, fetched from <https://szs.tptp.org>. 112
-  values across three ontologies:
+  This module is written by hand and maintained by hand. 112 values across three
+  ontologies:
 
     * `:success` — 53 values
     * `:no_success` — 29 values
@@ -14,6 +13,25 @@ defmodule Tptp.Szs.Ontology do
   convert untrusted prover output to an atom without `String.to_atom/1` being
   reachable from input. This is a security property rather than a stylistic one;
   see `Tptp.Token` for the same constraint and the Credo check enforcing it.
+
+  ## Why this is not generated
+
+  The grammar is generated because the BNF is a formal document that changes with
+  every TPTP release and is too large to transcribe reliably. The SZS ontology is
+  neither. It is a prose page of 112 entries that has changed once in this
+  library's lifetime — a doubled letter in one name — and scraping it cost a
+  vendored copy of a Google Sites document, an HTML extractor written against that
+  document's markup, and a generator, all to reproduce a table that can simply be
+  written down. Amending an entry by hand when the page changes is less work than
+  maintaining the machinery that reads it, and is reviewable in the diff.
+
+  What the machinery did enforce is kept as tests rather than lost: that every BNF
+  `<status_value>` resolves here to a success-ontology mnemonic, that names and
+  atoms round-trip, and that every value can be written and read back. See
+  `Tptp.SzsTest`.
+
+  Each value's `describe/1` text is quoted from the page. `NOTICE` carries the
+  attribution the TPTP's terms require for it.
 
   ## The `isa` hierarchy is not modelled
 
@@ -25,7 +43,7 @@ defmodule Tptp.Szs.Ontology do
   whose contract is fidelity to its sources. What is provided is the partition
   the text does state: the ontology a value belongs to, and its subontology
   within `Success`. Publication of a machine-readable ontology would allow the
-  hierarchy to be added by regeneration.
+  hierarchy to be added.
 
   ## Ordering
 
@@ -54,7 +72,7 @@ defmodule Tptp.Szs.Ontology do
   sensitive. The lower-case three-letter form occurring inside a TPTP
   `status(...)` annotation has a separate entry point, `from_status_value/1`,
   which searches the success ontology alone, that being the only source
-  `<status_value>` draws from, as the generator verifies on each run.
+  `<status_value>` draws from, as the test suite verifies against the BNF.
 
   `Ass` and `ASS` are a second such pair: `Ass` is `Assurance` in the data
   ontology and `ASS` is `Assumed` in the no-success ontology.
@@ -330,21 +348,14 @@ defmodule Tptp.Szs.Ontology do
   @spec count() :: pos_integer()
   def count, do: 112
 
-  @doc "Where the ontology was fetched from."
+  @doc """
+  The page these values are transcribed from.
+
+  The page carries no version number, so there is nothing finer to report. The
+  transcription was last checked against it on 2026-09-10.
+  """
   @spec source() :: binary()
   def source, do: "https://szs.tptp.org"
-
-  @doc "The vendored copy this module was generated from."
-  @spec vendored() :: binary()
-  def vendored, do: "SZSOntology-2026-09-10.html"
-
-  @doc """
-  A SHA-256 of the vendored page, for consumers that cache across regenerations.
-
-  The page carries no version number, so this stands in for one.
-  """
-  @spec digest() :: binary()
-  def digest, do: "b1862ce6e38fe3b1a537952e7668fb79d220b96b39626d70f22bc3da3c19c527"
 
   @doc """
   Turn a `OneWord` status value into an atom, without creating one.
