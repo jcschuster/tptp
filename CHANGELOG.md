@@ -10,35 +10,7 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
-### Changed
-
-- **`Tptp.Szs.Ontology` is written by hand rather than generated.** The module's
-  contents are unchanged — the same 112 values, names, mnemonics, ontologies,
-  subontologies and descriptions — but it is now an ordinary source file that is
-  edited when the page changes. The SZS ontology is a prose page that has changed
-  once in this library's lifetime, and reading it cost a vendored copy of a Google
-  Sites document, an HTML extractor written against that document's markup, and a
-  generator, to reproduce a table that can be written down. `mix tptp.gen` now
-  generates four files from the BNF alone.
-
-  The checks the generator enforced are kept as tests: every BNF `<status_value>`
-  resolves to a success-ontology mnemonic, names and atoms round-trip, and every
-  value can be written and read back.
-
-### Removed
-
-- **`Tptp.Szs.Extract` and `Tptp.Szs.Generator`**, along with the vendored
-  `priv/szs/SZSOntology-2026-09-10.html` they read. Nothing at runtime called
-  either.
-- **`Tptp.Szs.Ontology.vendored/0` and `digest/0`**, which named and hashed that
-  file. `source/0` remains and still answers <https://szs.tptp.org>; a consumer
-  that cached against `digest/0` should key on the package version instead.
-- **`Tptp.Szs.vendored_path!/0`**, for the same reason. `Tptp.Bnf.vendored_path!/0`
-  is unaffected — the BNF is still vendored.
-- The `:network` test comparing the vendored SZS page against the live one. The
-  BNF's remains.
-
-## [0.1.1] - 2026-09-10
+## [0.1.1] - 2026-09-11
 
 Two things at once. `Tptp.analyze/2` and the `Tptp.Analyzer` behaviour give an
 editor integration everything it needs from one traversal, `mix tptp.lint` puts the
@@ -115,6 +87,17 @@ misspelling.
 
 ### Removed
 
+- **`Tptp.Szs.Extract` and `Tptp.Szs.Generator`**, along with the vendored copy of
+  the SZS page they read. Nothing at runtime called either, and the ontology they
+  produced is an ordinary source file now. `mix tptp.gen` generates four files, all
+  of them from the BNF.
+- **`vendored/0` and `digest/0` on `Tptp.Szs.Ontology`**, which named and hashed
+  that copy. `source/0` remains and answers <https://szs.tptp.org>; a consumer that
+  cached against the digest should key on the package version instead.
+- **`vendored_path!/0` on `Tptp.Szs`**, for the same reason.
+  `Tptp.Bnf.vendored_path!/0` is unaffected — the BNF is still vendored.
+- The `:network` test comparing a vendored SZS page against the live one. The BNF's
+  remains.
 - `reports/TPTP-DEFECTS.md`, the register of places where the published TPTP
   sources disagreed with each other. It never shipped: it was written during this
   cycle, all six entries were reported upstream, and BNF v9.3.1.3 together with the
@@ -160,17 +143,21 @@ misspelling.
   token as before and `TPTP0107` — until now "empty quoted atom", now reported for
   either quoting — fires on it as it already did on `''`. The asymmetry between the
   two rules was an open question in the register and this is its answer.
-- **The SZS ontology moved to <https://szs.tptp.org>.** The former address serves a
-  notice pointing there. The page is re-vendored as
-  `priv/szs/SZSOntology-2026-09-10.html`, `Tptp.Szs.Extract` reads its new markup,
-  and `Tptp.Szs.Ontology.source/0`, `vendored/0` and `digest/0` answer accordingly.
-  The 112 values, their mnemonics, ontologies, subontologies and descriptions are
+- **The SZS ontology moved to <https://szs.tptp.org>, and is transcribed by hand
+  rather than generated.** The former address serves a notice pointing there, and
+  `Tptp.Szs.Ontology.source/0` answers the new one. The module is an ordinary source
+  file: the same 112 values, mnemonics, ontologies, subontologies and descriptions,
+  edited when the page changes rather than extracted from a copy of it. The 112 are
   unchanged but for the spelling below.
 
-  The new page carries per-response script nonces and signed image URLs, so two
-  fetches of an unchanged page do not agree byte for byte. The `:network` test that
-  checked the vendored copy against the live page by digest now compares the
-  ontology the two yield, value for value; `NOTICE` records why.
+  Reading the page cost a vendored copy of a Google Sites document, an HTML
+  extractor written against that document's markup, and a generator, to reproduce a
+  table that can be written down — and the new page carries per-response script
+  nonces and signed image URLs, so two fetches of an unchanged page do not even
+  agree byte for byte. The checks the generator enforced are kept as tests: every
+  BNF `<status_value>` resolves to a success-ontology mnemonic, names and atoms
+  round-trip, and every value can be written and read back. `NOTICE` attributes the
+  quoted descriptions in place of the deleted file.
 - **`TPTP0501` applies to the higher-order dialects only.** The TPTP language page
   gives TFF default typing — an undeclared predicate is `($i,...,$i) > $o` and an
   undeclared function `($i,...,$i) > $i` — and says that THF "does not admit default
@@ -284,13 +271,13 @@ misspelling.
   first was resolved: it writes `introduced(assumption,[from,the,world,[]])` where
   both the BNF and the TPTP language page state
   `introduced(<intro_type>,<useful_info>,<parents>)`, and the other three dialects'
-  copies of the same file write `introduced(assumption,[from,the,world],[])`. Not
-  reported upstream as of 2026-09-10.
+  copies of the same file write `introduced(assumption,[from,the,world],[])`.
+  Reported upstream on 2026-09-11.
 - `SYN000^2.p` carries a further defect that only surfaces once it parses: its
   `let_tuple_4` applies `qll @ a @ b`, and nothing declares `qll`. THF admits no
   default typing, so that is an error, and `TPTP0501` reports it. `ql`, declared as
   `$int > $int > $o`, has exactly the type the use needs, so it is presumably a
-  typo. Not reported upstream as of 2026-09-10.
+  typo. Reported upstream on 2026-09-11.
 
 ## [0.1.0]
 

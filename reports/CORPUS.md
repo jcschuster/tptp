@@ -53,7 +53,7 @@ what the comparison above is over.
 
 **`SYN000+2.p`, `SYN000-2.p`, `SYN000^2.p`** use `theory(equality)` as an inference parent, which `<source>` has not derived since v9.3.1.2 replaced `<source> ::= <general_term>` with a list of alternatives. Fixed upstream on 10/09/26 — see <https://tptp.org/TPTP/Distribution/BuggedProblems-v9.3.1.txt> — and the three parse once that edit reaches the distributed tarball. They are the same demonstration of the annotated-formula syntax written once per dialect, and all three carry the same two statements.
 
-**`SYN000_2.p`** writes `introduced(assumption,[from,the,world,[]])`, which is `introduced(<intro_type>,<useful_info>)` where both the BNF and the TPTP language page state `introduced(<intro_type>,<useful_info>,<parents>)`. The bracket belongs one place to the left: the other three dialects' copies of this file write `introduced(assumption,[from,the,world],[])`. Distinct from, and not covered by, the `theory(equality)` fix of 10/09/26 — this file carries both, and the second was reachable only once the first was resolved. Unreported upstream as of 2026-09-10.
+**`SYN000_2.p`** writes `introduced(assumption,[from,the,world,[]])`, which is `introduced(<intro_type>,<useful_info>)` where both the BNF and the TPTP language page state `introduced(<intro_type>,<useful_info>,<parents>)`. The bracket belongs one place to the left: the other three dialects' copies of this file write `introduced(assumption,[from,the,world],[])`. Distinct from, and not covered by, the `theory(equality)` fix of 10/09/26 — this file carries both, and the second was reachable only once the first was resolved. Reported upstream on 2026-09-11.
 <!-- end results -->
 
 ## This run

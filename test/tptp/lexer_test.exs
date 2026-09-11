@@ -298,11 +298,6 @@ defmodule Tptp.LexerTest do
     end
   end
 
-  defp codes(source) do
-    {_statements, _comments, diagnostics} = Lexer.statements(source)
-    Enum.map(diagnostics, & &1.code)
-  end
-
   defp filter_codes(source, code) do
     {_statements, _comments, diagnostics} = Lexer.statements(source)
     Enum.filter(diagnostics, &(&1.code == code))

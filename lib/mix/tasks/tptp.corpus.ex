@@ -99,7 +99,7 @@ defmodule Mix.Tasks.Tptp.Corpus do
                 "`introduced(assumption,[from,the,world],[])`. Distinct from, and " <>
                 "not covered by, the `theory(equality)` fix of 10/09/26 — this file " <>
                 "carries both, and the second was reachable only once the first was " <>
-                "resolved. Unreported upstream as of 2026-09-10."
+                "resolved. Reported upstream on 2026-09-11."
 
   @known %{
     "SYN000-2.p" => @theory,
