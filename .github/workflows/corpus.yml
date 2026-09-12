@@ -57,7 +57,7 @@ jobs:
       - name: Download the TPTP library
         run: |
           df -h /
-          curl -sSfL https://www.tptp.org/TPTP/Distribution/TPTP-v9.3.1.tgz -o TPTP.tgz
+          curl -sSfL https://tptp.org/TPTP/Distribution/TPTP-v9.3.1.tgz -o TPTP.tgz
           mkdir -p "$TPTP_ROOT"
           tar -xzf TPTP.tgz --strip-components=1 -C "$TPTP_ROOT" \
             --wildcards 'TPTP-v9.3.1/Problems/*' 'TPTP-v9.3.1/Axioms/*'
