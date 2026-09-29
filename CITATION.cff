@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "tptp"
+abstract: >-
+  tptp is a span-preserving parser, linter and printer for the TPTP language in
+  Elixir, generated from the published TPTP syntax BNF (v9.3.1.3). It also
+  carries the SZS ontologies, generated from the TPTP World's SZSOntology.bnf,
+  with their isa hierarchy. It has no runtime dependencies and performs no
+  elaboration or type checking.
+type: software
+authors:
+  - family-names: Schuster
+    given-names: Johannes
+    orcid: "https://orcid.org/0009-0003-5339-7216"
+    affiliation: "Otto-Friedrich-Universität Bamberg, Germany"
+version: "0.1.1"
+date-released: "2026-09-29"
+license: MIT
+repository-code: "https://github.com/jcschuster/tptp"
+url: "https://hexdocs.pm/tptp"
+keywords:
+  - TPTP
+  - parser
+  - linter
+  - pretty-printer
+  - BNF
+  - SZS
+  - automated reasoning
+  - Elixir
+  - BEAM

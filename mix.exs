@@ -89,7 +89,7 @@ defmodule Tptp.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
       files: ~w(lib src/tptp_parser.yrl priv/bnf mix.exs README.md LICENSE NOTICE
-           CHANGELOG.md reports examples .formatter.exs)
+           CHANGELOG.md reports examples .formatter.exs CITATION.cff)
     ]
   end
 
