@@ -13,8 +13,8 @@ defmodule Tptp.Bnf do
   | `::-`     | token rule             | `Tptp.Lexer` and the regex oracle        |
   | `:::`     | character class        | `Tptp.Lexer` and the regex oracle        |
 
-  `SZSOntology.bnf` uses `::=` alone, and `Tptp.Bnf.Generator.ontology/2` turns
-  its rules into `Tptp.Szs.Ontology`.
+  `SZSOntology.bnf` uses `::=` alone, and `Tptp.Bnf.Szs.generate/1` turns its
+  rules into `Tptp.Szs.Ontology`.
 
   Folding the `:==` layer into the grammar is how a TPTP parser ends up rejecting
   files that `tptp4X` accepts: `<formula_role> ::= <lower_word>` accepts *any*
