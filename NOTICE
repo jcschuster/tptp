@@ -8,22 +8,38 @@ the MIT licence in LICENSE.
 
         -- https://tptp.org/cgi-bin/SeeTPTP?Category=Documents&File=ReadMe
 
-The redistributed file, attributed to the TPTP and carried unmodified:
+Two files are redistributed, each carried unmodified:
 
     priv/bnf/SyntaxBNF-v9.3.1.3
-        The TPTP syntax BNF, version 9.3.1.3, taken as plain text from
-        https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html
-        sha256 17970a57e950d8dd768c2c691f0f493dd98d623669c5a39ca17c7e12993086d6
+        The TPTP syntax BNF, version 9.3.1.3, attributed to the TPTP and taken from
+        https://github.com/TPTPWorld/SyntaxBNF at commit 0f2ccdf1 of 2026-09-26:
+        https://raw.githubusercontent.com/TPTPWorld/SyntaxBNF/0f2ccdf176fe5119eb9af75094df8f258d60b581/SyntaxBNF-v9.3.1.3
+        sha256 ded01983d06207186b692eabe86c7336952cda9ca8c1331b10af75c8df8b409e
 
-It is vendored so that installing this package needs no network access, and is the
-text content of its page character for character, with no trailing newline. Nothing
-in this repository edits it. The files under lib/ and src/ that are derived from it
-are produced by `mix tptp.gen` and are regenerated rather than hand-maintained.
+    priv/bnf/SZSOntology.bnf
+        The BNF of the three SZS ontologies, licensed CC BY 4.0 by its repository
+        (https://creativecommons.org/licenses/by/4.0/; see the repository's LICENSE)
+        and taken from https://github.com/TPTPWorld/SZSOntologies at commit
+        934403fd of 2026-09-29:
+        https://raw.githubusercontent.com/TPTPWorld/SZSOntologies/934403fde10748dfa02a5fb404b5619d0ca84068/BNF/SZSOntology.bnf
+        sha256 640cd71710935d41e16914e7d577adf7a4f6c647f4aaa6a1e353b02b0b338c5f
 
-A second piece of TPTP material is carried without being redistributed as a file.
-lib/tptp/szs/ontology.ex transcribes the SZS ontology published at
-https://szs.tptp.org: the 112 value names, their mnemonics, their ontology and
-subontology, and the description of each, the last of these quoted from the page
+They are vendored so that installing this package needs no network access. Nothing
+in this repository edits them. The files under lib/, src/ and test/support/ that are
+derived from them are produced by `mix tptp.gen` and are regenerated rather than
+hand-maintained.
+
+The repository file of the syntax BNF is the source of the page published at
+https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html, and the two are not the same
+text under the same version number: at the time of writing the page still lists
+`unknown` among the alternatives of <source> and still carries the <status_value>
+rule, both of which the repository file has dropped, the latter in favour of the SZS
+BNF. The repository is the maintained copy and is the one vendored.
+
+A further piece of TPTP material is carried without being redistributed as a file.
+lib/tptp/szs/page.ex transcribes what the SZS ontology page at
+https://szs.tptp.org publishes and the SZS BNF does not: the mnemonic of each of
+the 112 values, and the description of each, the last of these quoted from the page
 in the TPTP's own words. The transcription is maintained by hand and was last
 checked against the page on 2026-09-10. It is offered as attributed verbatim
 quotation of the published text; no wording is altered.
@@ -31,8 +47,7 @@ quotation of the published text; no wording is altered.
 The SZS ontology moved to https://szs.tptp.org during 2026; the former address,
 https://tptp.org/UserDocs/SZSOntology, now serves a notice pointing there.
 
-Note that the BNF served by SeeTPTP under Category=Documents lags the UserDocs page:
-at the time of writing it is version 9.3.0.4. The UserDocs page above is the source
-to check against, not that one.
+Note that the BNF served by SeeTPTP under Category=Documents lags both of the above:
+at the time of writing it is version 9.3.0.4.
 
 TPTP World is the work of Geoff Sutcliffe. See https://tptp.org.

@@ -167,13 +167,15 @@ defmodule Tptp.MixProject do
         ],
         SZS: [
           Tptp.Szs,
-          Tptp.Szs.Ontology
+          Tptp.Szs.Ontology,
+          Tptp.Szs.Page
         ],
-        "Generated from the BNF": [
+        "Generated from the BNFs": [
           Tptp.Bnf,
           Tptp.Bnf.Rule,
           Tptp.Bnf.Vocabulary,
           Tptp.Bnf.Generator,
+          Tptp.Bnf.Szs,
           Tptp.Bnf.Oracle
         ]
       ]

@@ -6,7 +6,7 @@ defmodule Tptp.BnfTest do
 
   setup_all do
     path = Bnf.vendored_path!()
-    %{path: path, rules: Bnf.read!(path)}
+    %{path: path, rules: Bnf.read!(path), szs: Bnf.read!(Bnf.szs_path!())}
   end
 
   describe "version!/1" do
@@ -25,7 +25,7 @@ defmodule Tptp.BnfTest do
     test "finds the expected number of rules per separator", %{rules: rules} do
       assert Enum.frequencies_by(rules, & &1.separator) == %{
                "::=" => 229,
-               ":==" => 67,
+               ":==" => 66,
                "::-" => 18,
                ":::" => 38
              }
@@ -36,8 +36,8 @@ defmodule Tptp.BnfTest do
         rules |> Bnf.with_separator(separator) |> Enum.map(&length(&1.alternatives)) |> Enum.sum()
       end
 
-      assert alternatives.("::=") == 439
-      assert alternatives.(":==") == 253
+      assert alternatives.("::=") == 438
+      assert alternatives.(":==") == 219
     end
 
     test "leaves token and character-class rules unparsed", %{rules: rules} do
@@ -49,7 +49,28 @@ defmodule Tptp.BnfTest do
 
     test "records the source line of every rule", %{rules: rules} do
       assert Enum.all?(rules, &(&1.line > 0))
-      assert %Rule{line: 53} = Enum.find(rules, &(&1.lhs == "TPTP_file"))
+      assert %Rule{line: 54} = Enum.find(rules, &(&1.lhs == "TPTP_file"))
+    end
+  end
+
+  describe "read!/1 over the vendored SZS BNF" do
+    test "skips the banner and reads every rule as syntactic", %{szs: szs} do
+      assert length(szs) == 114
+      assert Enum.all?(szs, &(&1.separator == "::="))
+      assert %Rule{lhs: "SZS", line: 5} = hd(szs)
+    end
+
+    test "reads the one terminal that takes arguments", %{szs: szs} do
+      assert Enum.find(szs, &(&1.lhs == "Assumed")).alternatives == [
+               [literal: "Assumed(", ref: "Unknown", literal: ",", ref: "Success", literal: ")"]
+             ]
+    end
+
+    test "reads continuation lines into the rule they continue", %{szs: szs} do
+      success = Enum.find(szs, &(&1.lhs == "SemanticSuccess"))
+
+      assert length(success.alternatives) == 9
+      assert List.last(success.alternatives) == [ref: "FiniteCounterTheorem"]
     end
   end
 
@@ -113,9 +134,12 @@ defmodule Tptp.BnfTest do
     test "prefers the syntactic rule when a name carries both", %{rules: rules} do
       definitions = Bnf.definitions(rules)
 
+      # Referenced from <inference_status>, defined by the SZS BNF alone.
+      refute Map.has_key?(definitions, "status_value")
+
       assert definitions["formula_role"] == "::="
       assert definitions["thf_unitary_type"] == "::="
-      assert definitions["status_value"] == ":=="
+      assert definitions["inference_status"] == ":=="
       assert definitions["lower_word"] == "::-"
       assert definitions["alpha_numeric"] == ":::"
     end
