@@ -34,26 +34,27 @@ defmodule Tptp.Bnf.Generator do
 
   ## Departures
 
-  Four, each of which would otherwise constitute an LALR(1) conflict, and none of
+  Three, each of which would otherwise constitute an LALR(1) conflict, and none of
   which changes the language accepted. `departures/0` returns the list, `generate/1`
   includes it in its report, and `mix tptp.gen` prints it from that list rather than
-  from a copy, so a fifth cannot be introduced without appearing in the output
+  from a copy, so a fourth cannot be introduced without appearing in the output
   intended to surface it.
 
-  1. `<source> ::= … | unknown` is dropped. `unknown` still parses, as
-     `<dag_source> -> <name>`; retaining the literal alternative would render the
-     two indistinguishable in source position.
-  2. `inference`, `introduced` and `file` are given terminals of their own and are
+  A fourth was needed until the BNF's maintainer removed `unknown` from `<source>`,
+  which conflicted with `<dag_source> -> <name>`; `unknown` still parses by the
+  latter route.
+
+  1. `inference`, `introduced` and `file` are given terminals of their own and are
      also admitted as `<atomic_word>`, so that `fof(file, axiom, p).` continues to
      parse. The `(` lookahead separates the two readings. In `<atomic_word>`
      position they are relabelled `lower_word`, their keyword status being an
      artefact of parsing.
-  3. The six `$`-keywords — `$thf`, `$tff`, `$fof`, `$cnf`, `$fot` and `$let` — are
+  2. The six `$`-keywords — `$thf`, `$tff`, `$fof`, `$cnf`, `$fot` and `$let` — are
      reserved, and are not admitted as `<atomic_defined_word>`. Admitting `$let`
      would render `$let(a,b,c)` ambiguous between `<thf_let>` and
      `<thf_fof_function>`. The BNF has no notion of reservation — the word does not
      occur in it — so this is a decision the grammar compels rather than states.
-  4. The five `$`-language markers — `$thf`, `$tff`, `$fof`, `$cnf` and `$fot` —
+  3. The five `$`-language markers — `$thf`, `$tff`, `$fof`, `$cnf` and `$fot` —
      retain their terminals as children of `<formula_data>`, where the generator
      would otherwise omit them as fixed spellings. `$fot(a)` and `$fof(a)` are
      distinct nodes of the same shape, so the marker is what distinguishes them and
@@ -67,9 +68,11 @@ defmodule Tptp.Bnf.Generator do
 
   alias Tptp.Bnf
   alias Tptp.Bnf.Rule
+  alias Tptp.Bnf.Szs
   alias Tptp.Token
 
   @root "TPTP_input"
+  @status_value "status_value"
 
   @kept_terminals [:dw_thf, :dw_tff, :dw_fof, :dw_cnf, :dw_fot]
 
@@ -80,8 +83,6 @@ defmodule Tptp.Bnf.Generator do
   )a
 
   @significant_names Enum.map(@significant, &Atom.to_string/1)
-
-  @dropped_alternatives [{"source", [{:literal, "unknown"}]}]
 
   @injected_productions [
     {"atomic_word", :kw_inference},
@@ -105,7 +106,6 @@ defmodule Tptp.Bnf.Generator do
           transparent: [binary()],
           significant: [binary()],
           pruned: [binary()],
-          dropped: [binary()],
           injected: non_neg_integer(),
           departures: [binary()]
         }
@@ -125,7 +125,6 @@ defmodule Tptp.Bnf.Generator do
 
     {resolved, inlined} =
       syntactic
-      |> Enum.map(&drop_alternatives/1)
       |> Enum.map(&resolve_rule(&1, definitions))
       |> Map.new(fn {lhs, alts} -> {lhs, alts} end)
       |> inline_terminal_rules()
@@ -154,7 +153,6 @@ defmodule Tptp.Bnf.Generator do
       transparent: transparent,
       significant: Enum.sort(Enum.filter(@significant_names, &Map.has_key?(kept, &1))),
       pruned: pruned,
-      dropped: Enum.map(@dropped_alternatives, &elem(&1, 0)),
       injected: length(@injected_productions),
       departures: departures()
     }
@@ -170,15 +168,11 @@ defmodule Tptp.Bnf.Generator do
   entry.
 
       iex> Tptp.Bnf.Generator.departures() |> length()
-      4
+      3
   """
   @spec departures() :: [binary()]
   def departures do
     [
-      "dropped #{length(@dropped_alternatives)} alternative(s): " <>
-        Enum.map_join(@dropped_alternatives, ", ", fn {lhs, alternative} ->
-          "<#{lhs}> ::= " <> Enum.map_join(alternative, " ", &symbol_text/1)
-        end),
       "injected #{length(@injected_productions)} productions admitting keywords as " <>
         Enum.map_join(Enum.uniq(Enum.map(@injected_productions, &elem(&1, 0))), ", ", &"<#{&1}>"),
       "reserved the #{length(Token.dollar_keywords())} $-keywords: " <>
@@ -186,11 +180,6 @@ defmodule Tptp.Bnf.Generator do
       "kept the #{length(@kept_terminals)} $-language markers as children of <formula_data>"
     ]
   end
-
-  defp symbol_text({:literal, text}), do: text
-  defp symbol_text({:nonterminal, name}), do: "<#{name}>"
-  defp symbol_text({:terminal, category}), do: Atom.to_string(category)
-  defp symbol_text({:repeat, name}), do: "<#{name}>*"
 
   @doc """
   Returns the nonterminals whose node `Tptp.Parser` collapses onto its leaf.
@@ -229,16 +218,26 @@ defmodule Tptp.Bnf.Generator do
   follow the first temporal logic formalised in the TPTP World. No library file uses
   the form.
 
-  One entry is not a `:==` rule and is labelled as such in the generated module.
+  Two entries are not closed `:==` rules of the `SyntaxBNF`, and each is labelled
+  as such in the generated module.
+
   `<reserved_word>` does not exist in the BNF — the word "reserved" does not occur in
   the file — and `reserved_words/1` builds the list by collecting every `$`-prefixed
   literal that appears anywhere in any alternative. That is a superset of the
   `$`-words the language defines, which is the appropriate form for
   `Tptp.Lint.Rules.DefinedWord`: a `$`-word outside it is certainly not TPTP's, and
   the cost of the few extras is a warning not raised.
+
+  `<status_value>` is referenced by `<inference_status> :== status(<status_value>)`
+  and defined in neither file under that name. The `SyntaxBNF` stopped defining it
+  when the SZS ontologies moved to a BNF of their own, and `SZSOntology.bnf` states
+  the list as `<inference_status_value>`. The entry is taken from there and emitted
+  under the name the `SyntaxBNF` references. Generation fails if the `SyntaxBNF`
+  defines `<status_value>` again or stops referencing it, since either ends the
+  arrangement this documents.
   """
-  @spec vocabularies(Path.t()) :: {binary(), [{binary(), [binary()]}]}
-  def vocabularies(bnf_path) do
+  @spec vocabularies(Path.t(), Path.t()) :: {binary(), [{binary(), [binary()]}]}
+  def vocabularies(bnf_path, szs_path) do
     rules = bnf_path |> Bnf.read!() |> Bnf.merge_alternatives()
 
     entries =
@@ -246,11 +245,35 @@ defmodule Tptp.Bnf.Generator do
       |> Bnf.with_separator(":==")
       |> Enum.map(&{&1.lhs, closed_words(&1.alternatives)})
       |> Enum.filter(fn {_lhs, words} -> words != nil end)
+      |> Kernel.++([{@status_value, status_values!(rules, szs_path)}])
       |> Enum.sort()
 
     entries = entries ++ [{"reserved_word", reserved_words(rules)}]
 
-    {render_vocabulary(entries, bnf_path), entries}
+    {render_vocabulary(entries, bnf_path, szs_path), entries}
+  end
+
+  defp status_values!(rules, szs_path) do
+    definitions = Bnf.definitions(rules)
+
+    if Map.has_key?(definitions, @status_value) do
+      raise ArgumentError,
+            "the SyntaxBNF defines <#{@status_value}> itself; the SZS BNF's " <>
+              "<inference_status_value> can no longer stand in for it"
+    end
+
+    referenced? =
+      Enum.any?(rules, fn rule ->
+        is_list(rule.alternatives) and {:ref, @status_value} in List.flatten(rule.alternatives)
+      end)
+
+    unless referenced? do
+      raise ArgumentError,
+            "the SyntaxBNF no longer references <#{@status_value}>; " <>
+              "there is nothing for the SZS BNF's <inference_status_value> to stand in for"
+    end
+
+    Szs.read!(szs_path).mnemonics
   end
 
   @doc """
@@ -294,7 +317,6 @@ defmodule Tptp.Bnf.Generator do
     {resolved, _inlined} =
       rules
       |> Bnf.with_separator("::=")
-      |> Enum.map(&drop_alternatives/1)
       |> Enum.map(&resolve_rule(&1, definitions))
       |> Map.new(fn {lhs, alts} -> {lhs, alts} end)
       |> inline_terminal_rules()
@@ -448,7 +470,7 @@ defmodule Tptp.Bnf.Generator do
     """
   end
 
-  defp render_vocabulary(entries, bnf_path) do
+  defp render_vocabulary(entries, bnf_path, szs_path) do
     [
       """
       defmodule Tptp.Bnf.Vocabulary do
@@ -456,7 +478,8 @@ defmodule Tptp.Bnf.Generator do
         The closed vocabularies of the TPTP `:==` semantic layer.
 
         DO NOT EDIT. Generated by `mix tptp.gen` from
-        `priv/bnf/#{Path.basename(bnf_path)}`.
+        `priv/bnf/#{Path.basename(bnf_path)}` and
+        `priv/bnf/#{Path.basename(szs_path)}`.
 
         The grammar accepts far more than these lists do: `<formula_role> ::=
         <lower_word>` admits any lower word, and `<defined_functor> ::=
@@ -464,9 +487,11 @@ defmodule Tptp.Bnf.Generator do
         separates a well-formed statement from a merely parseable one, and it is
         checked by `Tptp.Lint` at warning severity rather than by the parser.
 
-        Every list here is a `:==` rule of the BNF, with one exception.
+        Every list here is a `:==` rule of the `SyntaxBNF`, with two exceptions.
         `<reserved_word>` is this library's own: the BNF has no such rule, and the
-        list is every `$`-prefixed literal appearing in it.
+        list is every `$`-prefixed literal appearing in it. `<status_value>` is
+        referenced by the `SyntaxBNF` and defined by `#{Path.basename(szs_path)}`,
+        as `<inference_status_value>`.
         \"\"\"
       """,
       Enum.map(entries, &render_vocabulary_entry/1),
@@ -483,6 +508,18 @@ defmodule Tptp.Bnf.Generator do
         "  Not a `:==` rule — the BNF has no `<reserved_word>` — but every `$`-prefixed\n" <>
         "  literal collected from every alternative of it. A superset of the words the\n" <>
         "  language defines, which is what `Tptp.Lint.Rules.DefinedWord` wants."
+    )
+  end
+
+  defp render_vocabulary_entry({@status_value = name, words}) do
+    render_vocabulary_entry(
+      name,
+      words,
+      "The #{length(words)} values `SZSOntology.bnf` lists for `<inference_status_value>`.\n\n" <>
+        "  The `SyntaxBNF` references `<#{name}>` from `<inference_status>` without\n" <>
+        "  defining it; the SZS BNF states the list under its own name, and it is\n" <>
+        "  emitted here under the name the reference uses. Each value is the\n" <>
+        "  lower-cased mnemonic of a success-ontology value."
     )
   end
 
@@ -515,11 +552,6 @@ defmodule Tptp.Bnf.Generator do
     #{Enum.map_join(words, "\n", &"  def #{name}?(#{inspect(&1)}), do: true")}
       def #{name}?(word) when is_binary(word), do: false
     """
-  end
-
-  defp drop_alternatives(%Rule{} = rule) do
-    dropped = for {lhs, alt} <- @dropped_alternatives, lhs == rule.lhs, do: alt
-    %{rule | alternatives: Enum.reject(rule.alternatives, &(&1 in dropped))}
   end
 
   defp resolve_rule(%Rule{} = rule, definitions) do

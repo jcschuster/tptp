@@ -3,6 +3,7 @@ defmodule Tptp.Bnf.GeneratorTest do
 
   alias Tptp.Bnf
   alias Tptp.Bnf.Generator
+  alias Tptp.Bnf.Szs
 
   setup_all do
     path = Bnf.vendored_path!()
@@ -79,8 +80,10 @@ defmodule Tptp.Bnf.GeneratorTest do
   end
 
   describe "the departures from a mechanical translation" do
-    test "drops <source> ::= unknown", %{report: report} do
-      assert report.dropped == ["source"]
+    test "no longer needs to drop <source> ::= unknown, since the BNF did", %{grammar: grammar} do
+      refute grammar =~ "'source' -> 'kw_unknown'"
+      refute grammar =~ "'source' -> 'lower_word'"
+      assert length(Generator.departures()) == 3
     end
 
     test "admits the three source keywords as ordinary atomic words", %{grammar: grammar} do
@@ -98,17 +101,16 @@ defmodule Tptp.Bnf.GeneratorTest do
     end
   end
 
-  describe "vocabularies/1" do
+  describe "vocabularies/2" do
     setup do
-      {source, entries} = Generator.vocabularies(Bnf.vendored_path!())
+      {source, entries} = Generator.vocabularies(Bnf.vendored_path!(), Bnf.szs_path!())
       %{source: source, entries: Map.new(entries)}
     end
 
     test "extracts every closed :== word list at the size the BNF states", %{entries: entries} do
-      # Four lists are larger here than in the BNF, each corrected against the TPTP
-      # language page: `formula_role` 13 -> 14, `defined_functor` 18 -> 19,
-      # `ntf_modal_system` 6 -> 16 and `ntf_modal_axiom` 6 -> 10. See
-      # `Tptp.Bnf.Generator.vocabularies/1`.
+      # `status_value` is the one list not read from the SyntaxBNF: it is
+      # `<inference_status_value>` of the SZS BNF, under the name the SyntaxBNF
+      # references. See `Tptp.Bnf.Generator.vocabularies/2`.
       assert Map.new(entries, fn {name, words} -> {name, length(words)} end) == %{
                "defined_functor" => 19,
                "defined_predicate" => 7,
@@ -120,7 +122,7 @@ defmodule Tptp.Bnf.GeneratorTest do
                "ntf_logic_name" => 6,
                "ntf_modal_axiom" => 10,
                "ntf_modal_system" => 16,
-               "status_value" => 34,
+               "status_value" => 47,
                "reserved_word" => 113
              }
     end
@@ -194,6 +196,32 @@ defmodule Tptp.Bnf.GeneratorTest do
       refute Map.has_key?(entries, "tff_plain_atomic")
       refute Map.has_key?(entries, "atomic_type")
       refute Map.has_key?(entries, "th1_quantified_type")
+    end
+
+    test "takes <status_value> from the SZS BNF, in its order", %{entries: entries} do
+      assert entries["status_value"] ==
+               Szs.read!(Bnf.szs_path!()).mnemonics
+
+      assert hd(entries["status_value"]) == "suc"
+      assert "thm" in entries["status_value"]
+    end
+
+    test "refuses a SyntaxBNF that defines <status_value> itself" do
+      path = Path.join(System.tmp_dir!(), "SyntaxBNF-v0.0.0.0")
+      File.write!(path, "<inference_status> :== status(<status_value>)\n<status_value> :== thm\n")
+
+      assert_raise ArgumentError, ~r/defines <status_value> itself/, fn ->
+        Generator.vocabularies(path, Bnf.szs_path!())
+      end
+    end
+
+    test "refuses a SyntaxBNF that no longer references <status_value>" do
+      path = Path.join(System.tmp_dir!(), "SyntaxBNF-v0.0.0.1")
+      File.write!(path, "<inference_status> :== <inference_info>\n")
+
+      assert_raise ArgumentError, ~r/no longer references <status_value>/, fn ->
+        Generator.vocabularies(path, Bnf.szs_path!())
+      end
     end
 
     test "matches the committed module", %{source: source} do

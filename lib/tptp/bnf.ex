@@ -1,6 +1,7 @@
 defmodule Tptp.Bnf do
   @moduledoc """
-  Reader for the upstream TPTP `SyntaxBNF` file.
+  Reader for the two upstream TPTP World BNF files, `SyntaxBNF` and
+  `SZSOntology.bnf`.
 
   The BNF uses four separators, and which one a rule carries decides where the
   rule ends up:
@@ -11,6 +12,9 @@ defmodule Tptp.Bnf do
   | `:==`     | semantic rule          | `Tptp.Bnf.Vocabulary` and the lint rules |
   | `::-`     | token rule             | `Tptp.Lexer` and the regex oracle        |
   | `:::`     | character class        | `Tptp.Lexer` and the regex oracle        |
+
+  `SZSOntology.bnf` uses `::=` alone, and `Tptp.Bnf.Generator.ontology/2` turns
+  its rules into `Tptp.Szs.Ontology`.
 
   Folding the `:==` layer into the grammar is how a TPTP parser ends up rejecting
   files that `tptp4X` accepts: `<formula_role> ::= <lower_word>` accepts *any*
@@ -27,7 +31,11 @@ defmodule Tptp.Bnf do
   @separators ["::=", ":==", "::-", ":::"]
 
   @doc """
-  Read a `SyntaxBNF` file into rules, in source order.
+  Read a BNF file into rules, in source order.
+
+  A line starting with `%` is a comment, a line of dashes alone is a banner, and
+  both are skipped. A rule starts with `<name>` in column one and continues on
+  indented lines.
 
   Raises `File.Error` if the path does not exist. Malformed rules raise
   `ArgumentError` with the line number — this reader only ever runs on a vendored
@@ -61,7 +69,7 @@ defmodule Tptp.Bnf do
   end
 
   @doc """
-  The single vendored BNF under `priv/bnf`.
+  The single vendored `SyntaxBNF` under `priv/bnf`.
 
   Raises if there is not exactly one, which keeps a half-finished version bump
   from silently shipping the wrong grammar.
@@ -82,6 +90,19 @@ defmodule Tptp.Bnf do
               "expected exactly one vendored BNF, found #{length(many)}: " <>
                 Enum.map_join(many, ", ", &Path.basename/1)
     end
+  end
+
+  @doc """
+  The vendored `SZSOntology.bnf` under `priv/bnf`.
+
+  The file carries no version number; `NOTICE` records the commit it was taken at.
+  Raises if it is missing.
+  """
+  @spec szs_path!() :: Path.t()
+  def szs_path! do
+    path = Path.join([Application.app_dir(:tptp, "priv"), "bnf", "SZSOntology.bnf"])
+
+    if File.exists?(path), do: path, else: raise(ArgumentError, "no SZS BNF found at #{path}")
   end
 
   @doc """
@@ -139,6 +160,9 @@ defmodule Tptp.Bnf do
       String.starts_with?(line, "%") ->
         collect_rules(rest, close(done, open), nil)
 
+      banner?(line) ->
+        collect_rules(rest, close(done, open), nil)
+
       String.trim(line) == "" ->
         collect_rules(rest, close(done, open), nil)
 
@@ -158,6 +182,8 @@ defmodule Tptp.Bnf do
 
   defp close(done, nil), do: done
   defp close(done, open), do: [open | done]
+
+  defp banner?(line), do: Regex.match?(~r/^-+\s*$/, line)
 
   defp start_of_rule(line, number) do
     case Regex.run(~r/^<([A-Za-z_][A-Za-z_0-9]*)>\s*(::=|:==|::-|:::)\s?(.*)$/, line) do
