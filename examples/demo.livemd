@@ -174,7 +174,9 @@ cnf(c1, axiom, p).
 %{
   unknown: Tptp.Szs.status("% SZS status Marzipan for X"),
   from_annotation: Tptp.Szs.Ontology.from_status_value("thm"),
-  described: Tptp.Szs.Ontology.describe(:counter_satisfiable)
+  described: Tptp.Szs.Ontology.describe(:counter_satisfiable),
+  parents: Tptp.Szs.Ontology.parents(:theorem),
+  isa?: Tptp.Szs.Ontology.isa?(:equivalent_theorem, :satisfiable)
 }
 ```
 
