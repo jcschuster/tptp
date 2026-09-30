@@ -1,5 +1,7 @@
 # tptp
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23063475.svg)](https://doi.org/10.5281/zenodo.23063475)
+
 A span-preserving parser, linter and printer for the [TPTP][tptp] language,
 generated from the published BNF.
 
