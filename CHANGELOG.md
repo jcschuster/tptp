@@ -10,6 +10,10 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-30
+
+Re-release of 0.1.1 for the Zenodo archive; no changes to the library.
+
 ## [0.1.1] - 2026-09-29
 
 The SZS ontologies are now read from the TPTP World's BNF for them rather than
