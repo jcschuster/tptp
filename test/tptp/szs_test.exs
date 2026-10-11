@@ -327,6 +327,172 @@ defmodule Tptp.SzsTest do
     end
   end
 
+  describe "reading prover output as AtpClient receives it" do
+    # Ported from AtpClient: the StarExec captures under test/fixtures/szs are its
+    # test/fixtures/starexec_stdout_{thm,csat}.txt, and the inline strings are the
+    # outputs its local_exec and result_normalization tests feed its classifier.
+
+    test "E under StarExec: a time prefix on every line, `#`, and no problem" do
+      thm = File.read!("test/fixtures/szs/starexec_e_theorem.txt")
+      csa = File.read!("test/fixtures/szs/starexec_e_counter_satisfiable.txt")
+
+      assert Szs.status(thm) == {:ok, :theorem, nil, nil}
+      assert Szs.success?(thm)
+      assert Szs.status(csa) == {:ok, :counter_satisfiable, nil, nil}
+      assert Szs.success?(csa)
+    end
+
+    test "E run locally: `#` with a problem" do
+      for {word, value} <- [
+            {"Theorem", :theorem},
+            {"Unsatisfiable", :unsatisfiable},
+            {"CounterSatisfiable", :counter_satisfiable},
+            {"Satisfiable", :satisfiable},
+            {"Timeout", :timeout},
+            {"GaveUp", :gave_up}
+          ] do
+        assert Szs.status("# SZS status #{word} for x\n") == {:ok, value, "x", nil}
+      end
+
+      assert Szs.status("ARGS: --auto /tmp/p.p\n# SZS status Theorem for x\n") ==
+               {:ok, :theorem, "x", nil}
+    end
+
+    test "Vampire: the status line wins over its own termination report" do
+      output = "% SZS status CounterSatisfiable for p\n% Termination reason: Satisfiable\n"
+
+      assert Szs.status(output) == {:ok, :counter_satisfiable, "p", nil}
+    end
+
+    test "iProver: a block opened without a problem and never closed is dropped" do
+      output = "% SZS status Theorem for p\n% SZS output start CNFRefutation\n...\n"
+
+      assert Szs.status(output) == {:ok, :theorem, "p", nil}
+      assert Szs.blocks(output) == []
+    end
+
+    test "every value AtpClient classifies by name resolves in the ontology" do
+      for {word, value} <- [
+            {"Theorem", :theorem},
+            {"Unsatisfiable", :unsatisfiable},
+            {"Satisfiable", :satisfiable},
+            {"CounterSatisfiable", :counter_satisfiable},
+            {"ContradictoryAxioms", :contradictory_axioms},
+            {"Equivalent", :equivalent},
+            {"CounterEquivalent", :counter_equivalent},
+            {"CounterTheorem", :counter_theorem},
+            {"EquivalentCounterTheorem", :equivalent_counter_theorem},
+            {"EquiSatisfiable", :equi_satisfiable},
+            {"Tautology", :tautology},
+            {"TautologousConclusion", :tautologous_conclusion},
+            {"WeakerConclusion", :weaker_conclusion},
+            {"NoConsequence", :no_consequence},
+            {"EquivalentTheorem", :equivalent_theorem},
+            {"FiniteTheorem", :finite_theorem},
+            {"GaveUp", :gave_up},
+            {"Unknown", :unknown},
+            {"Incomplete", :incomplete},
+            {"Timeout", :timeout},
+            {"ResourceOut", :resource_out},
+            {"MemoryOut", :memory_out},
+            {"Forced", :forced},
+            {"User", :user},
+            {"Inappropriate", :inappropriate},
+            {"Error", :error},
+            {"InputError", :input_error}
+          ] do
+        assert Szs.status("% SZS status #{word} for x") == {:ok, value, "x", nil}
+      end
+    end
+
+    test "a value whose name extends another's is read whole" do
+      assert Szs.value("% SZS status CounterSatisfiable for x") == {:ok, :counter_satisfiable}
+      assert Szs.value("% SZS status InputError for x") == {:ok, :input_error}
+      assert Szs.value("% SZS status ContradictoryAxioms for x") == {:ok, :contradictory_axioms}
+    end
+
+    test "the value is matched case-sensitively, so a lower-case word is unknown" do
+      assert Szs.status("% SZS status theorem for x") == {:error, "theorem", "x", nil}
+    end
+
+    test "a line without a comment character is not a status line" do
+      assert Szs.status("SZS status Theorem for x") == :none
+      assert Szs.status("SZS status theorem garbage") == :none
+    end
+
+    test "the SystemOnTPTP `says` summary is not a status line" do
+      assert Szs.status("FooProver says FiniteTheorem for problem") == :none
+
+      assert Szs.status(
+               "% RESULT: SOT_Ed3Zp - TPTP4X---0.0 says Unknown - CPU = 0.00 WC = 0.01\n"
+             ) == :none
+    end
+
+    test "text after the value other than `for` and `: comment` is not a status line" do
+      assert Szs.status("% SZS status Timeout (wall-clock kill)") == :none
+
+      assert Szs.status("% SZS status Timeout : wall-clock kill") ==
+               {:ok, :timeout, nil, "wall-clock kill"}
+    end
+  end
+
+  describe "the relaxed framing" do
+    test "a comment without a problem" do
+      assert Szs.status("% SZS status GaveUp : no strategy left") ==
+               {:ok, :gave_up, nil, "no strategy left"}
+    end
+
+    test "any prefix on the line, before either comment character" do
+      for line <- [
+            "0.00/0.03\t% SZS status Theorem for X",
+            "0.00/0.03\t# SZS status Theorem for X",
+            "[vampire] % SZS status Theorem for X"
+          ] do
+        assert Szs.status(line) == {:ok, :theorem, "X", nil}, "#{inspect(line)} did not parse"
+      end
+    end
+
+    test "CRLF line ends" do
+      output = "% SZS status Theorem for X\r\n# SZS status GaveUp\r\n"
+
+      assert Szs.statuses(output) == [{:ok, :theorem, "X", nil}, {:ok, :gave_up, nil, nil}]
+    end
+
+    test "a status line does not borrow its problem or comment from the next line" do
+      assert Szs.statuses("% SZS status Theorem\nfor X\n") == [{:ok, :theorem, nil, nil}]
+      assert Szs.statuses("% SZS status Theorem\n: not mine\n") == [{:ok, :theorem, nil, nil}]
+    end
+
+    test "a `for` with nothing after it is not a status line" do
+      assert Szs.status("% SZS status Theorem for") == :none
+    end
+
+    test "a block without a problem, under `#`, with a time prefix" do
+      output = """
+      0.00/0.03\t# SZS output start CNFRefutation
+      0.00/0.03\tcnf(c1, axiom, p).
+      0.00/0.03\t# SZS output end CNFRefutation
+      """
+
+      assert [block] = Szs.blocks(output)
+      assert block.dataform == :cnf_refutation
+      assert block.problem == nil
+      assert block.body == "0.00/0.03\tcnf(c1, axiom, p)."
+    end
+
+    test "a block opened with a problem is not closed by an end without one" do
+      output = "% SZS output start Proof for A\nbody\n% SZS output end Proof\n"
+
+      assert Szs.blocks(output) == []
+    end
+
+    test "a block opened without a problem is not closed by an end with one" do
+      output = "# SZS output start Proof\nbody\n# SZS output end Proof for A\n"
+
+      assert Szs.blocks(output) == []
+    end
+  end
+
   describe "reading output blocks" do
     test "a delimited block yields its body without the markers" do
       output = """
@@ -402,6 +568,25 @@ defmodule Tptp.SzsTest do
 
         assert Szs.status(line) == {:ok, value, "X", nil}
       end
+    end
+
+    test "a status read without a problem is written back without one" do
+      for output <- ["# SZS status Theorem\n", "% SZS status Timeout : wall-clock limit"] do
+        {:ok, value, nil, comment} = Szs.status(output)
+        line = Szs.status_line(value, nil, comment)
+
+        refute line =~ " for "
+        assert Szs.status(line) == {:ok, value, nil, comment}
+      end
+    end
+
+    test "a block without a problem round-trips through the reader" do
+      block = Szs.output_block(:cnf_refutation, nil, "cnf(c, axiom, p).")
+
+      refute block =~ " for "
+
+      assert [%{dataform: :cnf_refutation, problem: nil, body: "cnf(c, axiom, p)."}] =
+               Szs.blocks(block)
     end
   end
 end

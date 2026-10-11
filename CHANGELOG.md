@@ -10,6 +10,40 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-11
+
+The SZS reader accepts the status and output lines systems print in practice, and
+`Tptp.Span` resolves a line and column back to a byte offset.
+
+### Added
+
+- `Tptp.Span.offset/3`, the inverse of `line_column/2`: a one-based line and byte
+  column to a byte offset, as `{:ok, offset}`, or `:error` for a line the index
+  does not have, a column below one, or a column past the line's line feed. The
+  index does not record the source's length, so a column on the last line is not
+  bounded above.
+
+### Changed
+
+- The SZS readers (`Tptp.Szs.status/1`, `statuses/1`, `value/1`, `success?/1` and
+  `blocks/1`) accept the framing systems print in practice: `#` as well as `%`,
+  any text before it on the line (StarExec's elapsed-time prefix), and no
+  `for <problem>` (E). The value and dataform are still looked up in
+  `Tptp.Szs.Ontology` as written.
+- The problem in `t:Tptp.Szs.status/0`, `t:Tptp.Szs.unknown/0` and
+  `t:Tptp.Szs.block/0` is `binary() | nil`, `nil` when the line names none. Code
+  that matches the problem as a binary needs a clause for `nil`. A block opened
+  without a problem is closed only by an `end` without one, and likewise with.
+- `Tptp.Szs.status_line/3` and `Tptp.Szs.output_block/3` take `nil` for the problem
+  and then leave out `for <problem>`, so what the readers return can be written
+  back.
+
+### Fixed
+
+- A status line no longer takes its problem or comment from the following line:
+  the separators were `\s`, which matches a line feed, so
+  `"% SZS status Theorem\nfor X"` was read as a status for `X`.
+
 ## [0.1.2] - 2026-09-30
 
 Re-release of 0.1.1 for the Zenodo archive; no changes to the library.
@@ -183,6 +217,8 @@ files, and are recorded under Notes below.
   treated as different symbols" — so this compares two declarations at the same
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
-[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/jcschuster/tptp/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/jcschuster/tptp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/jcschuster/tptp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jcschuster/tptp/releases/tag/v0.1.0

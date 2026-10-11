@@ -108,6 +108,38 @@ defmodule Tptp.Span do
   end
 
   @doc """
+  Resolve a one-based line and column to a byte offset: the inverse of
+  `line_column/2`.
+
+  The column counts bytes, as `line_column/2` does. A line's last column is its
+  line feed. `:error` is returned for a line the index does not have, a column
+  below one, or a column past the line feed. The index does not record where the
+  source ends, so a column on the last line is not bounded above; check the
+  result against `byte_size/1` of the source where that matters.
+
+      iex> index = Tptp.Span.line_index("fof(a,axiom,p).\\nfof(b,axiom,q).\\n")
+      iex> Tptp.Span.offset(index, 2, 5)
+      {:ok, 20}
+      iex> Tptp.Span.offset(index, 1, 16)
+      {:ok, 15}
+      iex> Tptp.Span.offset(index, 1, 17)
+      :error
+      iex> Tptp.Span.offset(index, 4, 1)
+      :error
+  """
+  @spec offset(line_index(), integer(), integer()) :: {:ok, non_neg_integer()} | :error
+  def offset(index, line, column)
+      when is_tuple(index) and is_integer(line) and is_integer(column) do
+    count = tuple_size(index)
+
+    cond do
+      line < 1 or line > count or column < 1 -> :error
+      line < count and column > elem(index, line) - elem(index, line - 1) -> :error
+      true -> {:ok, elem(index, line - 1) + column - 1}
+    end
+  end
+
+  @doc """
   The number of lines the index covers.
   """
   @spec line_count(line_index()) :: pos_integer()

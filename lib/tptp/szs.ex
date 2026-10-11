@@ -25,6 +25,34 @@ defmodule Tptp.Szs do
   banner, its own comments and possibly several candidate answers, so locating the
   status requires scanning rather than matching.
 
+  ## What the reader accepts
+
+  The writers, `status_line/3` and `output_block/3`, emit the form above, leaving
+  out `for <problem>` when the problem is `nil`. The readers accept three departures
+  from it that occur in practice:
+
+    * `#` in place of `%` as the comment character. E writes
+      `# SZS status Theorem`.
+    * No `for <problem>`, as in the same line from E. The problem is then `nil`.
+    * Anything before the comment character on the same line. StarExec prefixes
+      each line of a job's output with a pair of elapsed times, as in
+      `0.00/0.03\\t# SZS status Theorem`.
+
+  The value and dataform are not relaxed: each is looked up in
+  `Tptp.Szs.Ontology` as written. Anything after the problem other than a
+  `: <free text>` suffix means the line is not a status line. The SystemOnTPTP
+  summary line, `... <system> says <value> ...`, is not an SZS status line and is
+  not read here.
+
+      iex> Tptp.Szs.status("# SZS status Theorem\\n")
+      {:ok, :theorem, nil, nil}
+
+      iex> Tptp.Szs.status("0.00/0.03\\t# SZS status CounterSatisfiable\\n")
+      {:ok, :counter_satisfiable, nil, nil}
+
+      iex> Tptp.Szs.status("% RESULT: SOT_x - Vampire---5.0 says Theorem - CPU = 0.01\\n")
+      :none
+
   ## Selection
 
   `status/1` returns the last status line in the output. A system refining its
@@ -43,23 +71,26 @@ defmodule Tptp.Szs do
   alias Tptp.Szs.Ontology
 
   @typedoc """
-  A parsed SZS status line: the value, the problem it is about, and any trailing
-  free text after the `:`.
+  A parsed SZS status line: the value, the problem it is about (`nil` when the line
+  names none), and any trailing free text after the `:`.
   """
-  @type status :: {:ok, Ontology.t(), binary(), binary() | nil}
+  @type status :: {:ok, Ontology.t(), binary() | nil, binary() | nil}
 
   @typedoc "A status line whose value is not in the ontology, kept verbatim."
-  @type unknown :: {:error, binary(), binary(), binary() | nil}
+  @type unknown :: {:error, binary(), binary() | nil, binary() | nil}
 
   @typedoc """
-  A delimited output block: its dataform, the problem, and the lines between the
-  `start` and `end` markers with the markers removed.
+  A delimited output block: its dataform, the problem (`nil` when the markers name
+  none), and the lines between the `start` and `end` markers with the markers
+  removed. The body is verbatim, including any per-line prefix such as StarExec's.
   """
-  @type block :: %{dataform: Ontology.t(), problem: binary(), body: binary()}
+  @type block :: %{dataform: Ontology.t(), problem: binary() | nil, body: binary()}
 
-  @status ~r{^\s*%\s*SZS\s+status\s+(\S+)\s+for\s+(\S+)\s*(?::\s*(.*?))?\s*$}im
-  @start ~r{^\s*%\s*SZS\s+output\s+start\s+(\S+)\s+for\s+(\S+)\s*(?::.*)?$}im
-  @stop ~r{^\s*%\s*SZS\s+output\s+end\s+(\S+)\s+for\s+(\S+)\s*(?::.*)?$}im
+  # Horizontal white space is spelled `[ \t]` rather than `\s` or `\h`: `\s` crosses
+  # line ends, and `\h` matches the byte 0xA0, which occurs inside UTF-8 sequences.
+  @status ~r{^[^\r\n]*?[%#][ \t]*SZS[ \t]+status[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[ \t]*([^\r\n]*?))?[ \t]*\r?$}im
+  @start ~r{^[^\r\n]*?[%#][ \t]*SZS[ \t]+output[ \t]+start[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[^\r\n]*)?\r?$}im
+  @stop ~r{^[^\r\n]*?[%#][ \t]*SZS[ \t]+output[ \t]+end[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[^\r\n]*)?\r?$}im
 
   @doc """
   The status a system reported, taken from the last status line it printed.
@@ -153,38 +184,53 @@ defmodule Tptp.Szs do
   end
 
   @doc """
-  Write a status line.
+  Write a status line. A `nil` problem leaves out `for <problem>`.
 
       iex> Tptp.Szs.status_line(:theorem, "PUZ001+1")
       "% SZS status Theorem for PUZ001+1"
       iex> Tptp.Szs.status_line(:gave_up, "PUZ001+1", "no strategy left")
       "% SZS status GaveUp for PUZ001+1 : no strategy left"
+      iex> Tptp.Szs.status_line(:timeout, nil, "wall-clock limit")
+      "% SZS status Timeout : wall-clock limit"
   """
-  @spec status_line(Ontology.t(), binary(), binary() | nil) :: binary()
-  def status_line(value, problem, comment \\ nil) when is_binary(problem) do
-    line = "% SZS status #{Ontology.name(value)} for #{problem}"
+  @spec status_line(Ontology.t(), binary() | nil, binary() | nil) :: binary()
+  def status_line(value, problem, comment \\ nil) when is_binary(problem) or is_nil(problem) do
+    line = "% SZS status #{Ontology.name(value)}#{for_problem(problem)}"
 
     if comment, do: "#{line} : #{comment}", else: line
   end
 
   @doc """
-  Wrap a body in `output start` / `output end` markers.
+  Wrap a body in `output start` / `output end` markers. A `nil` problem leaves out
+  `for <problem>` on both.
 
       iex> Tptp.Szs.output_block(:proof, "X", "fof(a,axiom,p).")
       "% SZS output start Proof for X\\nfof(a,axiom,p).\\n% SZS output end Proof for X"
+      iex> Tptp.Szs.output_block(:proof, nil, "fof(a,axiom,p).")
+      "% SZS output start Proof\\nfof(a,axiom,p).\\n% SZS output end Proof"
   """
-  @spec output_block(Ontology.t(), binary(), binary()) :: binary()
-  def output_block(dataform, problem, body) when is_binary(problem) and is_binary(body) do
-    name = Ontology.name(dataform)
+  @spec output_block(Ontology.t(), binary() | nil, binary()) :: binary()
+  def output_block(dataform, problem, body)
+      when (is_binary(problem) or is_nil(problem)) and is_binary(body) do
+    name = Ontology.name(dataform) <> for_problem(problem)
 
-    "% SZS output start #{name} for #{problem}\n#{body}\n% SZS output end #{name} for #{problem}"
+    "% SZS output start #{name}\n#{body}\n% SZS output end #{name}"
   end
 
+  @spec for_problem(binary() | nil) :: binary()
+  defp for_problem(nil), do: ""
+  defp for_problem(problem), do: " for #{problem}"
+
+  # `Regex.scan/2` omits trailing groups that did not participate and returns ""
+  # for earlier ones. Neither the problem nor the dataform can match empty, so ""
+  # means absent.
   @spec parse_status([binary()]) :: status() | unknown()
-  defp parse_status([_whole, word, problem]), do: parse_status([nil, word, problem, ""])
+  defp parse_status([whole, word]), do: parse_status([whole, word, "", ""])
+  defp parse_status([whole, word, problem]), do: parse_status([whole, word, problem, ""])
 
   defp parse_status([_whole, word, problem, comment]) do
-    text = if comment == "", do: nil, else: comment
+    problem = present(problem)
+    text = present(comment)
 
     case Ontology.from_string(word) do
       {:ok, value} -> {:ok, value, problem, text}
@@ -192,7 +238,14 @@ defmodule Tptp.Szs do
     end
   end
 
+  @spec present(binary()) :: binary() | nil
+  defp present(""), do: nil
+  defp present(text), do: text
+
   @spec block(binary(), [{integer(), integer()}], [[{integer(), integer()}]]) :: block() | nil
+  defp block(output, [whole, dataform], stops),
+    do: block(output, [whole, dataform, {-1, 0}], stops)
+
   defp block(output, [{start, length}, dataform, problem], stops) do
     name = slice(output, dataform)
     problem = slice(output, problem)
@@ -206,13 +259,13 @@ defmodule Tptp.Szs do
     end
   end
 
-  @spec closing(binary(), [[{integer(), integer()}]], binary(), binary(), integer()) ::
+  @spec closing(binary(), [[{integer(), integer()}]], binary(), binary() | nil, integer()) ::
           {integer(), integer()} | nil
   defp closing(output, stops, name, problem, after_marker) do
-    Enum.find_value(stops, fn [whole, dataform, target] ->
+    Enum.find_value(stops, fn [whole, dataform | target] ->
       matches? =
         elem(whole, 0) > after_marker and slice(output, dataform) == name and
-          slice(output, target) == problem
+          slice(output, List.first(target, {-1, 0})) == problem
 
       if matches?, do: whole
     end)
@@ -223,6 +276,8 @@ defmodule Tptp.Szs do
     output |> binary_part(from, to - from) |> String.trim()
   end
 
-  @spec slice(binary(), {integer(), integer()}) :: binary()
+  # `{-1, 0}` is how `Regex.scan/3` reports a group that did not participate.
+  @spec slice(binary(), {integer(), integer()}) :: binary() | nil
+  defp slice(_source, {-1, 0}), do: nil
   defp slice(source, {start, length}), do: binary_part(source, start, length)
 end
