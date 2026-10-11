@@ -55,7 +55,8 @@ defmodule Mix.Tasks.Tptp.Corpus do
 
   A file whose parse would exceed its worker's share is terminated and retried alone
   against the whole of `--heap`, so tiering costs no coverage. A file exceeding the
-  budget when run alone is reported as `:heap` in the failure table.
+  budget when run alone is reported as `:heap` in the failure table, and one whose
+  parse raises by the exception's module.
 
   ## Options
 
@@ -284,6 +285,12 @@ defmodule Mix.Tasks.Tptp.Corpus do
   # link delivers `:killed` to the child rather than leaving a parse running for a
   # result no longer awaited and still holding its share of the heap. Trapping exits
   # is what prevents the link from defeating the monitor.
+  #
+  # A raise or throw in `fun` is caught in the child and turned into an `exit/1` with
+  # the reason the runtime would have given it, so the monitor sees the same
+  # `{exception, stacktrace}` while the VM emits no crash report: the failure is an
+  # outcome the caller reports, and a report logged from a process nobody owns
+  # arrives after the caller has moved on.
   @spec guarded(Path.t(), (Path.t() -> term()), pos_integer()) :: {:ok, term()} | {:exit, term()}
   defp guarded(path, fun, heap) do
     parent = self()
@@ -299,7 +306,14 @@ defmodule Mix.Tasks.Tptp.Corpus do
           include_shared_binaries: true
         })
 
-        send(parent, {:swept, self(), fun.(path)})
+        try do
+          fun.(path)
+        catch
+          :error, reason -> exit({reason, __STACKTRACE__})
+          :throw, value -> exit({{:nocatch, value}, __STACKTRACE__})
+        else
+          value -> send(parent, {:swept, self(), value})
+        end
       end)
 
     Process.link(pid)
@@ -347,13 +361,11 @@ defmodule Mix.Tasks.Tptp.Corpus do
       {_path, {:ok, result}} ->
         result
 
+      {path, {:exit, reason}} when reason in [:heap, :timeout] ->
+        %{path: path, outcome: reason, micros: timeout * 1000, bytes: File.stat!(path).size}
+
       {path, {:exit, reason}} ->
-        %{
-          path: path,
-          outcome: if(reason == :heap, do: :heap, else: :timeout),
-          micros: timeout * 1000,
-          bytes: File.stat!(path).size
-        }
+        %{path: path, outcome: {:crashed, reason}, micros: 0, bytes: File.stat!(path).size}
     end)
   end
 
@@ -531,6 +543,12 @@ defmodule Mix.Tasks.Tptp.Corpus do
   defp describe(:timeout), do: "timed out"
   defp describe(:heap), do: "exceeded the heap ceiling, alone"
   defp describe({:error, codes}), do: Enum.join(codes, ", ")
+
+  defp describe({:crashed, {exception, _stacktrace}}) when is_exception(exception),
+    do: "raised `#{inspect(exception.__struct__)}`"
+
+  defp describe({:crashed, reason}),
+    do: "exited with `#{reason |> inspect(limit: 5) |> String.replace("|", "\\|")}`"
 
   defp megabytes(results) do
     results |> Enum.reduce(0, &(&1.bytes + &2)) |> Kernel./(1_048_576) |> Float.round(1)

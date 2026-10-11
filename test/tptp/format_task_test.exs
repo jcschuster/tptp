@@ -130,10 +130,14 @@ defmodule Tptp.FormatTaskTest do
       File.chmod!(missing, 0o000)
 
       if File.read(missing) == {:error, :eacces} do
-        assert_raise Mix.Error, ~r/1 file could not be read/, fn ->
-          run([good, missing])
-        end
+        stderr =
+          ExUnit.CaptureIO.capture_io(:stderr, fn ->
+            assert_raise Mix.Error, ~r/1 file could not be read/, fn ->
+              run([good, missing])
+            end
+          end)
 
+        assert stderr =~ "#{missing}: permission denied"
         assert File.read!(good) == "fof(a, axiom, p).\n"
       end
 
