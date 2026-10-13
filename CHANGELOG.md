@@ -18,6 +18,16 @@ moves when TPTP moves, not when this library does.
 - `Tptp.Szs.blocks/2` takes `prefix: regex | [regex]`, removed from every body
   line in the order given; `Tptp.Szs.prefix/1` names the two that occur
   (`:starexec`, `:line_comment`). The block records what was removed.
+- `Tptp.Derivation.from_file/1` and `from_string/2` read the `source`
+  annotations of a derivation as a graph: `Tptp.Derivation.Node` per statement,
+  with its `origin` classified and its parents resolved by name, and
+  `Tptp.Derivation.Step` per inference record, nested records flattened
+  innermost first and `status(thm)` resolved through `Tptp.Szs.Ontology`.
+  `ancestors/2`, `descendants/2`, `cone/2`, `acyclic?/1` and `topological/1`
+  query it; `cone/2` returns a sub-derivation whose `file` prints.
+- `TPTP0507`, a node of a derivation derived from itself. Reading a derivation
+  also reports `TPTP0503` and `TPTP0504`, which are `Tptp.Lint`'s codes for the
+  same two findings.
 - `Tptp.Tstp.from_string/2` and `from_file/2` read a TSTP solution file, or a
   SystemOnTPTP `X2TPTP` reply, into a `Tptp.Tstp.Solution`: the `% Key : value`
   header with its continuation lines and its order, the `Result` and `Output`

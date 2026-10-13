@@ -19,7 +19,7 @@ defmodule Tptp.Diagnostic do
   | `TPTP02xx` | statement structure — `Tptp.Splitter` |
   | `TPTP03xx` | grammar — `Tptp.Parser` |
   | `TPTP04xx` | `:==` well-formedness — `Tptp.Lint` |
-  | `TPTP05xx` | cross-statement — `Tptp.Lint` |
+  | `TPTP05xx` | cross-statement — `Tptp.Lint`, `Tptp.Derivation` |
   | `TPTP06xx` | include — `Tptp.Include` |
   | `TPTP08xx` | analyzer infrastructure — `Tptp.Analyzer` |
 
