@@ -63,6 +63,15 @@ defmodule Tptp.Szs do
       iex> Tptp.Szs.status("% RESULT: SOT_x - Vampire---5.0 says Theorem - CPU = 0.01\\n")
       :none
 
+  ## Per-line prefixes
+
+  What a reader tolerates on the marker lines it must not silently apply to the
+  body: the lines between the markers are someone's derivation, and a pattern
+  guessed from them would eventually eat a line of it. So the body is verbatim
+  unless the caller asks for a prefix to be removed, by passing `prefix/1` or a
+  regular expression of its own to `blocks/2`, and the block records what was
+  removed.
+
   ## Selection
 
   `status/1` returns the last status line in the output. A system refining its
@@ -92,9 +101,22 @@ defmodule Tptp.Szs do
   @typedoc """
   A delimited output block: its dataform, the problem (`nil` when the markers name
   none), and the lines between the `start` and `end` markers with the markers
-  removed. The body is verbatim, including any per-line prefix such as StarExec's.
+  removed. `prefix` is the list of patterns removed from every line of the body,
+  `[]` when none were.
+
+  A compiled regular expression holds a reference, so two `t:Regex.t/0` built from
+  the same pattern never compare equal; `prefix` is there to say what was done to
+  the body, and `source` is the field to compare if a caller must.
   """
-  @type block :: %{dataform: Ontology.t(), problem: binary() | nil, body: binary()}
+  @type block :: %{
+          dataform: Ontology.t(),
+          problem: binary() | nil,
+          body: binary(),
+          prefix: [Regex.t()]
+        }
+
+  @typedoc "A per-line prefix `prefix/1` knows by name."
+  @type prefix :: :starexec | :line_comment
 
   # Horizontal white space is spelled `[ \t]` rather than `\s` or `\h`: `\s` crosses
   # line ends, and `\h` matches the byte 0xA0, which occurs inside UTF-8 sequences.
@@ -186,17 +208,48 @@ defmodule Tptp.Szs do
 
       iex> output = "% SZS output start Proof for X\\nfof(a,axiom,p).\\n% SZS output end Proof for X\\n"
       iex> Tptp.Szs.blocks(output)
-      [%{dataform: :proof, problem: "X", body: "fof(a,axiom,p)."}]
+      [%{dataform: :proof, problem: "X", body: "fof(a,axiom,p).", prefix: []}]
+
+  The body is verbatim unless `:prefix` says otherwise. It takes one pattern or a
+  list of them, removed from every body line in the order given — `prefix/1` names
+  the two that occur:
+
+      iex> output = "0.0/0.1\\t# SZS output start Proof\\n0.0/0.2\\tcnf(c,axiom,p).\\n0.0/0.3\\t# SZS output end Proof\\n"
+      iex> [block] = Tptp.Szs.blocks(output, prefix: Tptp.Szs.prefix(:starexec))
+      iex> block.body
+      "cnf(c,axiom,p)."
   """
-  @spec blocks(binary()) :: [block()]
-  def blocks(output) when is_binary(output) do
+  @spec blocks(binary(), [{:prefix, Regex.t() | [Regex.t()]}]) :: [block()]
+  def blocks(output, options \\ []) when is_binary(output) and is_list(options) do
+    prefixes = options |> Keyword.get(:prefix, []) |> List.wrap()
     starts = Regex.scan(@start, output, return: :index)
     stops = Regex.scan(@stop, output, return: :index)
 
     starts
-    |> Enum.map(&block(output, &1, stops))
+    |> Enum.map(&block(output, &1, stops, prefixes))
     |> Enum.reject(&is_nil/1)
   end
+
+  @doc """
+  A per-line prefix, for `blocks/2`'s `:prefix` option.
+
+  `:starexec` is the pair of elapsed times StarExec stamps on every line of a
+  job's output, as in `0.20/0.43\\tcnf(c,axiom,p).`. The times differ from line to
+  line, so what is named here is their shape.
+
+  `:line_comment` is the `% ` a TSTP solution file writes in front of the system
+  output it quotes, under `ORIGINAL SYSTEM OUTPUT`. The two stack when a StarExec
+  run is archived that way: `% 0.12/0.45  % SZS status Theorem`.
+
+      iex> Regex.replace(Tptp.Szs.prefix(:starexec), "0.20/0.43\\tcnf(c,axiom,p).", "")
+      "cnf(c,axiom,p)."
+
+      iex> Regex.replace(Tptp.Szs.prefix(:line_comment), "% cnf(c,axiom,p).", "")
+      "cnf(c,axiom,p)."
+  """
+  @spec prefix(prefix()) :: Regex.t()
+  def prefix(:starexec), do: ~r/^\d+\.\d+\/\d+\.\d+[ \t]+/m
+  def prefix(:line_comment), do: ~r/^%[ \t]?/m
 
   @doc """
   Write a status line. A `nil` problem leaves out `for <problem>`.
@@ -257,18 +310,24 @@ defmodule Tptp.Szs do
   defp present(""), do: nil
   defp present(text), do: text
 
-  @spec block(binary(), [{integer(), integer()}], [[{integer(), integer()}]]) :: block() | nil
-  defp block(output, [whole, dataform], stops),
-    do: block(output, [whole, dataform, {-1, 0}], stops)
+  @spec block(binary(), [{integer(), integer()}], [[{integer(), integer()}]], [Regex.t()]) ::
+          block() | nil
+  defp block(output, [whole, dataform], stops, prefixes),
+    do: block(output, [whole, dataform, {-1, 0}], stops, prefixes)
 
-  defp block(output, [{start, length}, dataform, problem], stops) do
+  defp block(output, [{start, length}, dataform, problem], stops, prefixes) do
     name = slice(output, dataform)
     problem = slice(output, problem)
     after_marker = start + length
 
     with {:ok, value} <- Ontology.from_string(name),
          {stop, _length} <- closing(output, stops, name, problem, after_marker) do
-      %{dataform: value, problem: problem, body: body(output, after_marker, stop)}
+      %{
+        dataform: value,
+        problem: problem,
+        body: body(output, after_marker, stop, prefixes),
+        prefix: prefixes
+      }
     else
       _otherwise -> nil
     end
@@ -286,9 +345,15 @@ defmodule Tptp.Szs do
     end)
   end
 
-  @spec body(binary(), integer(), integer()) :: binary()
-  defp body(output, from, to) do
-    output |> binary_part(from, to - from) |> String.trim()
+  # The slice starts at the line end after the `start` marker, so `^` under `m`
+  # reaches every line of the body, the first one included.
+  @spec body(binary(), integer(), integer(), [Regex.t()]) :: binary()
+  defp body(output, from, to, prefixes) do
+    raw = binary_part(output, from, to - from)
+
+    prefixes
+    |> Enum.reduce(raw, fn pattern, body -> Regex.replace(pattern, body, "") end)
+    |> String.trim()
   end
 
   # `{-1, 0}` is how `Regex.scan/3` reports a group that did not participate.

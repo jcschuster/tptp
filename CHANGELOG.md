@@ -10,6 +10,36 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+### Added
+
+- `Tptp.Statement.Annotated.role_word/1` and `subrole/1`, for the sub-role form
+  `<lower_word>-<general_term>` (`interpretation-domains`, `type-datatype`).
+  `Tptp.Lint.Context.role/1` answers the word for either form.
+- `Tptp.Szs.blocks/2` takes `prefix: regex | [regex]`, removed from every body
+  line in the order given; `Tptp.Szs.prefix/1` names the two that occur
+  (`:starexec`, `:line_comment`). The block records what was removed.
+
+### Changed
+
+- `t:Tptp.Szs.block/0` gains `prefix: [Regex.t()]` (`[]` when nothing was
+  stripped). Code matching the map exhaustively needs the key.
+- The SZS readers accept `SZS status` and `SZS output start|end` at the start of
+  a line with no comment character before them, as Paradox prints them. Only
+  horizontal white space may precede `SZS` in that form. The `for` value may be a
+  path with a `:suffix`; it is taken whole.
+- `Tptp.Lint.Rules.Role` checks the `<lower_word>` of a sub-role, `Tptp.Lint`
+  collects a `type-datatype` typing as a declaration, and `Tptp.Query.roles/1`
+  counts a sub-role under its word.
+- `Tptp.Printer` writes a sub-role closed up on its `-`, as the TPTP does, rather
+  than `interpretation - domains`, which does not parse again. The space stays
+  before a number-like token, where the lexer would read `- 1` as one integer.
+
+### Fixed
+
+- `inspect/1` of an annotated statement with a sub-role raised
+  `FunctionClauseError`, and `Tptp.Lint` reported such a statement's typing as
+  having no `type` role (a false `TPTP0405`).
+
 ## [0.1.3] - 2026-10-11
 
 The SZS reader accepts the status and output lines systems print in practice, and

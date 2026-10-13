@@ -566,6 +566,57 @@ defmodule Tptp.SzsTest do
     end
   end
 
+  describe "per-line prefixes in a block body" do
+    @starexec_proof "test/fixtures/szs/starexec_e_proof_synthetic.txt"
+
+    test "a StarExec-stamped proof lexes once the stamps are removed" do
+      output = File.read!(@starexec_proof)
+
+      assert [block] = Szs.blocks(output, prefix: Szs.prefix(:starexec))
+      assert block.dataform == :cnf_refutation
+      assert {:ok, file, []} = Tptp.from_string(block.body)
+      assert length(file.statements) == 54
+    end
+
+    test "without the option the stamps are still there, and nothing lexes" do
+      output = File.read!(@starexec_proof)
+
+      assert [verbatim] = Szs.blocks(output)
+      assert [also_verbatim] = Szs.blocks(output, prefix: [])
+      assert verbatim == also_verbatim
+      assert String.starts_with?(verbatim.body, "0.08/0.13\tfof(pel55_4")
+      assert {:ok, nothing, [_ | _]} = Tptp.from_string(verbatim.body)
+      assert nothing.statements == []
+    end
+
+    test "the patterns are applied in the order given, so stacked prefixes come off" do
+      output = """
+      % 0.12/0.45  % SZS output start Proof for X
+      % 0.12/0.45  fof(a, axiom, p).
+      % 0.13/0.46  fof(b, axiom, q).
+      % 0.13/0.46  % SZS output end Proof for X
+      """
+
+      prefixes = [Szs.prefix(:line_comment), Szs.prefix(:starexec)]
+
+      assert [block] = Szs.blocks(output, prefix: prefixes)
+      assert block.body == "fof(a, axiom, p).\nfof(b, axiom, q)."
+      assert block.prefix == prefixes
+    end
+
+    test "a block records what was removed from it" do
+      output = Szs.output_block(:proof, "X", "% fof(a,axiom,p).")
+      comment = Szs.prefix(:line_comment)
+
+      assert [block] = Szs.blocks(output)
+      assert block.prefix == []
+
+      assert [stripped] = Szs.blocks(output, prefix: comment)
+      assert stripped.body == "fof(a,axiom,p)."
+      assert stripped.prefix == [comment]
+    end
+  end
+
   describe "writing" do
     test "a status line round-trips through the reader" do
       line = Szs.status_line(:counter_satisfiable, "PUZ001+1", "found a model")
