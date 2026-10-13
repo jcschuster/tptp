@@ -24,6 +24,15 @@ defmodule Tptp.Lint.Collect do
   symbols: `file` in a `<source>` is a keyword and `status(thm)` is a label.
   Counting them would report the TSTP vocabulary as undeclared.
 
+  ## Parents
+
+  The names an inference record was derived from are collected from the `<source>`
+  slot by `Tptp.Derivation.Node.parent_nodes/1`, which descends only into
+  `<parents>`. A `<name>` elsewhere under the slot is not a parent — the formula
+  name of a `<file_source>` belongs to that file, and a `<refutation>` in
+  `<useful_info>` names a file — and `Tptp.Lint.Rules.Parent` would otherwise
+  report it as missing.
+
   An `<ntf_index>` is the second such position. In `{$necessary(#agent)}` the word
   `agent` labels a modality rather than denoting a constant of the problem's
   signature, and `SYN000^7.p`, the reference example for the syntax, declares no
@@ -59,6 +68,7 @@ defmodule Tptp.Lint.Collect do
   """
 
   alias Tptp.Bnf.Vocabulary
+  alias Tptp.Derivation
   alias Tptp.Lint.Context
   alias Tptp.Lint.Table
   alias Tptp.Node
@@ -371,8 +381,18 @@ defmodule Tptp.Lint.Collect do
 
   defp note_symbol(table, _node, _context), do: table
 
-  defp note_parent(table, %Node{kind: :name} = node, %Context{slot: :source} = context) do
-    Table.parent(table, Node.value(node) || "", Context.span(context, node))
+  # Not every `<name>` under the slot is a parent, so the names are taken from the
+  # slot's root by the walk that knows the difference: in `file('x.p', ax1)` the
+  # formula `ax1` is a formula of `x.p`, and a `<refutation>` in a record's
+  # `<useful_info>` names a file rather than a parent. Reading them all as parents
+  # reported eleven axioms of a captured Vampire proof as missing. The walk is
+  # `Tptp.Derivation`'s, so that the two readers of a `<source>` cannot drift.
+  defp note_parent(table, %Node{} = node, %Context{slot: :source, depth: 0} = context) do
+    node
+    |> Derivation.Node.parent_nodes()
+    |> Enum.reduce(table, fn name, table ->
+      Table.parent(table, Node.value(name) || "", Context.span(context, name))
+    end)
   end
 
   defp note_parent(table, _node, _context), do: table

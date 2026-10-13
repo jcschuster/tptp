@@ -357,6 +357,71 @@ defmodule Tptp.LintTest do
     end
   end
 
+  describe "what a <source> names as a parent" do
+    test "the formula name of a file source belongs to that file, not to this one" do
+      # `file('x.p', ax1)` says this formula is `ax1` in `x.p`, which is no statement
+      # of this file and no parent. Reading it as one reported every axiom of a
+      # captured Vampire proof as missing — eleven findings in one proof.
+      source = "fof(a, axiom, p, file('x.p', ax1))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Parent]) == []
+      refute Enum.any?(table(source).parents, fn {name, _span} -> name == "ax1" end)
+    end
+
+    test "a refutation in useful_info names a file, not a parent" do
+      source = "fof(b, plain, q, inference(r, [refutation(file('x.p', ax1))], []))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Parent]) == []
+    end
+
+    test "neither the rule nor the file name is a parent" do
+      assert codes("fof(b, plain, q, inference(ghost_rule, [], [])).",
+               only: [Tptp.Lint.Rules.Parent]
+             ) == []
+
+      assert codes("fof(b, plain, q, file('ghost.p')).", only: [Tptp.Lint.Rules.Parent]) == []
+    end
+
+    test "a name in parent position is a parent however deeply nested" do
+      source = "fof(b, plain, q, inference(sr, [], [inference(rw, [], [ghost]), other]))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Parent]) == ["TPTP0504", "TPTP0504"]
+    end
+
+    test "an introduction's parents are parents" do
+      source = "fof(b, definition, q, introduced(definition, [], [spectre]))."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Parent]) == ["TPTP0504"]
+    end
+
+    test "an alternative source contributes its names" do
+      source = "fof(b, plain, q, [inference(x, [], [ghost]), other])."
+
+      assert codes(source, only: [Tptp.Lint.Rules.Parent]) == ["TPTP0504", "TPTP0504"]
+    end
+
+    # Both readers answer the same question about the same slot, and both report it
+    # under `Tptp.Lint.Rules.Parent.code/0`, so a caller cannot be told two different
+    # things about one file.
+    test "Tptp.Derivation reports the same missing parents as the rule" do
+      source = """
+      fof(ax, axiom, p, file('x.p', ax1)).
+      fof(b, plain, q, inference(sr, [status(thm)], [inference(rw, [], [ghost]), ax])).
+      fof(c, definition, r, introduced(definition, [], [spectre])).
+      """
+
+      {:ok, _derivation, found} = Tptp.Derivation.from_string(source)
+      from_derivation = for d <- found, d.code == "TPTP0504", do: {d.span.offset, d.message}
+
+      from_rule =
+        for d <- found(source, only: [Tptp.Lint.Rules.Parent]),
+            do: {d.span.offset, d.message}
+
+      assert from_rule == from_derivation
+      assert length(from_rule) == 2
+    end
+  end
+
   describe "conjectures" do
     test "a unit that asks nothing is reported once, at the top of the root file" do
       {:ok, unit, []} = Tptp.Unit.from_string("fof(a, axiom, p).")

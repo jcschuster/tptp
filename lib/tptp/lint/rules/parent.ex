@@ -6,15 +6,25 @@ defmodule Tptp.Lint.Rules.Parent do
   derived from `a` and `b`. An absent parent renders the derivation uncheckable,
   indicating either a dropped statement or an incorrect name.
 
-  A warning, reported only for names occurring in formula-name position. A
-  `<source>` is a `<dag_source>`, an `<internal_source>`, an `<external_source>`,
-  the literal `unknown`, or a bracketed list of sources, and `<name>` is reachable
-  through more than one of these: the rule of an `<inference_record>` and the file
-  name of a `<file_source>` are not formula names and are not resolved as such.
-  Neither is the literal `unknown`, which the grammar reads as a `<name>` — the
-  first of `Tptp.Bnf.Generator`'s departures — and which is therefore never
-  reported as a missing parent. The rule also declines unless the unit names at
-  least one formula, so it reports nothing for a problem containing no derivation.
+  A warning, reported only for a name in parent position: the `<parents>` of an
+  `<inference_record>` or an `<internal_source>`, however deeply those nest
+  (`SyntaxBNF-v9.3.1.3` lines 536, 540 and 550). A `<name>` is reachable through a
+  `<source>` in other positions, and none of those is a parent. The `<file_info>`
+  of a `<file_source>` (line 545) is the formula's name *in the file named*, which
+  the language page says may differ from the name the formula now carries, and a
+  `<refutation>` under a record's `<useful_info>` names a file as well. The
+  `<inference_rule>` and the `<file_name>` are not `<name>`s to the grammar and so
+  never reached this rule at all.
+
+  `Tptp.Lint.Collect` therefore takes the names from
+  `Tptp.Derivation.Node.parent_nodes/1`, which descends into `<parents>` and
+  nothing else, and the two readers of a `<source>` answer alike.
+
+  The literal `unknown` is not reported either: the grammar reads it as a `<name>`
+  — the first of `Tptp.Bnf.Generator`'s departures — and a system writing it has
+  declined to record a parent rather than named a missing one. The rule also
+  declines unless the unit names at least one formula, so it reports nothing for a
+  problem containing no derivation.
 
   Before v9.3.1.2 a `<source>` was a `<general_term>`, which admitted anything at
   all in the position this rule resolves.
