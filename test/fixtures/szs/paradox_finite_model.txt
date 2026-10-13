@@ -1,0 +1,44 @@
+% START OF SYSTEM OUTPUT
+Paradox, version 4.0, 2010-06-29.
++++ PROBLEM: /tmp/SystemOnTPTP1767393/KRS018+1.tptp:short
+Reading '/tmp/SystemOnTPTP1767393/KRS018+1.tptp:short' ... OK
++++ SOLVING: /tmp/SystemOnTPTP1767393/KRS018+1.tptp:short
++++ BEGIN MODEL
+SZS output start FiniteModel for /tmp/SystemOnTPTP1767393/KRS018+1.tptp:short
+% domain size is 1
+fof(domain, fi_domain,
+  (![X] : (X = "1"))
+).
+
+fof(cNothing, fi_predicates,
+  ( ![X1] : (cNothing(X1) <=> $false)
+  )
+).
+
+fof(cowlNothing, fi_predicates,
+  ( ![X1] : (cowlNothing(X1) <=> $false)
+  )
+).
+
+fof(cowlThing, fi_predicates,
+  ( ![X1] : (cowlThing(X1) <=> $true)
+  )
+).
+
+fof(xsd_integer, fi_predicates,
+  ( (xsd_integer("1") <=> $true)
+  )
+).
+
+fof(xsd_string, fi_predicates,
+  ( (xsd_string("1") <=> $false)
+  )
+).
+SZS output end FiniteModel for /tmp/SystemOnTPTP1767393/KRS018+1.tptp:short
++++ END MODEL
++++ RESULT: Satisfiable
+SZS status Satisfiable for /tmp/SystemOnTPTP1767393/KRS018+1.tptp:short
+
+% END OF SYSTEM OUTPUT
+% RESULT: KRS018+1 - Paradox---4.0 says Satisfiable - CPU = 0.00 WC = 0.01  Size = 1
+% OUTPUT: KRS018+1 - Paradox---4.0 says FiniteModel - CPU = 0.00 WC = 0.01 

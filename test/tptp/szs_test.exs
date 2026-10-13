@@ -342,6 +342,19 @@ defmodule Tptp.SzsTest do
       assert Szs.success?(csa)
     end
 
+    test "Paradox through SystemOnTPTP: `SZS` lines with no comment character" do
+      output = File.read!("test/fixtures/szs/paradox_finite_model.txt")
+      problem = "/tmp/SystemOnTPTP1767393/KRS018+1.tptp:short"
+
+      assert Szs.status(output) == {:ok, :satisfiable, problem, nil}
+      assert Szs.success?(output)
+
+      assert [block] = Szs.blocks(output)
+      assert block.dataform == :finite_model
+      assert block.problem == problem
+      assert String.starts_with?(block.body, "% domain size is 1")
+    end
+
     test "E run locally: `#` with a problem" do
       for {word, value} <- [
             {"Theorem", :theorem},
@@ -415,9 +428,14 @@ defmodule Tptp.SzsTest do
       assert Szs.status("% SZS status theorem for x") == {:error, "theorem", "x", nil}
     end
 
-    test "a line without a comment character is not a status line" do
-      assert Szs.status("SZS status Theorem for x") == :none
+    test "Paradox: no comment character at all" do
+      assert Szs.status("SZS status Theorem for x") == {:ok, :theorem, "x", nil}
+      assert Szs.status("   SZS status Theorem\n") == {:ok, :theorem, nil, nil}
       assert Szs.status("SZS status theorem garbage") == :none
+    end
+
+    test "a mention of the convention within a sentence is not a status line" do
+      assert Szs.status("The line SZS status Theorem is not a status line\n") == :none
     end
 
     test "the SystemOnTPTP `says` summary is not a status line" do

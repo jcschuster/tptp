@@ -28,7 +28,7 @@ defmodule Tptp.Szs do
   ## What the reader accepts
 
   The writers, `status_line/3` and `output_block/3`, emit the form above, leaving
-  out `for <problem>` when the problem is `nil`. The readers accept three departures
+  out `for <problem>` when the problem is `nil`. The readers accept four departures
   from it that occur in practice:
 
     * `#` in place of `%` as the comment character. E writes
@@ -37,6 +37,10 @@ defmodule Tptp.Szs do
     * Anything before the comment character on the same line. StarExec prefixes
       each line of a job's output with a pair of elapsed times, as in
       `0.00/0.03\\t# SZS status Theorem`.
+    * No comment character at all, as Paradox prints it:
+      `SZS status Satisfiable for /tmp/SOT_KBdUKq.tptp:short`. Only horizontal
+      white space may precede `SZS` in that form, so a mention of the convention
+      within a sentence is not taken for a line.
 
   The value and dataform are not relaxed: each is looked up in
   `Tptp.Szs.Ontology` as written. Anything after the problem other than a
@@ -49,6 +53,12 @@ defmodule Tptp.Szs do
 
       iex> Tptp.Szs.status("0.00/0.03\\t# SZS status CounterSatisfiable\\n")
       {:ok, :counter_satisfiable, nil, nil}
+
+      iex> Tptp.Szs.status("SZS status Satisfiable for /tmp/SOT_KBdUKq.tptp:short\\n")
+      {:ok, :satisfiable, "/tmp/SOT_KBdUKq.tptp:short", nil}
+
+      iex> Tptp.Szs.status("The line SZS status Theorem is not a status line\\n")
+      :none
 
       iex> Tptp.Szs.status("% RESULT: SOT_x - Vampire---5.0 says Theorem - CPU = 0.01\\n")
       :none
@@ -88,9 +98,14 @@ defmodule Tptp.Szs do
 
   # Horizontal white space is spelled `[ \t]` rather than `\s` or `\h`: `\s` crosses
   # line ends, and `\h` matches the byte 0xA0, which occurs inside UTF-8 sequences.
-  @status ~r{^[^\r\n]*?[%#][ \t]*SZS[ \t]+status[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[ \t]*([^\r\n]*?))?[ \t]*\r?$}im
-  @start ~r{^[^\r\n]*?[%#][ \t]*SZS[ \t]+output[ \t]+start[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[^\r\n]*)?\r?$}im
-  @stop ~r{^[^\r\n]*?[%#][ \t]*SZS[ \t]+output[ \t]+end[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[^\r\n]*)?\r?$}im
+  #
+  # The leading alternation is the framing: anything at all before a comment
+  # character, or horizontal white space and nothing else. The second alternative is
+  # what admits Paradox's uncommented lines while keeping `SZS status` mid-sentence
+  # out, since a word before it is neither.
+  @status ~r{^(?:[^\r\n]*?[%#][ \t]*|[ \t]*)SZS[ \t]+status[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[ \t]*([^\r\n]*?))?[ \t]*\r?$}im
+  @start ~r{^(?:[^\r\n]*?[%#][ \t]*|[ \t]*)SZS[ \t]+output[ \t]+start[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[^\r\n]*)?\r?$}im
+  @stop ~r{^(?:[^\r\n]*?[%#][ \t]*|[ \t]*)SZS[ \t]+output[ \t]+end[ \t]+(\S+)(?:[ \t]+for[ \t]+(\S+))?[ \t]*(?::[^\r\n]*)?\r?$}im
 
   @doc """
   The status a system reported, taken from the last status line it printed.
