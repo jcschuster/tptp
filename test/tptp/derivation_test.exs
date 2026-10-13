@@ -429,7 +429,13 @@ defmodule Tptp.DerivationTest do
              end) == ["% why"]
 
       assert cone.file.diagnostics == []
+
+      # The source is kept whole, which is what lets a retained statement still be
+      # sliced out of it.
       assert cone.file.source == @cone
+
+      [first | _rest] = cone.file.statements
+      assert Tptp.Statement.text(first, cone.file.source) == "fof(a, axiom, p, file('p.p', ax))."
     end
 
     test "drops a parent that named no statement" do
