@@ -18,6 +18,12 @@ moves when TPTP moves, not when this library does.
 - `Tptp.Szs.blocks/2` takes `prefix: regex | [regex]`, removed from every body
   line in the order given; `Tptp.Szs.prefix/1` names the two that occur
   (`:starexec`, `:line_comment`). The block records what was removed.
+- `Tptp.Tstp.from_string/2` and `from_file/2` read a TSTP solution file, or a
+  SystemOnTPTP `X2TPTP` reply, into a `Tptp.Tstp.Solution`: the `% Key : value`
+  header with its continuation lines and its order, the `Result` and `Output`
+  values through `Tptp.Szs.Ontology`, the derivation as a `Tptp.File`, and the
+  archived `ORIGINAL SYSTEM OUTPUT` section as text for `Tptp.Szs` to read.
+  Anything that is not a solution file is `{:error, :not_tstp}`.
 
 ### Changed
 

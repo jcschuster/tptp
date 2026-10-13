@@ -85,6 +85,30 @@ defmodule Tptp.InspectTest do
       assert Include.selected(include) == ["key_lemma", "other"]
     end
 
+    # A solution holds a prover's whole log in `original` and a `Tptp.File` in
+    # `solution`, so the derived implementation printed both in full.
+    test "a solution names its system without printing the log it archives" do
+      source = """
+      %----------------
+      % File     : E---3.5.1
+      % Result   : Theorem 0.12s
+      % Output   : CNFRefutation 0.12s
+      %----------------
+      cnf(c_0_53, plain, ($false)).
+      %----------------
+      %----ORIGINAL SYSTEM OUTPUT
+      % % Proof found!
+      %----------------
+      """
+
+      {:ok, solution, []} = Tptp.Tstp.from_string(source)
+      rendered = inspect(solution)
+
+      assert rendered =~ ~s(#Tptp.Tstp.Solution<"E---3.5.1": :theorem/:cnf_refutation,)
+      assert rendered =~ "1 statement,"
+      refute rendered =~ "Proof found"
+    end
+
     test "an analysis nests the file's summary and counts what it found" do
       rendered = @source |> Tptp.analyze() |> inspect()
 
