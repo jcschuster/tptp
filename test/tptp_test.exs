@@ -4,6 +4,7 @@ defmodule TptpTest do
   doctest Tptp
   doctest Tptp.File
   doctest Tptp.Statement
+  doctest Tptp.Statement.Annotated
 
   alias Tptp.Diagnostic
   alias Tptp.Statement.Include

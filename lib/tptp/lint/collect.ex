@@ -383,10 +383,17 @@ defmodule Tptp.Lint.Collect do
       iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("tff(d, type, f: $i).")
       iex> Tptp.Lint.Collect.typing?(statement)
       true
+
+  A sub-role declares as its word does, so `type-datatype` is a declaration:
+
+      iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("tff(d, type-datatype, nat: $tType).")
+      iex> Tptp.Lint.Collect.typing?(statement)
+      true
   """
   @spec typing?(Annotated.t()) :: boolean()
-  def typing?(%Annotated{role: role, formula: formula}) do
-    role.text == "type" and formula.kind in [:tff_atom_typing, :thf_atom_typing]
+  def typing?(%Annotated{formula: formula} = statement) do
+    Annotated.role_word(statement) == "type" and
+      formula.kind in [:tff_atom_typing, :thf_atom_typing]
   end
 
   def typing?(_statement), do: false

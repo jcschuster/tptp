@@ -11,6 +11,10 @@ defmodule Tptp.Printer.Spacing do
   opening delimiter, and none precedes an opening delimiter that follows a word or
   a prefix operator. A single space is emitted elsewhere.
 
+  One pair is spelled rather than positional: the `-` of a sub-role closes up on
+  both sides, since `interpretation-domains` is how the TPTP writes it and `-`
+  occurs in no other production.
+
   A space is never omitted where its absence would combine two tokens into a third
   under the lexer's longest-match rule.
   """
@@ -46,10 +50,26 @@ defmodule Tptp.Printer.Spacing do
       true
       iex> Tptp.Printer.Spacing.space?("~", "p")
       false
+
+  The `-` of a sub-role closes up, as the TPTP writes it, unless a number follows:
+
+      iex> Tptp.Printer.Spacing.space?("interpretation", "-")
+      false
+      iex> Tptp.Printer.Spacing.space?("-", "domains")
+      false
+      iex> Tptp.Printer.Spacing.space?("-", "1")
+      true
   """
   @spec space?(binary(), binary()) :: boolean()
   def space?(_previous, next) when next in @no_space_before, do: false
   def space?(previous, _next) when previous in @openers, do: false
+
+  # `-` is the one token of `<formula_role> ::= <lower_word>-<general_term>`, the
+  # only production using it, and `interpretation-domains` is how the TPTP writes
+  # one. A digit after it would lex as a signed number and the role would not parse
+  # again, so there the space stays.
+  def space?("-", next), do: number_like?(next)
+  def space?(_previous, "-"), do: false
 
   def space?(previous, next) when next in @openers do
     not (word_like?(previous) or previous in @prefixes)
@@ -65,6 +85,10 @@ defmodule Tptp.Printer.Spacing do
   end
 
   defp starts_word?(token), do: token |> :binary.first() |> word_byte?()
+
+  defp number_like?(<<sign, rest::binary>>) when sign in [?-, ?+], do: number_like?(rest)
+  defp number_like?(<<byte, _rest::binary>>) when byte >= ?0 and byte <= ?9, do: true
+  defp number_like?(_token), do: false
 
   defp word_byte?(byte) when byte >= ?a and byte <= ?z, do: true
   defp word_byte?(byte) when byte >= ?A and byte <= ?Z, do: true

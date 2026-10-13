@@ -282,16 +282,23 @@ defmodule Tptp.Query do
   @doc """
   Returns the roles the file uses, with the number of statements carrying each.
 
+  A sub-role is counted under its `<lower_word>`, so `interpretation-domains` and
+  `interpretation-mappings(f,g)` are two `"interpretation"` statements.
+
       iex> {:ok, file, []} = Tptp.from_string("fof(a,axiom,p). fof(b,axiom,q). fof(c,conjecture,r).")
       iex> Tptp.Query.roles(file)
       %{"axiom" => 2, "conjecture" => 1}
+
+      iex> {:ok, file, []} = Tptp.from_string("fof(a,interpretation-domains,p). fof(b,interpretation-mappings(f,g),q).")
+      iex> Tptp.Query.roles(file)
+      %{"interpretation" => 2}
   """
   @spec roles(Tptp.File.t() | Tptp.Unit.t()) :: %{binary() => pos_integer()}
   def roles(subject) do
     subject
     |> statements()
     |> Enum.flat_map(fn
-      {_id, %Annotated{role: role}} -> [role.text]
+      {_id, %Annotated{} = statement} -> [Annotated.role_word(statement)]
       {_id, _include} -> []
     end)
     |> Enum.frequencies()

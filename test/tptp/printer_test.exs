@@ -4,6 +4,7 @@ defmodule Tptp.PrinterTest do
   doctest Tptp.Printer.Canonical
   doctest Tptp.Printer.Format
   doctest Tptp.Printer.Pretty
+  doctest Tptp.Printer.Spacing
 
   alias Tptp.Node
   alias Tptp.Printer.Canonical
@@ -62,6 +63,27 @@ defmodule Tptp.PrinterTest do
     test "annotations keep their commas" do
       assert print("fof(a,axiom,p,unknown,[b]).") == "fof(a, axiom, p, unknown, [b])."
       assert print("fof(a,axiom,p,file('x.p',y)).") == "fof(a, axiom, p, file('x.p', y))."
+    end
+
+    test "a sub-role closes up on its `-`" do
+      assert print("fof(a, interpretation - domains, p).") ==
+               "fof(a, interpretation-domains, p)."
+
+      assert print("tff(a, interpretation-mappings( f , g ), p).") ==
+               "tff(a, interpretation-mappings(f, g), p)."
+
+      assert print("tff(d,type-datatype,nat: $tType).") == "tff(d, type-datatype, nat: $tType)."
+      assert print("fof(a,assumption-[1],p).") == "fof(a, assumption-[1], p)."
+
+      for source <- [
+            "fof(a, interpretation-domains, p).",
+            "tff(a, interpretation-mappings(f,g), p).",
+            "tff(d, type-datatype, nat: $tType).",
+            "fof(a, assumption-[1], p).",
+            "fof(a, assumption - 1, p)."
+          ] do
+        assert round_trips?(source), "#{source} did not round-trip"
+      end
     end
 
     test "an include prints its selection" do

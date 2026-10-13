@@ -110,6 +110,35 @@ defmodule Tptp.LintTest do
     end
   end
 
+  describe "sub-roles" do
+    test "the word of a sub-role is what the role rule checks" do
+      source = "fof(a, wibble-[1], p)."
+
+      assert [diagnostic] = found(source, only: [Tptp.Lint.Rules.Role])
+      assert diagnostic.code == "TPTP0401"
+      assert diagnostic.message == "\"wibble\" is not a TPTP formula role"
+
+      assert {diagnostic.span.offset, diagnostic.span.length} == {7, 10}
+      assert binary_part(source, 7, 10) == "wibble-[1]"
+    end
+
+    test "a sub-role the TPTP names is quiet, general term and all" do
+      assert codes("fof(interp_domain, interpretation-domains, p).") == []
+      assert codes("tff(m, interpretation-mappings(f,g), p).") == []
+      assert codes("tff(d, type-datatype, nat: $tType).") == []
+      assert codes("tff(d, type-codatatype_constructor, nat: $tType).") == []
+    end
+
+    test "a `type-datatype` statement declares, so a later use of its symbol is known" do
+      assert codes("""
+             thf(nat_type, type-datatype, nat: $tType).
+             thf(p_type, type, p: nat > $o).
+             thf(c_type, type, c: nat).
+             thf(a, axiom, p @ c).
+             """) == []
+    end
+  end
+
   describe "clean input stays quiet" do
     test "an ordinary first-order problem" do
       assert codes("""

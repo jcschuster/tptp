@@ -105,6 +105,37 @@ defmodule Tptp.ParserTest do
       assert statement.role.kind == :formula_role
       assert statement.role.children != []
     end
+
+    test "a sub-role is the word and the general term, with no text of its own" do
+      domains = parse!("fof(interp_domain, interpretation-domains, p).")
+      mappings = parse!("tff(m, interpretation-mappings(f,g), p).")
+
+      assert domains.role.text == nil
+
+      assert Enum.map(domains.role.children, &{&1.kind, &1.text}) == [
+               {:lower_word, "interpretation"},
+               {:lower_word, "domains"}
+             ]
+
+      assert Enum.map(mappings.role.children, & &1.kind) == [:lower_word, :general_function]
+
+      for statement <- [domains, mappings] do
+        assert Annotated.role_word(statement) == "interpretation"
+      end
+
+      assert Annotated.subrole(domains).text == "domains"
+      assert Annotated.subrole(mappings).kind == :general_function
+      assert Annotated.subrole(parse!("fof(a, axiom, p).")) == nil
+      assert Annotated.role_word(parse!("fof(a, axiom, p).")) == "axiom"
+    end
+
+    # `assumption-1` lexes its `-1` as a signed integer, so the one general term a
+    # sub-role cannot be written against is a bare number.
+    test "a numeric sub-role needs the space the lexer takes from it" do
+      assert {:error, [diagnostic]} = Parser.statement_from_string("fof(a, assumption-1, p).")
+      assert diagnostic.message == "unexpected `-1`"
+      assert Annotated.subrole(parse!("fof(a, assumption - 1, p).")).text == "1"
+    end
   end
 
   describe "include statements" do

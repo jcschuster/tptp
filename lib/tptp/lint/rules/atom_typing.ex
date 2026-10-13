@@ -25,6 +25,10 @@ defmodule Tptp.Lint.Rules.AtomTyping do
   `thf(a, type, (f: $i)).` and nothing else; it produced eleven findings on
   `SYN000^2.p`, none of them correct. Depth does not separate a meaningful typing
   from a meaningless one, and no criterion does, since the grammar admits none.
+
+  The role is taken from `Tptp.Lint.Context.role/1`, so a sub-role counts as its
+  word: `tff(d, type-datatype, nat: $tType).` declares, as the BNF's `datatype`
+  sub-role of `type` is meant to.
   """
 
   @behaviour Tptp.Lint.Rule
@@ -32,7 +36,6 @@ defmodule Tptp.Lint.Rules.AtomTyping do
   alias Tptp.Diagnostic
   alias Tptp.Lint.Context
   alias Tptp.Node
-  alias Tptp.Statement.Annotated
 
   @typings [:tff_atom_typing, :thf_atom_typing]
 
@@ -47,8 +50,11 @@ defmodule Tptp.Lint.Rules.AtomTyping do
 
   @impl true
   def visit(%Node{} = node, %Context{slot: :formula, depth: 0} = context, _table) do
-    case context.statement do
-      %Annotated{role: %Node{text: "type"}} when node.kind not in @typings ->
+    role = Context.role(context)
+    typing? = node.kind in @typings
+
+    cond do
+      role == "type" and not typing? ->
         [
           complain(
             context,
@@ -58,7 +64,7 @@ defmodule Tptp.Lint.Rules.AtomTyping do
           )
         ]
 
-      %Annotated{role: %Node{text: role}} when node.kind in @typings and role != "type" ->
+      typing? and role != "type" ->
         [
           complain(
             context,
@@ -68,7 +74,7 @@ defmodule Tptp.Lint.Rules.AtomTyping do
           )
         ]
 
-      _otherwise ->
+      true ->
         []
     end
   end

@@ -61,6 +61,19 @@ defmodule Tptp.InspectTest do
       assert inspect(statement) =~ ~s(#Tptp.Statement.Annotated<:fof "one": axiom,)
     end
 
+    # A sub-role is a `:formula_role` node with `text: nil`, which the implementation
+    # passed to `Inspect.Algebra.concat/1` — so `inspect/1` of a Mace4 interpretation
+    # statement raised `FunctionClauseError`.
+    test "a sub-role prints as its word rather than raising" do
+      {:ok, parsed, _diagnostics} =
+        Tptp.from_string("fof(interp_domain, interpretation-domains, p).")
+
+      [statement | _rest] = parsed.statements
+
+      assert inspect(statement) ==
+               ~s(#Tptp.Statement.Annotated<:fof "interp_domain": interpretation, 0..46>)
+    end
+
     test "an include names its file and how much of it was selected" do
       include = Enum.find(file().statements, &match?(%Include{}, &1))
 

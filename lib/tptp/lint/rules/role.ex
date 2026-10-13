@@ -19,6 +19,14 @@ defmodule Tptp.Lint.Rules.Role do
 
   What remains is the rule applied to an actual misspelling: `fof(a, axim, p).` is
   well-formed TPTP and semantically incorrect.
+
+  ## Sub-roles
+
+  The second alternative of the rule, `<lower_word>-<general_term>`, is checked on
+  its `<lower_word>` alone: `interpretation-domains` is an `interpretation` and
+  passes, `wibble-[1]` is reported. The `<general_term>` is drawn from no closed
+  set — the BNF names `domains`, `mappings` and `datatype` as examples of its use —
+  so there is nothing to check it against. The diagnostic spans the whole role.
   """
 
   @behaviour Tptp.Lint.Rule
@@ -38,12 +46,9 @@ defmodule Tptp.Lint.Rules.Role do
   def describe, do: "a formula role the TPTP semantic layer does not define"
 
   @impl true
-  def visit(
-        %Node{kind: :formula_role, text: role} = node,
-        %Context{slot: :role} = context,
-        _table
-      )
-      when is_binary(role) do
+  def visit(%Node{kind: :formula_role} = node, %Context{slot: :role} = context, _table) do
+    role = Context.role(context)
+
     if Vocabulary.formula_role?(role) do
       []
     else

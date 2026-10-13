@@ -53,9 +53,14 @@ defmodule Tptp.Lint.Context do
 
   @doc """
   The role of the statement, or `nil` for an `include`.
+
+  A sub-role answers its `<lower_word>`, as `Tptp.Statement.Annotated.role_word/1`
+  does.
   """
   @spec role(t()) :: binary() | nil
-  def role(%__MODULE__{statement: %Statement.Annotated{role: role}}), do: role.text
+  def role(%__MODULE__{statement: %Statement.Annotated{} = statement}),
+    do: Statement.Annotated.role_word(statement)
+
   def role(%__MODULE__{statement: %Statement.Include{}}), do: nil
 
   @doc """

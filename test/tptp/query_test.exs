@@ -242,6 +242,15 @@ defmodule Tptp.QueryTest do
       assert Query.roles(file) == %{"axiom" => 2, "negated_conjecture" => 1}
     end
 
+    test "roles/1 counts a sub-role under its word" do
+      {:ok, file, []} =
+        Tptp.from_string(
+          "fof(a,interpretation-domains,p). fof(b,interpretation-mappings(f,g),q). fof(c,axiom,r)."
+        )
+
+      assert Query.roles(file) == %{"interpretation" => 2, "axiom" => 1}
+    end
+
     test "conjectures/1 finds both spellings" do
       {:ok, file, []} =
         Tptp.from_string("fof(a,axiom,p). fof(b,conjecture,q). fof(c,negated_conjecture,r).")

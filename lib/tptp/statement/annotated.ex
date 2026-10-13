@@ -19,6 +19,11 @@ defmodule Tptp.Statement.Annotated do
   a lint decision rather than a parse decision. Likewise `formula` is the
   unelaborated subtree; in a THF statement it may be a type, a term or a formula,
   and the grammar does not distinguish them.
+
+  A sub-role, `<lower_word>-<general_term>` as in `interpretation-domains`, is the
+  second alternative of the same rule: a `:formula_role` node with `text: nil` and
+  two children. `role_word/1` and `subrole/1` read either form, so a consumer
+  asking for the role need not know which was written.
   """
 
   alias Tptp.Node
@@ -38,12 +43,49 @@ defmodule Tptp.Statement.Annotated do
           len: non_neg_integer()
         }
 
+  @doc """
+  The role's `<lower_word>`: the role itself, or the word before the `-` of a
+  sub-role.
+
+      iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a, axiom, p).")
+      iex> Tptp.Statement.Annotated.role_word(statement)
+      "axiom"
+
+      iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a, interpretation-domains, p).")
+      iex> Tptp.Statement.Annotated.role_word(statement)
+      "interpretation"
+  """
+  @spec role_word(t()) :: binary()
+  def role_word(%__MODULE__{role: %Node{text: word}}) when is_binary(word), do: word
+  def role_word(%__MODULE__{role: %Node{children: [%Node{text: word} | _rest]}}), do: word
+
+  @doc """
+  The `<general_term>` of a sub-role, or `nil` for a plain role.
+
+  The term is uninterpreted, as `source` and `info` are: the BNF names `domains`
+  and `mappings` for an `interpretation` and `datatype` for a `type` as examples
+  rather than as a closed set.
+
+      iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("tff(d, type-datatype, nat: $tType).")
+      iex> Tptp.Statement.Annotated.subrole(statement).text
+      "datatype"
+
+      iex> {:ok, statement, []} = Tptp.Parser.statement_from_string("fof(a, axiom, p).")
+      iex> Tptp.Statement.Annotated.subrole(statement)
+      nil
+  """
+  @spec subrole(t()) :: Node.t() | nil
+  def subrole(%__MODULE__{role: %Node{children: [_word, term]}}), do: term
+  def subrole(%__MODULE__{}), do: nil
+
   defimpl Inspect do
     @moduledoc false
     import Inspect.Algebra
 
     # The formula is a whole tree; see `Tptp.Node`'s implementation for why that is not
     # printed. `Tptp.Statement.text/2` renders the statement itself from its source.
+    # A sub-role prints as its word alone: `role_word/1` rather than `role.text`,
+    # which is `nil` there.
     @impl true
     def inspect(statement, opts) do
       concat([
@@ -52,7 +94,7 @@ defmodule Tptp.Statement.Annotated do
         " ",
         to_doc(statement.name.text, opts),
         ": ",
-        statement.role.text,
+        @for.role_word(statement),
         ", ",
         "#{statement.off}..#{statement.off + statement.len}",
         ">"
