@@ -8,7 +8,10 @@ Note that the package version and `Tptp.bnf_version/0` are two different numbers
 latter is the TPTP release whose BNF the shipped parser was generated from, and it
 moves when TPTP moves, not when this library does.
 
-## [Unreleased]
+## [0.2.0] - 2026-10-13
+
+Derivations and TSTP solution files are read as structure, and the SZS reader
+accepts two more shapes systems print in practice.
 
 ### Added
 

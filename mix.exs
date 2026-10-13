@@ -1,7 +1,7 @@
 defmodule Tptp.MixProject do
   use Mix.Project
 
-  @version "0.1.3"
+  @version "0.2.0"
   @source_url "https://github.com/jcschuster/tptp"
 
   def project do
@@ -169,6 +169,13 @@ defmodule Tptp.MixProject do
           Tptp.Szs,
           Tptp.Szs.Ontology,
           Tptp.Szs.Page
+        ],
+        TSTP: [
+          Tptp.Derivation,
+          Tptp.Derivation.Node,
+          Tptp.Derivation.Step,
+          Tptp.Tstp,
+          Tptp.Tstp.Solution
         ],
         "Generated from the BNFs": [
           Tptp.Bnf,

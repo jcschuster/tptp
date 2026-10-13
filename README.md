@@ -28,6 +28,9 @@ end
 6. **Print** a tree back to TPTP: canonical, pretty, or format-preserving.
 7. **Read** the SZS status lines emitted by ATP systems, over the 112 values and
    the `isa` hierarchy of the published SZS ontology BNF.
+8. **Index** a derivation's `source` annotations as a graph, and split a TSTP
+   solution file into its header, its derivation and the system output it
+   archives.
 
 ## Scope
 
@@ -69,6 +72,47 @@ implementations. `Tptp.Analyzer.run_all/3` dispatches by dialect and distinguish
 two outcomes that are easily conflated: an analyzer excluded by dialect reports
 `:skipped` rather than an empty list. An analyzer that raises is contained as a
 `TPTP0800` diagnostic naming it.
+
+## Derivations and TSTP files
+
+A derivation is a TPTP file whose statements record where they came from, and
+`<source>` is part of the grammar, so reading one is a traversal rather than a
+second parse. `Tptp.Derivation` indexes it as a graph:
+
+```elixir
+{:ok, derivation, []} = Tptp.Derivation.from_string(proof)
+
+derivation.roots     # ["c_0_53"] — the statement of $false, in a refutation
+derivation.leaves    # the eleven statements read from the problem file
+Tptp.Derivation.ancestors(derivation, "c_0_53")
+Tptp.Derivation.cone(derivation, "c_0_19")   # that statement and its ancestors
+```
+
+`inference(sr, [], [inference(rw, [], [a, b]), c])` flattens into a list of
+`Tptp.Derivation.Step`s, innermost first: the formula the inner record produced is
+not a statement of the file and has no name, so a parent that is one of those
+records is `{:step, index}` rather than a name. `status(thm)` resolves through the
+SZS ontology; the rest of `<useful_info>` is handed back as parsed. A duplicate
+name, a parent naming no statement and a cycle are reported, and the graph is
+returned either way — `acyclic?/1` and `topological/1` answer the DAG question.
+
+A TSTP solution file, and the `X2TPTP` reply SystemOnTPTP builds from a system's
+output, are one shape: a `% Key : value` header, the derivation, and the system's
+own output archived under `%----ORIGINAL SYSTEM OUTPUT`. `Tptp.Tstp` splits them,
+leaving the derivation to the parser and the archived output to `Tptp.Szs`:
+
+```elixir
+{:ok, solution, []} = Tptp.Tstp.from_file("E---3.5.1.THM-CRf.s")
+
+{solution.result, solution.output}    # {:theorem, :cnf_refutation}
+solution.header["SZS Type"]           # "Refutation\nDerivation depth      :    8\n..."
+Tptp.Szs.status(solution.original)    # {:ok, :theorem, nil, nil}
+
+{:ok, derivation, []} = Tptp.Derivation.from_file(solution.solution)
+```
+
+Writing these files is not in scope: a solution file archives what a system
+printed, and this library has nothing of its own to put in one.
 
 ## Coverage
 
