@@ -55,15 +55,23 @@ defmodule Tptp.SzsTest do
       end
     end
 
+    # The count of atoms in the system is not something an async test can measure:
+    # another test loading a module for the first time moves it, and this one then
+    # fails for a reason that has nothing to do with the ontology. What matters is
+    # the one atom, so the word is unique to the run — had `from_string/1` reached
+    # for `String.to_atom/1`, that atom would exist afterwards and nothing else in
+    # the system could have made it.
     test "no atom is created from an unknown word" do
-      before = :erlang.system_info(:atom_count)
-
       for word <- ["NotAStatus", "Th30rem", "", "theorem"] do
         assert Ontology.from_string(word) == :error
         assert Ontology.value?(word) == false
       end
 
-      assert :erlang.system_info(:atom_count) == before
+      fresh = "Theorem#{System.unique_integer([:positive])}"
+
+      assert Ontology.from_string(fresh) == :error
+      assert Ontology.value?(fresh) == false
+      assert_raise ArgumentError, fn -> String.to_existing_atom(fresh) end
     end
 
     test "it says where it came from" do
