@@ -29,6 +29,17 @@ defmodule Tptp.LexerTest do
       assert [{:real, 0, 3}, {:dot, 3, 1}] = tokens_of("1.5.")
     end
 
+    test "a dot before a digit still terminates, since `.1` is not a number" do
+      {statements, _comments, diagnostics} = Lexer.statements("fof(a,axiom,p).1")
+
+      assert [first, [{:integer, 15, 1}]] = statements
+      assert List.last(first) == {:dot, 14, 1}
+      assert Enum.map(diagnostics, & &1.code) == ["TPTP0106"]
+
+      assert categories("p(a.1).") ==
+               [:lower_word, :lparen, :lower_word, :dot, :integer, :rparen, :dot]
+    end
+
     test "an integer followed by a dot is two tokens" do
       assert [{:integer, 0, 3}, {:dot, 3, 1}] = tokens_of("123.")
     end
@@ -48,6 +59,17 @@ defmodule Tptp.LexerTest do
   end
 
   describe "numbers" do
+    test "a leading zero before an exponent is a <real> and is not reported" do
+      assert [{:real, 0, 5}] = tokens_of("007e1")
+      assert [] = filter_codes("007e1", "TPTP0110")
+      assert [{:real, 0, 6}] = tokens_of("-00E+1")
+      assert [] = filter_codes("-00E+1", "TPTP0110")
+
+      assert [_] = filter_codes("007.5e1", "TPTP0110")
+      assert [_] = filter_codes("007", "TPTP0110")
+      assert [_] = filter_codes("00/3", "TPTP0110")
+    end
+
     test "integers, signed and not" do
       assert [{:integer, 0, 1}] = tokens_of("0")
       assert [{:integer, 0, 3}] = tokens_of("123")
@@ -108,6 +130,53 @@ defmodule Tptp.LexerTest do
         assert [{:dollar_word, 0, 4}] = tokens_of(keyword),
                "#{keyword} must lex as a dollar word; Tptp.Splitter decides the rest"
       end
+    end
+  end
+
+  describe "the character class of a quoted token" do
+    test "a backslash that escapes nothing is reported, and the token survives" do
+      assert [{:single_quoted, 0, 5}] = tokens_of(~S('a\b'))
+
+      assert [%{code: "TPTP0112", severity: :warning, span: %{offset: 0, length: 5}}] =
+               filter_codes(~S('a\b'), "TPTP0112")
+
+      assert [{:distinct_object, 0, 5}] = tokens_of(~S("a\b"))
+      assert [%{code: "TPTP0112"}] = filter_codes(~S("a\b"), "TPTP0112")
+    end
+
+    test "a tab, a control character, DEL and a byte outside ASCII are reported" do
+      for body <- ["a\tb", "a\x01b", "a\x7Fb", "aéb", <<?a, 0xFF, ?b>>, "\\x"] do
+        single = "'" <> body <> "'"
+        assert [{:single_quoted, 0, _}] = tokens_of(single)
+        assert [%{code: "TPTP0112"}] = filter_codes(single, "TPTP0112")
+
+        double = "\"" <> body <> "\""
+        assert [{:distinct_object, 0, _}] = tokens_of(double)
+        assert [%{code: "TPTP0112"}] = filter_codes(double, "TPTP0112")
+      end
+    end
+
+    test "the two escapes and every printable byte are admitted" do
+      assert [] = filter_codes(~S('a\'b\\c'), "TPTP0112")
+      assert [] = filter_codes(~S("a\"b\\c"), "TPTP0112")
+
+      single = for c <- ?\s..?~, c != ?', c != ?\\, do: c
+      assert [{:single_quoted, 0, _}] = tokens_of("'" <> IO.iodata_to_binary(single) <> "'")
+      assert [] = filter_codes("'" <> IO.iodata_to_binary(single) <> "'", "TPTP0112")
+
+      double = for c <- ?\s..?~, c != ?", c != ?\\, do: c
+      assert [{:distinct_object, 0, _}] = tokens_of("\"" <> IO.iodata_to_binary(double) <> "\"")
+      assert [] = filter_codes("\"" <> IO.iodata_to_binary(double) <> "\"", "TPTP0112")
+    end
+
+    test "an empty token is reported as empty, not as inadmissible" do
+      assert [] = filter_codes("''", "TPTP0112")
+      assert [_] = filter_codes("''", "TPTP0107")
+    end
+
+    test "a backslash before the closing quote leaves the token unterminated" do
+      assert [] = tokens_of(~S('a\'))
+      assert [_] = filter_codes(~S('a\'), "TPTP0102")
     end
   end
 

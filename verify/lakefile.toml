@@ -1,0 +1,6 @@
+name = "tptp-verify"
+version = "0.1.0"
+defaultTargets = ["Tptp"]
+
+[[lean_lib]]
+name = "Tptp"

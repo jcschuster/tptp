@@ -8,6 +8,43 @@ Note that the package version and `Tptp.bnf_version/0` are two different numbers
 latter is the TPTP release whose BNF the shipped parser was generated from, and it
 moves when TPTP moves, not when this library does.
 
+## [Unreleased]
+
+Three lexer findings, one of them a missing diagnostic the BNF oracle could not
+see, and a Lean project under `verify/` that proves the lexer's departures from
+the BNF are exactly the ones it reports.
+
+### Added
+
+- `TPTP0112`, a quoted atom or distinct object whose body holds a byte that
+  `<sq_char>` or `<do_char>` does not admit: a tab, a control character, a lone
+  backslash, or a byte outside ASCII. The token is emitted as before and the
+  statement parses; the departure is now said rather than silent. The oracle
+  property test's generator produces raw bytes, which is what had kept it from
+  finding this.
+- `verify/`, a Lean 4 project modelling `Tptp.Lexer.quoted_body`,
+  `Tptp.Lexer.number` with its diagnostics, and `Tptp.Span`'s line index and
+  lookups, with kernel-checked proofs of the properties the tests sample.
+- `test/tptp/spacing_test.exs`, which tries every pair of fixed spellings
+  through `Tptp.Printer.Spacing` and the lexer.
+
+### Fixed
+
+- A `.` at bracket depth zero followed by a digit was reported as an illegal
+  character and did not end the statement, so `fof(a, axiom, p).1` absorbed
+  what followed. The lookahead was unnecessary: a number is scanned from its
+  own leading digit, so a `.` the scan loop reaches is never part of one.
+- `TPTP0110` was raised on `007e1` and `-00E+1`, which are `<real>`s:
+  `<decimal_exponent>` begins with `<integer_digits>`, which admits a leading
+  zero. The exponent-only form is now exempt; `007.5e1`, `007` and `00/3` are
+  still reported.
+- `:max_statements` reported `TPTP0002` on a file holding exactly that many
+  statements, with a hint to raise the limit to read a rest that did not exist.
+  It is now raised only when a statement is left unread.
+- `Tptp.Printer.Spacing.space?/2` put no space between `@` and a bare `-`,
+  which re-lexes as `@-`. No tree produces that pair, but the rule's contract
+  says it never merges two tokens, and now it does not.
+
 ## [0.2.0] - 2026-10-13
 
 Derivations and TSTP solution files are read as structure, and the SZS reader

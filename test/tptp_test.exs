@@ -88,6 +88,19 @@ defmodule TptpTest do
 
       assert length(file.statements) == 1
     end
+
+    test "max_statements is not reached when the file holds exactly that many" do
+      source = "fof(a, axiom, p). fof(b, axiom, q)."
+      {:ok, file, []} = Tptp.from_string(source, max_statements: 2)
+
+      assert length(file.statements) == 2
+
+      {:ok, file, [diagnostic]} =
+        Tptp.from_string(source <> " fof(c, axiom, r).", max_statements: 2)
+
+      assert length(file.statements) == 2
+      assert diagnostic.code == "TPTP0002"
+    end
   end
 
   describe "from_string!/2" do

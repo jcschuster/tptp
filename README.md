@@ -296,9 +296,21 @@ The lexer is the only stage not derived from the BNF, so `mix tptp.gen` also wri
 anchored regular expressions. The property asserted is not that the lexer matches
 the BNF but that every token the lexer emits without a diagnostic satisfies its BNF
 pattern, so a departure is admissible only where the lexer reports it. There are
-two, both warnings: an empty quoted token, which `<single_quoted>` and — since
-v9.3.1.3 — `<distinct_object>` both forbid, and a redundant leading zero, as in
-`00`, `-007` and `1/02`.
+three, all warnings: an empty quoted token, which `<single_quoted>` and — since
+v9.3.1.3 — `<distinct_object>` both forbid; a redundant leading zero, as in
+`00`, `-007` and `1/02`; and a byte between quotes outside `<sq_char>` or
+`<do_char>`, such as a tab, a lone backslash or anything beyond ASCII.
+
+### Proofs
+
+`verify/` is a Lean 4 project that models the hand-written parts byte for byte
+and proves what the tests above can only sample: that a quoted token is reported
+exactly when its body leaves the BNF's character class, that a number's two
+diagnostics are raised exactly when the token is outside `<integer>`,
+`<rational>` or `<real>`, and that `Tptp.Span.line_column/2` and `offset/3` are
+inverse. Each file carries the Elixir it models and says what the proof found;
+two of the three found something. `cd verify && lake build` checks them, with
+the Lean the `lean-toolchain` file names.
 
 ### Documentation and static analysis
 
