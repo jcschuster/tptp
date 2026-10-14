@@ -241,6 +241,7 @@ mix test               # unit and property tests
 mix test --include corpus
 mix test --include network   # re-checks the vendored files against their pages
 mix check              # format, compile --warnings-as-errors, credo, test, dialyzer
+(cd verify && lake build)    # the Lean proofs, with the toolchain lean-toolchain names
 mix run bench/parse.exs
 mix tptp.corpus        # sweep a local TPTP library, rewrite reports/CORPUS.md
 mix tptp.census        # the same library's type applications, rewrite reports/CENSUS.md
@@ -307,10 +308,12 @@ v9.3.1.3 — `<distinct_object>` both forbid; a redundant leading zero, as in
 and proves what the tests above can only sample: that a quoted token is reported
 exactly when its body leaves the BNF's character class, that a number's two
 diagnostics are raised exactly when the token is outside `<integer>`,
-`<rational>` or `<real>`, and that `Tptp.Span.line_column/2` and `offset/3` are
-inverse. Each file carries the Elixir it models and says what the proof found;
-two of the three found something. `cd verify && lake build` checks them, with
-the Lean the `lean-toolchain` file names.
+`<rational>` or `<real>`, that `Tptp.Span.line_column/2` and `offset/3` are
+inverse, and that the set `Tptp.Derivation.cone/2` retains is closed under the
+edges into it. Each file carries the Elixir it models and says what the proof
+found; three of the four found something. `cd verify && lake build` checks
+them, with the Lean the `lean-toolchain` file names, and the `proofs` workflow
+does so on every push.
 
 ### Documentation and static analysis
 

@@ -8,11 +8,12 @@ Note that the package version and `Tptp.bnf_version/0` are two different numbers
 latter is the TPTP release whose BNF the shipped parser was generated from, and it
 moves when TPTP moves, not when this library does.
 
-## [Unreleased]
+## [0.2.1] - 2026-10-14
 
 Three lexer findings, one of them a missing diagnostic the BNF oracle could not
-see, and a Lean project under `verify/` that proves the lexer's departures from
-the BNF are exactly the ones it reports.
+see; a cone whose leaves are the derivation's; and a Lean project under
+`verify/` that proves the lexer's departures from the BNF are exactly the ones
+it reports. `Tptp.bnf_version/0` does not move: the grammar was not regenerated.
 
 ### Added
 
