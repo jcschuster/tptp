@@ -28,6 +28,16 @@ the BNF are exactly the ones it reports.
 - `test/tptp/spacing_test.exs`, which tries every pair of fixed spellings
   through `Tptp.Printer.Spacing` and the lexer.
 
+### Changed
+
+- `Tptp.Derivation.cone/2` keeps each node's `parents` as written rather than
+  filtering them to the retained names. Every parent that resolves is an
+  ancestor and was retained anyway, so the filter only ever dropped a name that
+  resolved to nothing — and with it, turned a node the derivation did not count
+  as a leaf into a leaf of its cone. A node is now a leaf of its cone exactly
+  when it is a leaf of the derivation. `verify/Tptp/Derivation.lean` proves
+  the closure fact the change rests on.
+
 ### Fixed
 
 - A `.` at bracket depth zero followed by a digit was reported as an illegal

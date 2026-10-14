@@ -33,8 +33,13 @@ defmodule Tptp.Derivation do
   `<name>` has a parent and no inference step, and is not a leaf.
 
   An edge is a name, and a name need not resolve. A parent naming no statement of
-  the file is reported and is then ignored by every query here, because a node it
-  cannot name is a node this graph does not have.
+  the file is reported and is then ignored by every query that walks the graph —
+  `ancestors/2`, `descendants/2`, `cone/2`, `topological/1`, `acyclic?/1` —
+  because a node it cannot name is a node this graph does not have. `leaves`
+  reads `parents` as written instead: a statement whose parent the file lacks was
+  derived from something, and is not an input of the derivation. The literal
+  `unknown`, by which a system declines to record a parent, is the case that shows
+  why; `inference(r, [], [unknown])` is no axiom.
 
   ## Diagnostics
 
@@ -183,9 +188,11 @@ defmodule Tptp.Derivation do
   The `file` of the result is the input's, with the statements of the dropped nodes
   and the comments outside the retained statements removed — so the source is
   intact and the result prints and slices like any other file. A node's `parents`
-  are filtered to the retained names; a name that resolved to nothing is dropped
-  there, the diagnostic having already said so. An unknown name yields an empty
-  derivation.
+  are as written: every parent that resolves is an ancestor of the node, so it is
+  retained, and a name that resolved to nothing stays, as it stays in the
+  derivation. A node is therefore a leaf of its cone exactly when it is a leaf of
+  the derivation (`verify/Tptp/Derivation.lean` proves the first half of that).
+  An unknown name yields an empty derivation.
 
       iex> {:ok, derivation, []} =
       ...>   Tptp.Derivation.from_string("fof(a, axiom, p).\\nfof(b, axiom, q).\\nfof(c, plain, r, inference(x, [], [a])).")
@@ -196,7 +203,7 @@ defmodule Tptp.Derivation do
   @spec cone(t(), binary()) :: t()
   def cone(%__MODULE__{} = derivation, name) when is_binary(name) do
     retained = retained(derivation, name)
-    nodes = Map.new(retained, &{&1, prune(derivation.nodes[&1], retained)})
+    nodes = Map.new(retained, &{&1, derivation.nodes[&1]})
     order = Enum.filter(derivation.order, &MapSet.member?(retained, &1))
 
     %__MODULE__{
@@ -489,11 +496,6 @@ defmodule Tptp.Derivation do
     else
       MapSet.new()
     end
-  end
-
-  @spec prune(Vertex.t(), MapSet.t(binary())) :: Vertex.t()
-  defp prune(node, retained) do
-    %{node | parents: Enum.filter(node.parents, &MapSet.member?(retained, &1))}
   end
 
   @spec sub_file(t(), %{binary() => Vertex.t()}, [binary()]) :: Tptp.File.t()
