@@ -67,8 +67,11 @@ defmodule Tptp.Printer.Spacing do
   # `-` is the one token of `<formula_role> ::= <lower_word>-<general_term>`, the
   # only production using it, and `interpretation-domains` is how the TPTP writes
   # one. A digit after it would lex as a signed number and the role would not parse
-  # again, so there the space stays.
+  # again, so there the space stays; and `@` before it would lex as `@-`, which no
+  # tree produces but which the rule below must not produce either.
+  # `test/tptp/spacing_test.exs` checks every pair of fixed spellings for this.
   def space?("-", next), do: number_like?(next)
+  def space?("@", "-"), do: true
   def space?(_previous, "-"), do: false
 
   def space?(previous, next) when next in @openers do

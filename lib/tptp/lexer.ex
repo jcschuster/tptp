@@ -18,9 +18,10 @@ defmodule Tptp.Lexer do
   unnecessary and slower. This module uses byte patterns and `:binary` throughout.
 
   Non-ASCII bytes can occur only inside a quoted atom or a comment in
-  non-conforming input. They are carried through without validation, since
-  validating them would introduce a branch per byte of every string for a condition
-  a lint rule can evaluate from the token text.
+  non-conforming input. Inside a comment they are carried through unexamined.
+  Inside a quoted token they are consumed, so the token and its statement
+  survive, and reported with `TPTP0112`, since `<sq_char>` and `<do_char>` do not
+  admit them; see "Accepted departures from the BNF" below.
 
   ## Token representation
 
@@ -36,9 +37,12 @@ defmodule Tptp.Lexer do
   Three cases are not resolved by the table alone:
 
     * **Statement terminator against decimal point.** Numbers are scanned from
-      their leading digit and consume their own `.`; the terminator clause applies
-      only to a `.` not followed by a digit. `p(3).` is therefore terminated
-      correctly, since `<decimal_fraction>` requires digits after the point.
+      their leading digit and consume their own `.`, so a `.` reached by the scan
+      loop is never part of a number and is always a terminator or a `dot` token.
+      `p(3).` is terminated correctly because `3` was read first, and `p(3).1`
+      is terminated too: `.1` is not a `<real>`, since `<decimal_fraction>`
+      requires an `<unsigned_integer>` before the point, and the `1` begins the
+      next statement.
     * **Words are scanned to their end** rather than truncated at a prefix that
       forms a keyword. `$letter` is a single `dollar_word` and `filename` a single
       `lower_word`. `Tptp.Splitter` relies on this when resolving keywords by
@@ -58,13 +62,22 @@ defmodule Tptp.Lexer do
       beginning `1`–`9`, so `00`, `-007` and `01.5` are not admitted
       (`TPTP0110`). A rational's denominator is a `<positive_integer>`, which may
       not begin with `0`, so neither `1/02` nor `1/0` is a `<rational>`
-      (`TPTP0111`).
+      (`TPTP0111`). The one place the BNF does admit a leading zero is the
+      exponent form of a `<real>`: `<decimal_exponent>` begins with
+      `<integer_digits>`, so `007e1` is well formed and is not reported.
+    * **Inadmissible byte in a quoted token.** `<sq_char>` and `<do_char>` admit
+      printable ASCII other than the quote and the backslash, and `\\'` (or
+      `\\"`) and `\\\\` as the only escapes. A tab, a control character, a lone
+      backslash or a byte outside ASCII between the quotes is consumed and the
+      token emitted, with `TPTP0112` on it.
 
   Emitting the token allows the statement to parse, which is why these are
-  warnings. That the list is exactly these two is checked rather than asserted:
+  warnings. That the list is exactly these three is checked rather than asserted:
   `Tptp.Bnf.OracleTable` transcribes the `::-` and `:::` rules mechanically, and
   `Tptp.LexerOracleTest` verifies that every token emitted without a diagnostic
-  satisfies its BNF pattern.
+  satisfies its BNF pattern. For the quoted tokens the check is a proof rather
+  than a sample: `verify/Tptp/Lexer/Quoted.lean` models `quoted_body/4` byte for
+  byte and shows the token is reported exactly when its body leaves the class.
 
   ## Deferred decisions
 
@@ -114,6 +127,7 @@ defmodule Tptp.Lexer do
   @incomplete_back_quote "TPTP0109"
   @leading_zero "TPTP0110"
   @zero_denominator "TPTP0111"
+  @inadmissible_quoted_byte "TPTP0112"
 
   defguardp is_lower(c) when c >= ?a and c <= ?z
   defguardp is_upper(c) when c >= ?A and c <= ?Z
@@ -122,6 +136,7 @@ defmodule Tptp.Lexer do
   defguardp is_space(c) when c == ?\s or c == ?\t or c == ?\n or c == ?\r or c == ?\f or c == ?\v
   defguardp is_sign(c) when c == ?- or c == ?+
   defguardp is_exponent(c) when c == ?e or c == ?E
+  defguardp is_printable(c) when c >= ?\s and c <= ?~
 
   @doc """
   Scan the next statement starting at `offset`.
@@ -239,30 +254,12 @@ defmodule Tptp.Lexer do
     line_comment(rest, offset, file, depth, tokens, comments, diagnostics)
   end
 
-  defp scan(<<?., c, _::binary>> = all, offset, _file, 0, tokens, comments, diagnostics)
-       when not is_digit(c) do
-    finish([{:dot, offset, 1} | tokens], drop(all, 1), offset + 1, comments, diagnostics)
+  defp scan(<<?., rest::binary>>, offset, _file, 0, tokens, comments, diagnostics) do
+    finish([{:dot, offset, 1} | tokens], rest, offset + 1, comments, diagnostics)
   end
 
-  defp scan(<<?.>>, offset, _file, 0, tokens, comments, diagnostics) do
-    finish([{:dot, offset, 1} | tokens], "", offset + 1, comments, diagnostics)
-  end
-
-  defp scan(<<?., c, _::binary>> = all, offset, file, depth, tokens, comments, diagnostics)
-       when not is_digit(c) do
-    scan(
-      drop(all, 1),
-      offset + 1,
-      file,
-      depth,
-      [{:dot, offset, 1} | tokens],
-      comments,
-      diagnostics
-    )
-  end
-
-  defp scan(<<?.>>, offset, file, depth, tokens, comments, diagnostics) do
-    scan("", offset + 1, file, depth, [{:dot, offset, 1} | tokens], comments, diagnostics)
+  defp scan(<<?., rest::binary>>, offset, file, depth, tokens, comments, diagnostics) do
+    scan(rest, offset + 1, file, depth, [{:dot, offset, 1} | tokens], comments, diagnostics)
   end
 
   defp scan(<<s, c, _::binary>> = all, offset, file, depth, tokens, comments, diagnostics)
@@ -455,11 +452,24 @@ defmodule Tptp.Lexer do
   end
 
   defp malformed(digits, category, offset, file) do
-    List.wrap(padded(digits, offset, file)) ++
+    List.wrap(padded(digits, category, offset, file)) ++
       List.wrap(denominator(digits, category, offset, file))
   end
 
-  defp padded(<<?0, c, _::binary>>, offset, file) when is_digit(c) do
+  # `<decimal_exponent> ::: (<integer_digits>|<decimal_fraction>)<exponent><exp_integer>`
+  # admits any digit string before the exponent, so `007e1` is a `<real>`; every
+  # other form begins with an `<unsigned_integer>`, which `00` is not.
+  defp padded(<<?0, c, _::binary>> = digits, category, offset, file) when is_digit(c) do
+    if category == :real and not String.contains?(digits, ".") do
+      nil
+    else
+      leading_zero(offset, file)
+    end
+  end
+
+  defp padded(_digits, _category, _offset, _file), do: nil
+
+  defp leading_zero(offset, file) do
     Diagnostic.new(
       @leading_zero,
       :warning,
@@ -468,8 +478,6 @@ defmodule Tptp.Lexer do
       hint: "`<unsigned_integer>` is `0` or a digit sequence starting `1`-`9`"
     )
   end
-
-  defp padded(_digits, _offset, _file), do: nil
 
   defp denominator(digits, :rational, offset, file) do
     case :binary.split(digits, "/") do
@@ -538,15 +546,15 @@ defmodule Tptp.Lexer do
   defp digits(rest, taken), do: {taken, rest}
 
   defp quoted(rest, quote_byte, category, offset, file, depth, tokens, comments, diagnostics) do
-    case quoted_body(rest, quote_byte, 0) do
-      {:ok, body, tail} ->
+    case quoted_body(rest, quote_byte, 0, true) do
+      {:ok, body, tail, clean} ->
         length = body + 2
 
         diagnostics =
-          if body == 0 do
-            [empty_quote(category, file, offset) | diagnostics]
-          else
-            diagnostics
+          cond do
+            body == 0 -> [empty_quote(category, file, offset) | diagnostics]
+            not clean -> [inadmissible_byte(category, file, offset, length) | diagnostics]
+            true -> diagnostics
           end
 
         emit(category, length, tail, offset, file, depth, tokens, comments, diagnostics)
@@ -566,24 +574,53 @@ defmodule Tptp.Lexer do
     end
   end
 
-  defp quoted_body(<<?\\, c, rest::binary>>, quote_byte, taken)
+  # `clean` records whether every byte so far was one the BNF admits: a printable
+  # ASCII byte other than the quote and the backslash, or a backslash escaping
+  # either. A byte outside the class is consumed all the same, so the token and
+  # the statement survive it, and `quoted/9` reports it. `verify/Tptp/Lexer/Quoted.lean`
+  # proves that `clean` is true exactly when the body is in the class.
+  defp quoted_body(<<?\\, c, rest::binary>>, quote_byte, taken, clean)
        when c == ?\\ or c == quote_byte do
-    quoted_body(rest, quote_byte, taken + 2)
+    quoted_body(rest, quote_byte, taken + 2, clean)
   end
 
-  defp quoted_body(<<c, rest::binary>>, c, taken), do: {:ok, taken, rest}
+  defp quoted_body(<<c, rest::binary>>, c, taken, clean), do: {:ok, taken, rest, clean}
 
-  defp quoted_body(<<?\n, _::binary>> = tail, _quote_byte, taken),
+  defp quoted_body(<<?\n, _::binary>> = tail, _quote_byte, taken, _clean),
     do: {:unterminated, taken, tail}
 
-  defp quoted_body(<<>>, _quote_byte, taken), do: {:unterminated, taken, ""}
+  defp quoted_body(<<>>, _quote_byte, taken, _clean), do: {:unterminated, taken, ""}
 
-  defp quoted_body(<<_c, rest::binary>>, quote_byte, taken) do
-    quoted_body(rest, quote_byte, taken + 1)
+  defp quoted_body(<<c, rest::binary>>, quote_byte, taken, clean)
+       when is_printable(c) and c != ?\\ do
+    quoted_body(rest, quote_byte, taken + 1, clean)
+  end
+
+  defp quoted_body(<<_c, rest::binary>>, quote_byte, taken, _clean) do
+    quoted_body(rest, quote_byte, taken + 1, false)
   end
 
   defp describe(:single_quoted), do: "quoted atom"
   defp describe(:distinct_object), do: "distinct object"
+
+  defp inadmissible_byte(category, file, offset, length) do
+    Diagnostic.new(
+      @inadmissible_quoted_byte,
+      :warning,
+      Span.new(file, offset, length),
+      "#{describe(category)} contains a character TPTP does not admit",
+      hint:
+        "between the quotes TPTP allows printable ASCII, with `\\#{quote_mark(category)}` and " <>
+          "`\\\\` as the only escapes; a control character, a lone `\\` or a byte " <>
+          "outside ASCII is not a `<#{char_class(category)}>`"
+    )
+  end
+
+  defp quote_mark(:single_quoted), do: "'"
+  defp quote_mark(:distinct_object), do: "\""
+
+  defp char_class(:single_quoted), do: "sq_char"
+  defp char_class(:distinct_object), do: "do_char"
 
   defp empty_quote(category, file, offset) do
     Diagnostic.new(

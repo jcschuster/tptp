@@ -438,15 +438,38 @@ defmodule Tptp.DerivationTest do
       assert Tptp.Statement.text(first, cone.file.source) == "fof(a, axiom, p, file('p.p', ax))."
     end
 
-    test "drops a parent that named no statement" do
+    test "keeps a parent that named no statement, as the derivation does" do
       {derivation, [_missing]} =
         read("fof(c_0, axiom, p).\nfof(c, plain, r, inference(x, [], [a, c_0])).")
 
       cone = Derivation.cone(derivation, "c")
 
       assert cone.order == ["c_0", "c"]
-      assert cone.nodes["c"].parents == ["c_0"]
-      assert cone.nodes["c"].steps == derivation.nodes["c"].steps
+      assert cone.nodes["c"] == derivation.nodes["c"]
+      assert cone.leaves == ["c_0"]
+    end
+
+    test "a node is a leaf of its cone exactly when it is a leaf of the derivation" do
+      {derivation, [_missing]} = read("fof(c, plain, r, inference(x, [], [zzz])).")
+      cone = Derivation.cone(derivation, "c")
+
+      assert derivation.leaves == []
+      assert cone.leaves == []
+      assert cone.roots == ["c"]
+
+      {derivation, []} = read("fof(c, plain, r, inference(x, [], [unknown])).")
+
+      assert Derivation.cone(derivation, "c").leaves == []
+
+      {:ok, solution, []} = Tptp.Tstp.from_file("test/fixtures/tstp/E---3.5.1.THM-CRf.s")
+      {:ok, derivation, []} = Derivation.from_file(solution.solution)
+
+      for name <- derivation.order do
+        cone = Derivation.cone(derivation, name)
+
+        assert cone.leaves == Enum.filter(derivation.leaves, &(&1 in cone.order))
+        assert Enum.all?(cone.order, &(cone.nodes[&1] == derivation.nodes[&1]))
+      end
     end
 
     test "an unknown name is an empty derivation" do

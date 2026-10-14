@@ -14,8 +14,8 @@ authors:
     given-names: Johannes
     orcid: "https://orcid.org/0009-0003-5339-7216"
     affiliation: "Otto-Friedrich-Universität Bamberg, Germany"
-version: "0.2.0"
-date-released: "2026-10-13"
+version: "0.2.1"
+date-released: "2026-10-14"
 license: MIT
 repository-code: "https://github.com/jcschuster/tptp"
 url: "https://hexdocs.pm/tptp"

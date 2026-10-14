@@ -195,11 +195,16 @@ defmodule Tptp.LexerOracleTest do
     end
   end
 
+  # The raw bytes are what reach the quoted tokens: a backslash escaping nothing, a
+  # tab, a control character or a byte outside ASCII between quotes lexed as a clean
+  # token until the generator produced one.
   defp fragment do
     one_of([
       string(Enum.concat([?a..?z, ?A..?Z, ?0..?9, [?_, ?$, ?', ?", ?., ?/, ?+, ?-]]),
         max_length: 8
       ),
+      binary(max_length: 4),
+      member_of(["'a\\b'", "'a\tb'", "\"\\x\"", "007e1", "00e1", "01.5"]),
       member_of([
         "p",
         "X",

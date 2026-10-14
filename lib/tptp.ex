@@ -87,7 +87,8 @@ defmodule Tptp do
     * `:path` — recorded on the result and used when rendering diagnostics.
       `from_file/2` sets it.
     * `:max_statements` — an upper bound on the number of statements read, reported
-      as a diagnostic when reached. Defaults to no limit.
+      as a diagnostic when a statement beyond it is left unread. A file holding
+      exactly that many is read whole and reports nothing. Defaults to no limit.
   """
   @type option :: {:file, Span.file_id()} | {:path, Path.t()} | {:max_statements, pos_integer()}
 
@@ -292,28 +293,30 @@ defmodule Tptp do
           [[Tptp.Lexer.comment()]],
           [[Diagnostic.t()]]
         ) :: {[Tptp.Statement.t()], [Tptp.Lexer.comment()], [Diagnostic.t()]}
+  # The limit is a bound on what is read, and is reported only when it leaves
+  # something unread: a file holding exactly `limit` statements is read whole and
+  # says nothing, so the warning's hint to raise the limit is never wrong.
   defp gather(source, offset, id, limit, count, statements, comments, diagnostics) do
-    if reached?(count, limit) do
-      finish(statements, comments, [[too_many(source, offset, id, limit)] | diagnostics])
-    else
-      case Splitter.next_input(source, offset, id) do
-        {:input, input, next, new_comments} ->
-          {statements, diagnostics} = add(input, source, id, statements, diagnostics)
+    case Splitter.next_input(source, offset, id) do
+      {:input, _input, _next, _comments} when is_integer(limit) and count >= limit ->
+        finish(statements, comments, [[too_many(source, offset, id, limit)] | diagnostics])
 
-          gather(
-            source,
-            next,
-            id,
-            limit,
-            count + 1,
-            statements,
-            [new_comments | comments],
-            diagnostics
-          )
+      {:input, input, next, new_comments} ->
+        {statements, diagnostics} = add(input, source, id, statements, diagnostics)
 
-        {:eof, _next, new_comments, new_diagnostics} ->
-          finish(statements, [new_comments | comments], [new_diagnostics | diagnostics])
-      end
+        gather(
+          source,
+          next,
+          id,
+          limit,
+          count + 1,
+          statements,
+          [new_comments | comments],
+          diagnostics
+        )
+
+      {:eof, _next, new_comments, new_diagnostics} ->
+        finish(statements, [new_comments | comments], [new_diagnostics | diagnostics])
     end
   end
 
@@ -329,9 +332,6 @@ defmodule Tptp do
   end
 
   defp flatten(chunks), do: chunks |> Enum.reverse() |> Enum.concat()
-
-  defp reached?(_count, :infinity), do: false
-  defp reached?(count, limit), do: count >= limit
 
   defp too_many(source, offset, id, limit) do
     Diagnostic.new(
