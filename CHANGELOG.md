@@ -106,15 +106,6 @@ accepts two more shapes systems print in practice.
 - `inspect/1` of an annotated statement with a sub-role raised
   `FunctionClauseError`, and `Tptp.Lint` reported such a statement's typing as
   having no `type` role (a false `TPTP0405`).
-- `Tptp.Lint.Rules.Parent` reported the formula name of a `<file_source>` as a
-  missing parent: in `file('x.p', ax1)` the name `ax1` is the formula's name in
-  `x.p`, not a parent in this file, and `Tptp.Lint.Collect` collected every
-  `<name>` under the `<source>` slot. A captured Vampire proof of `PUZ001+1`
-  drew eleven false `TPTP0504`s, one per axiom; it now draws the three that are
-  real. A `<refutation>` in an inference record's `<useful_info>` was read the
-  same way and no longer is. No file of TPTP v9.3.1 changes verdict — the four
-  that write `file('SYN000-1.p', source_unknown)` also contain a statement of
-  that name — so only the symbol table's parent list differs there.
 
 ## [0.1.3] - 2026-10-11
 
@@ -323,7 +314,8 @@ files, and are recorded under Notes below.
   treated as different symbols" — so this compares two declarations at the same
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
-[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.1.3...HEAD
+[0.2.1]: https://github.com/jcschuster/tptp/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/jcschuster/tptp/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/jcschuster/tptp/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/jcschuster/tptp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/jcschuster/tptp/compare/v0.1.0...v0.1.1
