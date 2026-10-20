@@ -20,9 +20,9 @@ Two files are redistributed, each carried unmodified:
         The BNF of the three SZS ontologies, licensed CC BY 4.0 by its repository
         (https://creativecommons.org/licenses/by/4.0/; see the repository's LICENSE)
         and taken from https://github.com/TPTPWorld/SZSOntologies at commit
-        934403fd of 2026-09-29:
-        https://raw.githubusercontent.com/TPTPWorld/SZSOntologies/934403fde10748dfa02a5fb404b5619d0ca84068/BNF/SZSOntology.bnf
-        sha256 640cd71710935d41e16914e7d577adf7a4f6c647f4aaa6a1e353b02b0b338c5f
+        df81444d of 2026-10-12:
+        https://raw.githubusercontent.com/TPTPWorld/SZSOntologies/df81444d3dfe8a3bd553a0c331865c6cef3e11a9/BNF/SZSOntology.bnf
+        sha256 8d7c0174f3f3ab7972db7334fa01e80198fa81fe121a8dc3281e3c9a6da55e14
 
 They are vendored so that installing this package needs no network access. Nothing
 in this repository edits them. The files under lib/, src/ and test/support/ that are
