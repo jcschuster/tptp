@@ -170,7 +170,7 @@ defmodule Tptp.Lint.Collect do
   # is TXF's as well — "$distinct is part of the TXF and THF languages", where the
   # BNF gives `<defined_predicate>` — and is likewise a defined functor here.
   @formula_kinds ~w(
-    tff_and_formula tff_or_formula tff_binary_nonassoc tff_prefix_unary tff_infix_unary
+    tff_and_formula tff_or_formula tff_binary_pair tff_prefix_unary tff_infix_unary
     tff_quantified_formula tff_unitary_formula tff_unitary_term tff_defined_infix
   )a
 

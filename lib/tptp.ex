@@ -278,7 +278,7 @@ defmodule Tptp do
   code cannot interpret.
 
       iex> Tptp.bnf_version()
-      "9.3.1.3"
+      "9.3.1.6"
   """
   @spec bnf_version() :: binary()
   def bnf_version, do: @bnf_version

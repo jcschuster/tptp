@@ -114,16 +114,31 @@ Tptp.Szs.status(solution.original)    # {:ok, :theorem, nil, nil}
 Writing these files is not in scope: a solution file archives what a system
 printed, and this library has nothing of its own to put in one.
 
+The header is the same in a problem, an axiom set and a solution, and
+`Tptp.Header` reads it from any of them, resolving the `Status` (or a solution's
+`Result`) and the `SPC` through the SZS ontology:
+
+```elixir
+{:ok, header, []} = Tptp.Header.from_file("PUZ001+1.p")
+
+Tptp.Header.status(header)           # :theorem
+Tptp.Header.spc(header)              # %{form: "FOF", status: :theorem, features: ["RFO", "SEQ"]}
+Tptp.Header.entries(header, "Refs")  # ["[Pel86] Pelletier (1986), ...", "[Hah94] Haehnle (1994), ..."]
+```
+
+A line that is neither a key nor a continuation is reported as `TPTP0901`; four
+files of TPTP v9.3.1 have three each.
+
 ## Coverage
 
 Every problem and axiom file of a complete TPTP v9.3.1, across all dialects,
 through the parser alone: no `include` resolved and no lint rule applied.
 
-| Set | Files | Parsed | Failed | Timed out |
-|---|---:|---:|---:|---:|
-| Problems | 26925 | 26921 | 4 | 0 |
-| Axioms | 2433 | 2433 | 0 | 0 |
-| Total | 29358 | 29354 | 4 | 0 |
+| Set      | Files | Parsed | Failed | Timed out |
+| -------- | ----: | -----: | -----: | --------: |
+| Problems | 26925 |  26921 |      4 |         0 |
+| Axioms   |  2433 |   2433 |      0 |         0 |
+| Total    | 29358 |  29354 |      4 |         0 |
 
 5.4 GB in 887 seconds on eight workers, under a 60-second per-file budget that
 no file reached. The preceding toolchain recorded 628 timeouts and 221 parse
@@ -154,11 +169,6 @@ The 65 problems above 20 MB — 64 `HWV` and `LCL680+1.020.p`, 3.7 GB between th
 are read by `stream_file!/2` rather than by this sweep. The size limit is a property
 of the report rather than of the parser.
 
-[FINDINGS.md](reports/FINDINGS.md) records what the four failures were hiding from
-the stages after the parser, and what a sweep of the library turned up once they
-were patched out of a copy: two further defects in those files, and three rules of
-this library's that were wrong.
-
 `mix tptp.corpus` writes [CORPUS.md](reports/CORPUS.md), from which these figures are taken
 and which the nightly workflow regenerates. `mix tptp.census` writes
 [CENSUS.md](reports/CENSUS.md), recording where the library applies a type constructor and
@@ -170,13 +180,13 @@ elaborator built on this library must answer.
 Five files are generated from the two vendored TPTP World BNFs and committed, so
 installation requires neither Python, nor awk, nor the BNFs, nor network access:
 
-| Generated | From |
-|---|---|
-| `src/tptp_parser.yrl` | `priv/bnf/SyntaxBNF-v9.3.1.3` |
+| Generated                    | From                                                                  |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `src/tptp_parser.yrl`        | `priv/bnf/SyntaxBNF-v9.3.1.6`                                         |
 | `lib/tptp/bnf/vocabulary.ex` | the same, `:==` rules — and `<inference_status_value>` of the SZS BNF |
-| `lib/tptp/printer/shapes.ex` | the same, `::=` rules |
-| `test/support/bnf_oracle.ex` | the same BNF, `::-` and `:::` rules |
-| `lib/tptp/szs/ontology.ex` | `priv/bnf/SZSOntology.bnf` |
+| `lib/tptp/printer/shapes.ex` | the same, `::=` rules                                                 |
+| `test/support/bnf_oracle.ex` | the same BNF, `::-` and `:::` rules                                   |
+| `lib/tptp/szs/ontology.ex`   | `priv/bnf/SZSOntology.bnf`                                            |
 
 Regeneration is a maintainer action performed on a TPTP release, and the resulting
 diff constitutes the review of that release.
@@ -241,7 +251,6 @@ mix test               # unit and property tests
 mix test --include corpus
 mix test --include network   # re-checks the vendored files against their pages
 mix check              # format, compile --warnings-as-errors, credo, test, dialyzer
-(cd verify && lake build)    # the Lean proofs, with the toolchain lean-toolchain names
 mix run bench/parse.exs
 mix tptp.corpus        # sweep a local TPTP library, rewrite reports/CORPUS.md
 mix tptp.census        # the same library's type applications, rewrite reports/CENSUS.md
@@ -302,19 +311,6 @@ v9.3.1.3 — `<distinct_object>` both forbid; a redundant leading zero, as in
 `00`, `-007` and `1/02`; and a byte between quotes outside `<sq_char>` or
 `<do_char>`, such as a tab, a lone backslash or anything beyond ASCII.
 
-### Proofs
-
-`verify/` is a Lean 4 project that models the hand-written parts byte for byte
-and proves what the tests above can only sample: that a quoted token is reported
-exactly when its body leaves the BNF's character class, that a number's two
-diagnostics are raised exactly when the token is outside `<integer>`,
-`<rational>` or `<real>`, that `Tptp.Span.line_column/2` and `offset/3` are
-inverse, and that the set `Tptp.Derivation.cone/2` retains is closed under the
-edges into it. Each file carries the Elixir it models and says what the proof
-found; three of the four found something. `cd verify && lake build` checks
-them, with the Lean the `lean-toolchain` file names, and the `proofs` workflow
-does so on every push.
-
 ### Documentation and static analysis
 
 Every module carries a `@moduledoc`, every public function a `@doc` and every type
@@ -333,7 +329,7 @@ them from input. This is a security property and is enforced mechanically.
 
 This library is MIT licensed. See [LICENSE](LICENSE).
 
-Redistributed TPTP material is not. `priv/bnf/SyntaxBNF-v9.3.1.3` is the file from
+Redistributed TPTP material is not. `priv/bnf/SyntaxBNF-v9.3.1.6` is the file from
 [github.com/TPTPWorld/SyntaxBNF][bnf], `priv/bnf/SZSOntology.bnf` the file from
 [github.com/TPTPWorld/SZSOntologies][szsbnf] (CC BY 4.0), each carried unmodified
 so that installation requires no network access, and `lib/tptp/szs/page.ex` quotes
@@ -352,5 +348,4 @@ was taken at and its digest, and [tptp.org][tptp] for the TPTP itself.
 [szsbnf]: https://github.com/TPTPWorld/SZSOntologies
 [szs]: https://szs.tptp.org
 [bugged]: https://tptp.org/TPTP/Distribution/BuggedProblems-v9.3.1.txt
-
 [tptp]: https://www.tptp.org

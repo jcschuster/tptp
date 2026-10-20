@@ -22,6 +22,7 @@ defmodule Tptp.Diagnostic do
   | `TPTP05xx` | cross-statement — `Tptp.Lint`, `Tptp.Derivation` |
   | `TPTP06xx` | include — `Tptp.Include` |
   | `TPTP08xx` | analyzer infrastructure — `Tptp.Analyzer` |
+  | `TPTP09xx` | the `% Key : value` header — `Tptp.Header` |
 
   A code is never reassigned, so the numbering contains gaps: `TPTP0103`,
   `TPTP0108`, `TPTP0403`, `TPTP0502`, `TPTP0505` and `TPTP0604` are unassigned.

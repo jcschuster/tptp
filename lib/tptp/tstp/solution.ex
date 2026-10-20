@@ -20,7 +20,7 @@ defmodule Tptp.Tstp.Solution do
 
   ## Header
 
-  `header` maps a key to its value with continuation lines joined by `"\\n"`, and
+  `header` maps a key to its value as `Tptp.Header.get/2` gives it, and
   `keys` lists the keys in the order the file writes them, which a map does not
   keep. A key written twice keeps its first position in `keys` and its last value
   in `header`.

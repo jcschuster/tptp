@@ -11,7 +11,7 @@ defmodule Tptp.BnfTest do
 
   describe "version!/1" do
     test "reads the version out of the filename" do
-      assert Bnf.version!("priv/bnf/SyntaxBNF-v9.3.1.3") == "9.3.1.3"
+      assert Bnf.version!("priv/bnf/SyntaxBNF-v9.3.1.6") == "9.3.1.6"
     end
 
     test "refuses a filename it cannot read a version from" do
@@ -27,7 +27,7 @@ defmodule Tptp.BnfTest do
                "::=" => 229,
                ":==" => 66,
                "::-" => 18,
-               ":::" => 38
+               ":::" => 37
              }
     end
 
@@ -49,7 +49,7 @@ defmodule Tptp.BnfTest do
 
     test "records the source line of every rule", %{rules: rules} do
       assert Enum.all?(rules, &(&1.line > 0))
-      assert %Rule{line: 54} = Enum.find(rules, &(&1.lhs == "TPTP_file"))
+      assert %Rule{line: 60} = Enum.find(rules, &(&1.lhs == "TPTP_file"))
     end
   end
 

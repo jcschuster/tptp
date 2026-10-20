@@ -191,7 +191,7 @@ defmodule Tptp.Derivation do
   are as written: every parent that resolves is an ancestor of the node, so it is
   retained, and a name that resolved to nothing stays, as it stays in the
   derivation. A node is therefore a leaf of its cone exactly when it is a leaf of
-  the derivation (`verify/Tptp/Derivation.lean` proves the first half of that).
+  the derivation.
   An unknown name yields an empty derivation.
 
       iex> {:ok, derivation, []} =

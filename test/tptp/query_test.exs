@@ -48,6 +48,7 @@ defmodule Tptp.QueryTest do
       assert dialect("tff(a, axiom, ! [X: $o] : (X | ~ X)).") == :tx0
       assert dialect("tff(a, axiom, p((q))).") == :tx0
       assert dialect("tff(a, axiom, p(q & r)).") == :tx0
+      assert dialect("tff(a, axiom, p(q => r)).") == :tx0
       assert dialect("tff(a, axiom, f(a) = (p | q)).") == :tx0
       assert dialect("tff(a, axiom, p($ite(q, a, b))).") == :tx0
       assert dialect("tff(a, axiom, p($true)).") == :tx0

@@ -8,9 +8,9 @@ defmodule Tptp.Lint.Rules.Parent do
 
   A warning, reported only for a name in parent position: the `<parents>` of an
   `<inference_record>` or an `<internal_source>`, however deeply those nest
-  (`SyntaxBNF-v9.3.1.3` lines 536, 540 and 550). A `<name>` is reachable through a
+  (`SyntaxBNF-v9.3.1.6` lines 541, 545 and 555). A `<name>` is reachable through a
   `<source>` in other positions, and none of those is a parent. The `<file_info>`
-  of a `<file_source>` (line 545) is the formula's name *in the file named*, which
+  of a `<file_source>` (line 550) is the formula's name *in the file named*, which
   the language page says may differ from the name the formula now carries, and a
   `<refutation>` under a record's `<useful_info>` names a file as well. The
   `<inference_rule>` and the `<file_name>` are not `<name>`s to the grammar and so

@@ -75,9 +75,7 @@ defmodule Tptp.Lexer do
   warnings. That the list is exactly these three is checked rather than asserted:
   `Tptp.Bnf.OracleTable` transcribes the `::-` and `:::` rules mechanically, and
   `Tptp.LexerOracleTest` verifies that every token emitted without a diagnostic
-  satisfies its BNF pattern. For the quoted tokens the check is a proof rather
-  than a sample: `verify/Tptp/Lexer/Quoted.lean` models `quoted_body/4` byte for
-  byte and shows the token is reported exactly when its body leaves the class.
+  satisfies its BNF pattern.
 
   ## Deferred decisions
 
@@ -577,8 +575,7 @@ defmodule Tptp.Lexer do
   # `clean` records whether every byte so far was one the BNF admits: a printable
   # ASCII byte other than the quote and the backslash, or a backslash escaping
   # either. A byte outside the class is consumed all the same, so the token and
-  # the statement survive it, and `quoted/9` reports it. `verify/Tptp/Lexer/Quoted.lean`
-  # proves that `clean` is true exactly when the body is in the class.
+  # the statement survive it, and `quoted/9` reports it.
   defp quoted_body(<<?\\, c, rest::binary>>, quote_byte, taken, clean)
        when c == ?\\ or c == quote_byte do
     quoted_body(rest, quote_byte, taken + 2, clean)

@@ -25,9 +25,10 @@ defmodule Tptp.Tstp do
       % 0.12/0.45  % SZS status Theorem                                    original
       %------------------------------------------------------------------   rule
 
-  A header line is `%`, one space, a key, ` : ` and a value; a line whose `%` is
-  followed by two or more spaces continues the previous value. Only the first colon
-  after the key divides the line, so `Problem` keeps `PUZ001+1 : TPTP v9.3.1` whole.
+  The header is a problem's header, and `Tptp.Header` reads both: a key line is `%`,
+  one space, a key, ` : ` and a value, and a line whose `%` is followed by two or
+  more spaces continues it. Only the first colon after the key divides the line, so
+  `Problem` keeps `PUZ001+1 : TPTP v9.3.1` whole.
 
   ## What this does not do
 
@@ -56,6 +57,7 @@ defmodule Tptp.Tstp do
   """
 
   alias Tptp.Diagnostic
+  alias Tptp.Header
   alias Tptp.Span
   alias Tptp.Szs
   alias Tptp.Szs.Ontology
@@ -65,16 +67,15 @@ defmodule Tptp.Tstp do
 
   # Horizontal white space is `[ \t]`, never `\s`, which crosses line ends.
   @rule ~r/^%-{4,}[ \t]*\r?$/m
-  @key ~r/^%[ \t](\S(?:[^:\r\n]*?\S)?)[ \t]*:[ \t]?([^\r\n]*?)[ \t]*\r?$/
-  @continuation ~r/^%[ \t]{2,}([^\r\n]*?)[ \t]*\r?$/
   @marker ~r/^%----ORIGINAL SYSTEM OUTPUT[ \t]*\r?$/
 
   @doc """
   Reads a solution from a binary.
 
   The options are `Tptp.from_string/2`'s and are passed to it for the solution
-  region. The diagnostics returned are that parse's, with their spans shifted so
-  that they index the input rather than the region — the diagnostics on
+  region. The diagnostics returned are `Tptp.Header.from_string/2`'s on the header
+  and that parse's, with the parse's spans shifted so that they index the input
+  rather than the region — the diagnostics on
   `solution.solution` are unshifted, since that file is the region.
 
       iex> source = "%----\\n% File     : Otter\\n% Result   : Unsatisfiable 0.1s\\n%----\\ncnf(c,plain,$false).\\n"
@@ -88,11 +89,10 @@ defmodule Tptp.Tstp do
   @spec from_string(binary(), [Tptp.option()]) ::
           {:ok, Solution.t(), [Diagnostic.t()]} | {:error, :not_tstp}
   def from_string(input, options \\ []) when is_binary(input) and is_list(options) do
-    with [first | rest] <- rules(input),
-         true <- nothing_before?(input, first),
-         {header, keys} = read_header(input, region(input, first, rest)),
-         {:ok, _system} <- Map.fetch(header, "File") do
-      build(input, header, keys, rest, options)
+    with {:ok, header, diagnostics} <- Header.from_string(input, options),
+         {:ok, _system} <- Map.fetch(header.fields, "File"),
+         [_first | rest] <- rules(input) do
+      build(input, header, diagnostics, rest, options)
     else
       _otherwise -> {:error, :not_tstp}
     end
@@ -129,14 +129,6 @@ defmodule Tptp.Tstp do
     @rule |> Regex.scan(input, return: :index) |> Enum.map(&hd/1)
   end
 
-  # The first rule has to be the first thing in the input. A prover log that happens
-  # to print a line of dashes halfway down is not a solution file, and reading one as
-  # if it were would hand back a header made of its banner.
-  @spec nothing_before?(binary(), Solution.region()) :: boolean()
-  defp nothing_before?(input, {offset, _length}) do
-    input |> binary_part(0, offset) |> String.trim() == ""
-  end
-
   # The region between the end of one rule and the start of the next, or the end of
   # the input when that was the last rule.
   @spec region(binary(), Solution.region(), [Solution.region()]) :: Solution.region()
@@ -152,21 +144,21 @@ defmodule Tptp.Tstp do
     {from, max(to - from, 0)}
   end
 
-  @spec build(binary(), %{binary() => binary()}, [binary()], [Solution.region()], keyword()) ::
+  @spec build(binary(), Header.t(), [Diagnostic.t()], [Solution.region()], keyword()) ::
           {:ok, Solution.t(), [Diagnostic.t()]}
-  defp build(input, header, keys, rules, options) do
+  defp build(input, header, header_diagnostics, rules, options) do
     {solution_span, solution, diagnostics} = solution(input, rules, options)
 
     {:ok,
      %Solution{
-       header: header,
-       keys: keys,
-       result: ontology_value(header, "Result"),
-       output: ontology_value(header, "Output"),
+       header: Header.to_map(header),
+       keys: header.keys,
+       result: ontology_value(Header.get(header, "Result")),
+       output: ontology_value(Header.get(header, "Output")),
        solution: solution,
        original: original(input, rules),
        span: %{solution: solution_span, original: original_span(input, rules)}
-     }, diagnostics}
+     }, header_diagnostics ++ diagnostics}
   end
 
   @spec solution(binary(), [Solution.region()], keyword()) ::
@@ -220,52 +212,11 @@ defmodule Tptp.Tstp do
     {offset + leading, byte_size(String.trim(slice))}
   end
 
-  @spec read_header(binary(), Solution.region()) :: {%{binary() => binary()}, [binary()]}
-  defp read_header(input, {offset, length}) do
-    {header, keys} =
-      input
-      |> binary_part(offset, length)
-      |> String.split("\n")
-      |> Enum.reduce({%{}, []}, &header_line/2)
+  @spec ontology_value(binary() | nil) :: Ontology.t() | nil
+  defp ontology_value(nil), do: nil
 
-    {header, Enum.reverse(keys)}
-  end
-
-  @spec header_line(binary(), {%{binary() => binary()}, [binary()]}) ::
-          {%{binary() => binary()}, [binary()]}
-  defp header_line(line, {header, keys} = so_far) do
-    cond do
-      match = Regex.run(@key, line) ->
-        [_whole, key, value] = match
-        {Map.put(header, key, value), if(key in keys, do: keys, else: [key | keys])}
-
-      match = Regex.run(@continuation, line) ->
-        [_whole, text] = match
-        continue(so_far, keys, text)
-
-      true ->
-        so_far
-    end
-  end
-
-  # A continuation before any key has nothing to continue, and a bare `%` line is the
-  # header's own blank line.
-  @spec continue({%{binary() => binary()}, [binary()]}, [binary()], binary()) ::
-          {%{binary() => binary()}, [binary()]}
-  defp continue(so_far, [], _text), do: so_far
-
-  defp continue({header, keys}, [key | _rest], text) do
-    {Map.update!(header, key, &join(&1, text)), keys}
-  end
-
-  @spec join(binary(), binary()) :: binary()
-  defp join("", text), do: text
-  defp join(value, text), do: value <> "\n" <> text
-
-  @spec ontology_value(%{binary() => binary()}, binary()) :: Ontology.t() | nil
-  defp ontology_value(header, key) do
-    with {:ok, value} <- Map.fetch(header, key),
-         [word | _rest] <- String.split(value),
+  defp ontology_value(value) do
+    with [word | _rest] <- String.split(value),
          {:ok, found} <- Ontology.from_string(word) do
       found
     else

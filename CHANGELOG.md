@@ -8,6 +8,69 @@ Note that the package version and `Tptp.bnf_version/0` are two different numbers
 latter is the TPTP release whose BNF the shipped parser was generated from, and it
 moves when TPTP moves, not when this library does.
 
+## [0.3.0] - 2026-10-20
+
+### Added
+
+- `Tptp.Header`, a public reader for the `% Key : value` header of a problem, an
+  axiom set or a TSTP solution: `from_string/2`, `from_file/2`, `get/2`,
+  `entries/2` (a `%          :` line starts a further entry, as in `Refs`),
+  `to_map/1`, `status/1` (`Status`, or a solution's `Result`, through the SZS
+  ontology) and `spc/1` (`FOF_THM_RFO_SEQ` as form, status and features).
+- `TPTP0901`, a header line with no `:` after its key, in a new `TPTP09xx` tier.
+  `MGT087+1.p`, `MGT088+1.p`, `MGT105+1.p` and `MGT108+1.p` of TPTP v9.3.1 write
+  `Refs`, `Source` and `Names` that way; the reader had dropped those lines without
+  a word.
+
+### Changed
+
+- The parser is regenerated from TPTP BNF v9.3.1.6, which `Tptp.bnf_version/0` now
+  reports; it was v9.3.1.3. This breaks callers that name what it removed:
+  - `<comment_line>` (`::-`) changed
+  - `<fof_binary_assoc>` (`::=`) is no longer defined
+  - `<fof_binary_formula>` (`::=`) no longer admits `<fof_binary_assoc>`
+  - `<fof_binary_formula>` (`::=`) no longer admits `<fof_binary_nonassoc>`
+  - `<fof_binary_nonassoc>` (`::=`) is no longer defined
+  - `<ntf_logic_name>` (`:==`) no longer admits `$temporal_instant`
+  - `<printable_char>` (`:::`) is no longer defined
+  - `<tff_binary_assoc>` (`::=`) is no longer defined
+  - `<tff_binary_formula>` (`::=`) no longer admits `<tff_binary_assoc>`
+  - `<tff_binary_formula>` (`::=`) no longer admits `<tff_binary_nonassoc>`
+  - `<tff_binary_nonassoc>` (`::=`) is no longer defined
+  - `<thf_binary_assoc>` (`::=`) is no longer defined
+  - `<thf_binary_formula>` (`::=`) no longer admits `<thf_binary_assoc>`
+  - `<thf_binary_formula>` (`::=`) no longer admits `<thf_binary_nonassoc>`
+  - `<thf_binary_nonassoc>` (`::=`) is no longer defined
+  - `<viewable_char>` (`:::`) is no longer defined
+
+  The BNF records what changed:
+
+  ```text
+  % v9.3.1.4 - Changed <*_binary_assoc> to <*_binary_list> and <*_binary_nonassoc> to
+  %            <*_binary_pair>, to reflect the intended non-associativity.
+  % v9.3.1.5 - Changed <printable_char> ::: . to <comment_char> ::: [^\r\n], and replaced
+  %            <printable_char> with <comment_char> in all uses. Removed unused <viewable_char>.
+  %            Thanks to Jiazhen Xia for these fixes.
+  % v9.3.1.6 - Removed $temporal_instant and added $intuitionistic as a <ntf_logic_name>
+  ```
+
+- The nodes of a binary formula with a non-associative connective are now of kind
+  `:fof_binary_pair`, `:tff_binary_pair` and `:thf_binary_pair`, where they were
+  `:fof_binary_nonassoc`, `:tff_binary_nonassoc` and `:thf_binary_nonassoc`. The
+  children and the printed text are unchanged; `<*_binary_list>`, like
+  `<*_binary_assoc>` before it, passes its child through and has no node.
+- `$intuitionistic` is an `<ntf_logic_name>` and `$temporal_instant` is not, so
+  `Tptp.Bnf.Vocabulary.ntf_logic_name?/1` and `reserved_word?/1` answer accordingly.
+- `Tptp.Tstp` reads its header through `Tptp.Header`. A `%          : text` line
+  now contributes `text` to the value rather than `: text`, and `from_string/2`
+  returns `TPTP0901` among its diagnostics.
+
+### Removed
+
+- `verify/`, the Lean 4 project, and the `proofs` workflow that built it. Its
+  models were transcriptions of the Elixir by hand, so nothing kept them in step
+  with the code they described; the oracle and property tests remain.
+
 ## [0.2.1] - 2026-10-14
 
 Three lexer findings, one of them a missing diagnostic the BNF oracle could not
@@ -234,6 +297,7 @@ files, and are recorded under Notes below.
   position, a declared `$o` argument type, `$ite` and `$distinct` all carry it, so
   all 340 TX0 problems in the library are classified correctly, with no false
   positive among the 2,251 TF0, 679 TF1 and 148 TX1 problems beside them.
+
 - `Tptp.analyze/2` and `Tptp.Analysis`: the file, its diagnostics, the symbol table
   and the dialect from a single traversal, `Tptp.Lint.scan/2`, of which
   `Tptp.Lint.run/2`, `run_unit/2` and `table/1` are projections. An opt-in line index
@@ -270,7 +334,8 @@ files, and are recorded under Notes below.
   exceeds its share. A file's size does not predict its parse: the corpus runs from
   2.5 to 111 bytes per CST node, so bounding a sweep by bytes of source bounds the
   wrong quantity.
-- [FINDINGS.md](reports/FINDINGS.md): what the four unparseable `SYN000*2.p` files
+
+- FINDINGS.md: what the four unparseable `SYN000*2.p` files
   were hiding from every stage after the parser. With the announced fix applied to
   copies, two further defects in those files surfaced, and a sweep of the library for
   anything else a skipped file could conceal showed three rules of this library's to
@@ -314,6 +379,7 @@ files, and are recorded under Notes below.
   treated as different symbols" — so this compares two declarations at the same
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
+[0.3.0]: https://github.com/jcschuster/tptp/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jcschuster/tptp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jcschuster/tptp/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/jcschuster/tptp/compare/v0.1.2...v0.1.3

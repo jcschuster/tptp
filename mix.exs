@@ -1,7 +1,7 @@
 defmodule Tptp.MixProject do
   use Mix.Project
 
-  @version "0.2.1"
+  @version "0.3.0"
   @source_url "https://github.com/jcschuster/tptp"
 
   def project do
@@ -100,9 +100,9 @@ defmodule Tptp.MixProject do
       source_ref: "v#{@version}",
       extras: [
         "README.md",
+        "examples/demo.livemd",
         "reports/CORPUS.md",
         "reports/CENSUS.md",
-        "reports/FINDINGS.md",
         "CHANGELOG.md",
         "NOTICE",
         "LICENSE"
@@ -116,7 +116,8 @@ defmodule Tptp.MixProject do
           Tptp.Statement.Annotated,
           Tptp.Statement.Include,
           Tptp.Node,
-          Tptp.Query
+          Tptp.Query,
+          Tptp.Header
         ],
         Analysis: [
           Tptp.Analysis,

@@ -1,0 +1,134 @@
+name: bnf
+
+# Looks each night for a TPTP syntax BNF newer than the vendored one, as announced by
+# https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html, and opens a pull request that
+# vendors it from TPTPWorld/SyntaxBNF, regenerates, and bumps the version: minor when
+# the new BNF removes a rule or an alternative, patch when it only adds. Merging that
+# pull request publishes the release; see release.yml.
+#
+# A new BNF can rename rules that hand-written code names, as v9.3.1.4 renamed
+# <tff_binary_nonassoc>, and nothing fails when a list of node kinds goes stale. So
+# the release waits for a review, and the pull request says what to review.
+#
+# A pull request opened with GITHUB_TOKEN does not start other workflows, so ci would
+# not run on it. Set a BNF_PR_TOKEN secret (a fine-grained token with contents and
+# pull-request write access) to have it run; without one, the pull request is still
+# opened and the tests below are its only check.
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bnf
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.BNF_PR_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BNF_PR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - uses: erlef/setup-beam@v1
+        id: beam
+        with:
+          elixir-version: "1.20.3"
+          otp-version: "28.0"
+
+      - name: Restore dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            mix-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+
+      - run: mix deps.get
+
+      - name: Vendor a newer BNF, if there is one
+        id: bump
+        run: .github/scripts/bnf-bump.sh "$RUNNER_TEMP/review.md"
+
+      # One pull request per BNF version: once its branch exists, later nights leave
+      # it to the review.
+      - name: Skip a version already proposed
+        id: fresh
+        if: steps.bump.outputs.bnf != ''
+        run: |
+          if git ls-remote --exit-code --heads origin "bnf-v${{ steps.bump.outputs.bnf }}"; then
+            echo "branch bnf-v${{ steps.bump.outputs.bnf }} exists; nothing to do"
+            echo "open=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test the regenerated parser
+        id: test
+        if: steps.fresh.outputs.open == 'true'
+        env:
+          MIX_ENV: test
+        run: |
+          set +e
+          mix test 2>&1 | tee "$RUNNER_TEMP/test.log"
+          echo "status=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Open the pull request
+        if: steps.fresh.outputs.open == 'true'
+        env:
+          BNF: ${{ steps.bump.outputs.bnf }}
+          OLD: ${{ steps.bump.outputs.old }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          BUMP: ${{ steps.bump.outputs.bump }}
+          TEST_STATUS: ${{ steps.test.outputs.status }}
+        run: |
+          branch="bnf-v$BNF"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A
+          git commit -m "Regenerate from TPTP BNF v$BNF, and release $VERSION"
+          git push origin "$branch"
+
+          if [ "$TEST_STATUS" = 0 ]; then
+            verdict="\`mix test\` passes on the regenerated parser."
+            draft=()
+          else
+            verdict="\`mix test\` fails on the regenerated parser, so this is opened as a draft. The summary:"
+            draft=(--draft)
+          fi
+
+          {
+            echo "TPTP published BNF v$BNF at <https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html>. This vendors it from <https://github.com/TPTPWorld/SyntaxBNF> in place of v$OLD, records it in \`NOTICE\`, runs \`mix tptp.gen\`, and bumps the package to $VERSION, a $BUMP release, with a CHANGELOG section quoting the BNF's own notes."
+            echo
+            echo "**Merging this publishes tptp $VERSION to Hex and creates the GitHub release \`v$VERSION\`.** Edit the CHANGELOG section here before merging; it becomes the release notes."
+            echo
+            echo "$verdict"
+            echo
+            echo '```text'
+            grep -E '^\s+[0-9]+\) |^Result:|^Failed:' "$RUNNER_TEMP/test.log" || tail -n 5 "$RUNNER_TEMP/test.log"
+            echo '```'
+            echo
+            echo "## To review"
+            echo
+            echo "A rule the BNF renamed or dropped still parses everywhere the generator reaches it; hand-written code that names it by its old node kind silently stops matching. Every hit below is one to rename or remove."
+            echo
+            cat "$RUNNER_TEMP/review.md"
+            echo
+            echo "Pins the tests hold against the vendored file (rule counts, line numbers) change with it, and \`reports/\` was measured against v$OLD; rerun \`mix tptp.corpus\` and \`mix tptp.census\` if their numbers should move."
+          } > "$RUNNER_TEMP/body.md"
+
+          gh label create bnf-update --color 0e8a16 \
+            --description "Regenerates from a new TPTP BNF; merging releases" 2>/dev/null || true
+          gh pr create "${draft[@]}" --base main --head "$branch" --label bnf-update \
+            --title "TPTP BNF v$BNF, release $VERSION" --body-file "$RUNNER_TEMP/body.md"

@@ -2,7 +2,7 @@ defmodule Tptp.Bnf.OracleTable do
   @moduledoc """
   The BNF's token layer as anchored regular expressions. Generated; do not edit.
 
-  `mix tptp.gen` writes this from `SyntaxBNF-v9.3.1.3`, one entry per
+  `mix tptp.gen` writes this from `SyntaxBNF-v9.3.1.6`, one entry per
   `::-` and `:::` rule, with every `<name>` reference inlined. It exists so that
   the hand-written `Tptp.Lexer` has something independent to be checked against;
   see `Tptp.Bnf.Oracle` for why that is worth generating and what the checking
@@ -12,7 +12,7 @@ defmodule Tptp.Bnf.OracleTable do
   @typedoc """
   A nonterminal defined by a `::-` or `:::` rule.
 
-  One of: `alpha`, `alpha_numeric`, `arrow`, `back_quote`, `back_quoted`, `comment`, `comment_block`, `comment_line`, `decimal_exponent`, `decimal_fraction`, `distinct_object`, `do_char`, `dollar`, `dollar_dollar_word`, `dollar_word`, `dot`, `double_quote`, `exp_integer`, `exponent`, `hash`, `integer`, `integer_digits`, `less_sign`, `lower_alpha`, `lower_word`, `non_zero_numeric`, `not_star_slash`, `numeric`, `percentage_sign`, `plus`, `positive_integer`, `printable_char`, `rational`, `real`, `sign`, `signed_exp_integer`, `signed_integer`, `signed_rational`, `signed_real`, `single_quote`, `single_quoted`, `slash`, `slash_char`, `slosh`, `slosh_char`, `sq_char`, `star`, `underscore`, `unsigned_integer`, `unsigned_rational`, `unsigned_real`, `upper_alpha`, `upper_word`, `viewable_char`, `vline`, `zero_numeric`.
+  One of: `alpha`, `alpha_numeric`, `arrow`, `back_quote`, `back_quoted`, `comment`, `comment_block`, `comment_char`, `comment_line`, `decimal_exponent`, `decimal_fraction`, `distinct_object`, `do_char`, `dollar`, `dollar_dollar_word`, `dollar_word`, `dot`, `double_quote`, `exp_integer`, `exponent`, `hash`, `integer`, `integer_digits`, `less_sign`, `lower_alpha`, `lower_word`, `non_zero_numeric`, `not_star_slash`, `numeric`, `percentage_sign`, `plus`, `positive_integer`, `rational`, `real`, `sign`, `signed_exp_integer`, `signed_integer`, `signed_rational`, `signed_real`, `single_quote`, `single_quoted`, `slash`, `slash_char`, `slosh`, `slosh_char`, `sq_char`, `star`, `underscore`, `unsigned_integer`, `unsigned_rational`, `unsigned_real`, `upper_alpha`, `upper_word`, `vline`, `zero_numeric`.
   """
   @type name :: binary()
 
@@ -25,13 +25,14 @@ defmodule Tptp.Bnf.OracleTable do
       Regex.compile!("\\A(?:(?:[`])(?:(?:[A-Z])(?:((?:[a-z])|(?:[A-Z])|(?:[0-9])|(?:[_])))*))\\z"),
     "comment" =>
       Regex.compile!(
-        "\\A(?:(?:(?:[%])(?:.)*)|(?:(?:[/])(?:[*])(?:([^*]*[*][*]*[^/*])*[^*]*)(?:[*])(?:[*])*(?:[/])))\\z"
+        "\\A(?:(?:(?:[%])(?:[^\\r\\n])*)|(?:(?:[/])(?:[*])(?:([^*]*[*][*]*[^/*])*[^*]*)(?:[*])(?:[*])*(?:[/])))\\z"
       ),
     "comment_block" =>
       Regex.compile!(
         "\\A(?:(?:[/])(?:[*])(?:([^*]*[*][*]*[^/*])*[^*]*)(?:[*])(?:[*])*(?:[/]))\\z"
       ),
-    "comment_line" => Regex.compile!("\\A(?:(?:[%])(?:.)*)\\z"),
+    "comment_char" => Regex.compile!("\\A(?:[^\\r\\n])\\z"),
+    "comment_line" => Regex.compile!("\\A(?:(?:[%])(?:[^\\r\\n])*)\\z"),
     "decimal_exponent" =>
       Regex.compile!(
         "\\A(?:((?:(?:[0-9])(?:[0-9])*)|(?:(?:((?:[0])|(?:(?:[1-9])(?:[0-9])*)))(?:[.])(?:(?:[0-9])(?:[0-9])*)))(?:[Ee])(?:((?:(?:[+-])(?:(?:[0-9])(?:[0-9])*))|(?:(?:[0-9])(?:[0-9])*))))\\z"
@@ -71,7 +72,6 @@ defmodule Tptp.Bnf.OracleTable do
     "percentage_sign" => Regex.compile!("\\A(?:[%])\\z"),
     "plus" => Regex.compile!("\\A(?:[+])\\z"),
     "positive_integer" => Regex.compile!("\\A(?:(?:[1-9])(?:[0-9])*)\\z"),
-    "printable_char" => Regex.compile!("\\A(?:.)\\z"),
     "rational" =>
       Regex.compile!(
         "\\A(?:((?:(?:[+-])(?:(?:((?:[0])|(?:(?:[1-9])(?:[0-9])*)))(?:(?:[/]))(?:(?:[1-9])(?:[0-9])*)))|(?:(?:((?:[0])|(?:(?:[1-9])(?:[0-9])*)))(?:(?:[/]))(?:(?:[1-9])(?:[0-9])*))))\\z"
@@ -115,7 +115,6 @@ defmodule Tptp.Bnf.OracleTable do
     "upper_alpha" => Regex.compile!("\\A(?:[A-Z])\\z"),
     "upper_word" =>
       Regex.compile!("\\A(?:(?:[A-Z])(?:((?:[a-z])|(?:[A-Z])|(?:[0-9])|(?:[_])))*)\\z"),
-    "viewable_char" => Regex.compile!("\\A(?:[.\\n])\\z"),
     "vline" => Regex.compile!("\\A(?:[|])\\z"),
     "zero_numeric" => Regex.compile!("\\A(?:[0])\\z")
   }
@@ -131,6 +130,7 @@ defmodule Tptp.Bnf.OracleTable do
       "back_quoted",
       "comment",
       "comment_block",
+      "comment_char",
       "comment_line",
       "decimal_exponent",
       "decimal_fraction",
@@ -155,7 +155,6 @@ defmodule Tptp.Bnf.OracleTable do
       "percentage_sign",
       "plus",
       "positive_integer",
-      "printable_char",
       "rational",
       "real",
       "sign",
@@ -177,7 +176,6 @@ defmodule Tptp.Bnf.OracleTable do
       "unsigned_real",
       "upper_alpha",
       "upper_word",
-      "viewable_char",
       "vline",
       "zero_numeric"
     ]
