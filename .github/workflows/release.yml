@@ -31,7 +31,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.20.3"
-          otp-version: "28.0"
+          otp-version: "29.0"
 
       - name: Read the version, and refuse one already released
         id: version
