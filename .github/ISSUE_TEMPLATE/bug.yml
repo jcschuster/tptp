@@ -1,0 +1,42 @@
+name: Bug report
+description: Input that reads, prints, lints or resolves differently from the TPTP specification.
+labels: [bug]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "tptp and the BNF it reports (`Tptp.bnf_version/0`), Elixir and OTP."
+      placeholder: "tptp 0.3.0 (BNF v9.3.1.6), Elixir 1.20.3, OTP 29"
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Stage
+      options: [Lexer, Splitter, Parser, Includes, Lint, Printer, SZS, TSTP / Derivation, Header, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Input
+      description: The smallest TPTP text that shows it, or the library file name (`PUZ001+1.p`) when it is a library file.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What the BNF or the TPTP documentation says should happen, with the rule or page if you have it.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: The value or diagnostic returned.
+      render: elixir
+    validations:
+      required: true

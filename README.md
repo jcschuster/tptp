@@ -1,6 +1,22 @@
 # tptp
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23063475.svg)](https://doi.org/10.5281/zenodo.23063475)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jcschuster/tptp/main/assets/logo-dark.svg">
+    <img alt="tptp" src="https://raw.githubusercontent.com/jcschuster/tptp/main/assets/logo-light.svg" height="72">
+  </picture>
+</p>
+
+[![Hex.pm](https://img.shields.io/hexpm/v/tptp.svg)](https://hex.pm/packages/tptp)
+[![Documentation](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/tptp)
+[![CI](https://github.com/jcschuster/tptp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jcschuster/tptp/actions/workflows/ci.yml)
+[![Corpus](https://github.com/jcschuster/tptp/actions/workflows/corpus.yml/badge.svg)](https://github.com/jcschuster/tptp/actions/workflows/corpus.yml)
+[![BNF](https://github.com/jcschuster/tptp/actions/workflows/bnf.yml/badge.svg)](https://github.com/jcschuster/tptp/actions/workflows/bnf.yml)
+[![SyntaxBNF](https://img.shields.io/badge/SyntaxBNF-v9.3.1.6-c4a7e7.svg)](https://github.com/TPTPWorld/SyntaxBNF)
+[![License](https://img.shields.io/hexpm/l/tptp.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23063474.svg)](https://doi.org/10.5281/zenodo.23063474)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jcschuster/tptp/badge)](https://scorecard.dev/viewer/?uri=github.com/jcschuster/tptp)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fjcschuster%2Ftptp%2Fblob%2Fmain%2Fexamples%2Fdemo.livemd)
 
 A span-preserving parser, linter and printer for the [TPTP][tptp] language,
 generated from the published BNF.
@@ -15,6 +31,16 @@ end
 ```
 
 ## Function
+
+```mermaid
+flowchart LR
+  src[TPTP source] --> scan[Scan] --> split[Split] --> parse[Parse] --> tree[Tptp.File]
+  tree --> resolve[Resolve includes] --> unit[Tptp.Unit]
+  tree --> check[Check] --> diag[Diagnostics]
+  tree --> print[Print] --> out[TPTP text]
+  log[System output] --> szs[SZS status and blocks]
+  sol[TSTP solution file] --> tstp[Header, derivation, original output] --> der[Tptp.Derivation]
+```
 
 1. **Scan** TPTP source into tokens with byte-accurate spans.
 2. **Split** the token stream into statements, bounding the effect of malformed
@@ -262,10 +288,12 @@ source ranges from 2.5 to 111 bytes per tree node, so `SWV535-1.010.p` peaks at
 3.2 GB from 8 MB while a file twice its size peaks at a ninth of that. `--heap` is
 the total across all workers, and a parse exceeding its share is retried alone.
 
-CI runs the stages of `mix check` as one job and Dialyzer as another, so the PLT is
-cached under its own key and a lock-file change does not rebuild it. A third
-workflow regenerates the generated files and fails if the working tree is not
-clean, which is what prevents a generated file from being hand-edited.
+CI runs the static stages of `mix check` plus the documentation and package builds
+as one job, the test suite on the `.tool-versions` toolchain (with coverage) and on
+the oldest supported OTP as a second, and Dialyzer as a third, so the PLT is cached
+under its own key and a lock-file change does not rebuild it. Another workflow
+regenerates the generated files and fails if the working tree is not clean, which
+is what prevents a generated file from being hand-edited.
 
 A fourth workflow reads the library. On a pull request it sweeps one file in five;
 nightly it sweeps every file, since a check skipping four files in five examines

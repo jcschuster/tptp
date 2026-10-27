@@ -155,7 +155,7 @@ EOF
 
 awk -v section="$section" \
   -v link="[$next]: https://github.com/$project/compare/v$version...v$next" '
-  !s && /^## \[/ { while ((getline line < section) > 0) print line; s = 1 }
+  !s && /^## \[/ && !/^## \[Unreleased\]/ { while ((getline line < section) > 0) print line; s = 1 }
   !k && /^\[[0-9]/ { print link; k = 1 }
   { print }' CHANGELOG.md >CHANGELOG.md.new
 mv CHANGELOG.md.new CHANGELOG.md

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://hexdocs.pm/tptp
+    about: The published documentation for the latest release.
+  - name: Security report
+    url: https://github.com/jcschuster/tptp/security/advisories/new
+    about: Report a vulnerability privately; see SECURITY.md.

@@ -28,6 +28,11 @@
       "identifier": "https://github.com/jcschuster/tptp",
       "relation": "isSupplementTo",
       "scheme": "url"
+    },
+    {
+      "identifier": "https://hexdocs.pm/tptp",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
     }
   ]
 }

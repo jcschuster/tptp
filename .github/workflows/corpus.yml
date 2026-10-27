@@ -22,6 +22,9 @@ on:
       - "mix.lock"
       - ".github/workflows/corpus.yml"
 
+permissions:
+  contents: read
+
 env:
   MIX_ENV: test
   TPTP_ROOT: ${{ github.workspace }}/TPTP
@@ -31,16 +34,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 330
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         id: beam
         with:
-          elixir-version: "1.20.3"
-          otp-version: "29.0"
+          version-file: .tool-versions
+          version-type: strict
 
       - name: Restore dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             deps
@@ -91,7 +94,7 @@ jobs:
 
       - name: Keep the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: corpus-report
           path: corpus-*.md

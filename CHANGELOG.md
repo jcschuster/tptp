@@ -8,6 +8,23 @@ Note that the package version and `Tptp.bnf_version/0` are two different numbers
 latter is the TPTP release whose BNF the shipped parser was generated from, and it
 moves when TPTP moves, not when this library does.
 
+## [Unreleased]
+
+### Changed
+
+- The README, `CITATION.cff` and the Hex package metadata name the concept DOI
+  (`10.5281/zenodo.23063474`), which resolves to the latest release, instead of
+  the DOI of 0.1.2. The package description on Hex says "span-preserving", as
+  the README and `CITATION.cff` do, and links the changelog, the DOI and
+  tptp.org.
+- Repository: a logo, badges, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
+  `SECURITY.md`, issue and pull-request templates, Dependabot, an OpenSSF
+  Scorecard workflow, every action pinned by commit, `.tool-versions`, and a
+  CI matched to AtpClient's (documentation and package builds, a second
+  toolchain, coverage). `release.yml` publishes through Hex's workload
+  identity instead of a stored API key, and also runs on a pushed `v*` tag.
+- The documentation renders Mermaid code blocks; the README's pipeline is one.
+
 ## [0.3.0] - 2026-10-20
 
 ### Added
@@ -379,6 +396,7 @@ files, and are recorded under Notes below.
   treated as different symbols" — so this compares two declarations at the same
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
+[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/jcschuster/tptp/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jcschuster/tptp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jcschuster/tptp/compare/v0.1.3...v0.2.0

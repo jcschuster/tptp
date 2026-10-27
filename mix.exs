@@ -81,13 +81,49 @@ defmodule Tptp.MixProject do
   end
 
   defp description do
-    "A faithful, span-carrying parser, linter and printer for the TPTP language."
+    "A span-preserving parser, linter and printer for the TPTP language, " <>
+      "generated from the published BNF; with the SZS ontologies and TSTP readers."
   end
+
+  # Renders the ```mermaid blocks of the extras (the README's pipeline).
+  defp before_closing_body_tag(:html) do
+    """
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: document.body.className.includes("dark") ? "dark" : "default"
+        });
+        let id = 0;
+        for (const codeEl of document.querySelectorAll("pre code.mermaid")) {
+          const preEl = codeEl.parentElement;
+          const graphDefinition = codeEl.textContent;
+          const graphEl = document.createElement("div");
+          const graphId = "mermaid-graph-" + id++;
+          mermaid.render(graphId, graphDefinition).then(({svg, bindFunctions}) => {
+            graphEl.innerHTML = svg;
+            bindFunctions?.(graphEl);
+            preEl.insertAdjacentElement("afterend", graphEl);
+            preEl.remove();
+          });
+        }
+      });
+    </script>
+    """
+  end
+
+  defp before_closing_body_tag(_), do: ""
 
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => @source_url},
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md",
+        "DOI" => "https://doi.org/10.5281/zenodo.23063474",
+        "TPTP" => "https://www.tptp.org"
+      },
       files: ~w(lib src/tptp_parser.yrl priv/bnf mix.exs README.md LICENSE NOTICE
            CHANGELOG.md reports examples .formatter.exs CITATION.cff)
     ]
@@ -96,6 +132,8 @@ defmodule Tptp.MixProject do
   defp docs do
     [
       main: "readme",
+      logo: "assets/logo.svg",
+      before_closing_body_tag: &before_closing_body_tag/1,
       source_url: @source_url,
       source_ref: "v#{@version}",
       extras: [

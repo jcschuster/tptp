@@ -1,0 +1,17 @@
+name: Feature request
+description: A reading, printer, query or resolver the library should offer.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The task, not the solution. Note the scope in the README — the library reads and writes the TPTP World's formats and attaches no semantics — so elaboration and type checking belong to a consumer.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The call and its result, if you have a shape in mind.
+      render: elixir

@@ -30,4 +30,11 @@ keywords:
   - automated reasoning
   - Elixir
   - BEAM
-doi: 10.5281/zenodo.23063475
+doi: 10.5281/zenodo.23063474
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23063474
+    description: "Concept DOI of the software; resolves to the latest version. Each release has its own DOI under it."
+  - type: url
+    value: "https://hex.pm/packages/tptp"
+    description: "Hex package"
