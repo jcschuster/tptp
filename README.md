@@ -26,7 +26,7 @@ hand-written, so the package is straightforward to vendor.
 
 ```elixir
 def deps do
-  [{:tptp, "~> 0.2"}]
+  [{:tptp, "~> 0.3"}]
 end
 ```
 
