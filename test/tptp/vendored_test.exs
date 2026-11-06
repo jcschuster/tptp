@@ -26,8 +26,8 @@ defmodule Tptp.VendoredTest do
   @external_resource @notice
 
   @vendored %{
-    "priv/bnf/SyntaxBNF-v9.3.1.6" =>
-      "https://raw.githubusercontent.com/TPTPWorld/SyntaxBNF/master/SyntaxBNF-v9.3.1.6",
+    "priv/bnf/SyntaxBNF-v10.0.0.0" =>
+      "https://raw.githubusercontent.com/TPTPWorld/SyntaxBNF/master/SyntaxBNF-v10.0.0.0",
     "priv/bnf/SZSOntology.bnf" =>
       "https://raw.githubusercontent.com/TPTPWorld/SZSOntologies/master/BNF/SZSOntology.bnf"
   }

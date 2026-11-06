@@ -10,11 +10,11 @@ the MIT licence in LICENSE.
 
 Two files are redistributed, each carried unmodified:
 
-    priv/bnf/SyntaxBNF-v9.3.1.6
-        The TPTP syntax BNF, version 9.3.1.6, attributed to the TPTP and taken from
-        https://github.com/TPTPWorld/SyntaxBNF at commit 3568c275 of 2026-10-12:
-        https://raw.githubusercontent.com/TPTPWorld/SyntaxBNF/3568c27532fb9635e9ea4454ec439c6f549c8279/SyntaxBNF-v9.3.1.6
-        sha256 716d494d6c0aca2c6305edd580107e5f6cf3f1faab457d72fed6accbec38d8d7
+    priv/bnf/SyntaxBNF-v10.0.0.0
+        The TPTP syntax BNF, version 10.0.0.0, attributed to the TPTP and taken from
+        https://github.com/TPTPWorld/SyntaxBNF at commit 0f29ed6d of 2026-11-06:
+        https://raw.githubusercontent.com/TPTPWorld/SyntaxBNF/0f29ed6d34df74f3043d323352c372d7994f44a1/SyntaxBNF-v10.0.0.0
+        sha256 ea3f64ddc11504a53e303f4412176dd3e6b70ba2983b613c905264193a5f55ce
 
     priv/bnf/SZSOntology.bnf
         The BNF of the three SZS ontologies, licensed CC BY 4.0 by its repository

@@ -2,7 +2,7 @@ defmodule Tptp.Bnf.OracleTable do
   @moduledoc """
   The BNF's token layer as anchored regular expressions. Generated; do not edit.
 
-  `mix tptp.gen` writes this from `SyntaxBNF-v9.3.1.6`, one entry per
+  `mix tptp.gen` writes this from `SyntaxBNF-v10.0.0.0`, one entry per
   `::-` and `:::` rule, with every `<name>` reference inlined. It exists so that
   the hand-written `Tptp.Lexer` has something independent to be checked against;
   see `Tptp.Bnf.Oracle` for why that is worth generating and what the checking
