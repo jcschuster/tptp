@@ -25,6 +25,17 @@ moves when TPTP moves, not when this library does.
   identity instead of a stored API key, and also runs on a pushed `v*` tag.
 - The documentation renders Mermaid code blocks; the README's pipeline is one.
 
+## [0.3.1] - 2026-11-06
+
+### Changed
+
+- The parser is regenerated from TPTP BNF v10.0.0.0, which `Tptp.bnf_version/0` now
+  reports; it was v9.3.1.6. The BNF records what changed:
+
+  ```text
+  
+  ```
+
 ## [0.3.0] - 2026-10-20
 
 ### Added
@@ -397,6 +408,7 @@ files, and are recorded under Notes below.
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
 [Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.0...HEAD
+[0.3.1]: https://github.com/jcschuster/tptp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jcschuster/tptp/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jcschuster/tptp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jcschuster/tptp/compare/v0.1.3...v0.2.0
