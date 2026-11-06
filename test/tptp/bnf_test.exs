@@ -47,9 +47,16 @@ defmodule Tptp.BnfTest do
       end
     end
 
-    test "records the source line of every rule", %{rules: rules} do
+    test "records the source line of every rule", %{path: path, rules: rules} do
+      line =
+        path
+        |> File.read!()
+        |> String.split("\n")
+        |> Enum.find_index(&String.starts_with?(&1, "<TPTP_file>"))
+        |> Kernel.+(1)
+
       assert Enum.all?(rules, &(&1.line > 0))
-      assert %Rule{line: 60} = Enum.find(rules, &(&1.lhs == "TPTP_file"))
+      assert %Rule{line: ^line} = Enum.find(rules, &(&1.lhs == "TPTP_file"))
     end
   end
 
