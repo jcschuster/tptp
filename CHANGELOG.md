@@ -10,21 +10,6 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
-### Changed
-
-- The README, `CITATION.cff` and the Hex package metadata name the concept DOI
-  (`10.5281/zenodo.23063474`), which resolves to the latest release, instead of
-  the DOI of 0.1.2. The package description on Hex says "span-preserving", as
-  the README and `CITATION.cff` do, and links the changelog, the DOI and
-  tptp.org.
-- Repository: a logo, badges, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
-  `SECURITY.md`, issue and pull-request templates, Dependabot, an OpenSSF
-  Scorecard workflow, every action pinned by commit, `.tool-versions`, and a
-  CI matched to AtpClient's (documentation and package builds, a second
-  toolchain, coverage). `release.yml` publishes through Hex's workload
-  identity instead of a stored API key, and also runs on a pushed `v*` tag.
-- The documentation renders Mermaid code blocks; the README's pipeline is one.
-
 ## [0.3.1] - 2026-11-06
 
 ### Changed
