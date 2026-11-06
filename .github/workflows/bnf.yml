@@ -1,7 +1,7 @@
 name: bnf
 
 # Looks each night for a TPTP syntax BNF newer than the vendored one, as announced by
-# https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html, and opens a pull request that
+# https://tptpworld.github.io/SyntaxBNF/SyntaxBNF.html, and opens a pull request that
 # vendors it from TPTPWorld/SyntaxBNF, regenerates, and bumps the version: minor when
 # the new BNF removes a rule or an alternative, patch when it only adds. Merging that
 # pull request publishes the release; see release.yml.
@@ -109,7 +109,7 @@ jobs:
           fi
 
           {
-            echo "TPTP published BNF v$BNF at <https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html>. This vendors it from <https://github.com/TPTPWorld/SyntaxBNF> in place of v$OLD, records it in \`NOTICE\`, runs \`mix tptp.gen\`, and bumps the package to $VERSION, a $BUMP release, with a CHANGELOG section quoting the BNF's own notes."
+            echo "TPTP published BNF v$BNF at <https://tptpworld.github.io/SyntaxBNF/SyntaxBNF.html>. This vendors it from <https://github.com/TPTPWorld/SyntaxBNF> in place of v$OLD, records it in \`NOTICE\`, runs \`mix tptp.gen\`, and bumps the package to $VERSION, a $BUMP release, with a CHANGELOG section quoting the BNF's own notes."
             echo
             echo "**Merging this publishes tptp $VERSION to Hex and creates the GitHub release \`v$VERSION\`.** Edit the CHANGELOG section here before merging; it becomes the release notes."
             echo

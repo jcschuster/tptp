@@ -14,7 +14,7 @@
 set -euo pipefail
 
 review=${1:?usage: bnf-bump.sh REVIEW_FILE}
-page=https://tptp.org/UserDocs/TPTPLanguage/SyntaxBNF.html
+page=https://tptpworld.github.io/SyntaxBNF/SyntaxBNF.html
 repo=TPTPWorld/SyntaxBNF
 project=${GITHUB_REPOSITORY:-jcschuster/tptp}
 out=${GITHUB_OUTPUT:-/dev/stdout}
@@ -25,10 +25,11 @@ old_path=$(ls priv/bnf/SyntaxBNF-v*)
 old=${old_path##*SyntaxBNF-v}
 old_re=${old//./\\.}
 
-# The page renders the BNF's own history comments, `% v9.3.1.6 - ...`, with &nbsp;.
-new=$(curl -sSfL "$page" |
-  grep -oE '%(&nbsp;)+v[0-9]+(\.[0-9]+)+&nbsp;-' |
-  grep -oE '[0-9]+(\.[0-9]+)+' | sort -V | tail -n 1)
+# The page renders the BNF's own history comments, `% v9.3.1.6 - ...` or a bare
+# `% v10.0.0.0`, with &nbsp;.
+html=$(curl -sSfL "$page")
+new=$(grep -oE '%(&nbsp;)+v[0-9]+(\.[0-9]+)+&nbsp;' <<<"$html" |
+  grep -oE '[0-9]+(\.[0-9]+)+' | sort -V | tail -n 1) || true
 
 if [ -z "$new" ]; then
   echo "::error::no version found on $page; has the page's layout changed?"
