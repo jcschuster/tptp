@@ -12,7 +12,7 @@
 [![CI](https://github.com/jcschuster/tptp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jcschuster/tptp/actions/workflows/ci.yml)
 [![Corpus](https://github.com/jcschuster/tptp/actions/workflows/corpus.yml/badge.svg)](https://github.com/jcschuster/tptp/actions/workflows/corpus.yml)
 [![BNF](https://github.com/jcschuster/tptp/actions/workflows/bnf.yml/badge.svg)](https://github.com/jcschuster/tptp/actions/workflows/bnf.yml)
-[![SyntaxBNF](https://img.shields.io/badge/SyntaxBNF-v10.0.0.0-c4a7e7.svg)](https://github.com/TPTPWorld/SyntaxBNF)
+[![SyntaxBNF](https://img.shields.io/badge/SyntaxBNF-v10.0.0.1-c4a7e7.svg)](https://github.com/TPTPWorld/SyntaxBNF)
 [![License](https://img.shields.io/hexpm/l/tptp.svg)](LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23063474.svg)](https://doi.org/10.5281/zenodo.23063474)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jcschuster/tptp/badge)](https://scorecard.dev/viewer/?uri=github.com/jcschuster/tptp)
@@ -208,7 +208,7 @@ installation requires neither Python, nor awk, nor the BNFs, nor network access:
 
 | Generated                    | From                                                                  |
 | ---------------------------- | --------------------------------------------------------------------- |
-| `src/tptp_parser.yrl`        | `priv/bnf/SyntaxBNF-v10.0.0.0`                                         |
+| `src/tptp_parser.yrl`        | `priv/bnf/SyntaxBNF-v10.0.0.1`                                         |
 | `lib/tptp/bnf/vocabulary.ex` | the same, `:==` rules — and `<inference_status_value>` of the SZS BNF |
 | `lib/tptp/printer/shapes.ex` | the same, `::=` rules                                                 |
 | `test/support/bnf_oracle.ex` | the same BNF, `::-` and `:::` rules                                   |
@@ -357,7 +357,7 @@ them from input. This is a security property and is enforced mechanically.
 
 This library is MIT licensed. See [LICENSE](LICENSE).
 
-Redistributed TPTP material is not. `priv/bnf/SyntaxBNF-v10.0.0.0` is the file from
+Redistributed TPTP material is not. `priv/bnf/SyntaxBNF-v10.0.0.1` is the file from
 [github.com/TPTPWorld/SyntaxBNF][bnf], `priv/bnf/SZSOntology.bnf` the file from
 [github.com/TPTPWorld/SZSOntologies][szsbnf] (CC BY 4.0), each carried unmodified
 so that installation requires no network access, and `lib/tptp/szs/page.ex` quotes

@@ -10,6 +10,29 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-13
+
+### Changed
+
+- The parser is regenerated from TPTP BNF v10.0.0.1, which `Tptp.bnf_version/0` now
+  reports; it was v10.0.0.0. This breaks callers that name what it removed:
+  - `<alpha>` (`:::`) changed
+  - `<alpha_numeric>` (`:::`) changed
+  - `<do_char>` (`:::`) changed
+  - `<exp_integer>` (`:::`) changed
+  - `<integer>` (`::-`) changed
+  - `<rational>` (`::-`) changed
+  - `<real>` (`::-`) changed
+  - `<sq_char>` (`:::`) changed
+  - `<unsigned_integer>` (`:::`) changed
+  - `<unsigned_real>` (`:::`) changed
+
+  The BNF records what changed:
+
+  ```text
+  
+  ```
+
 ## [0.3.1] - 2026-11-06
 
 ### Changed
@@ -393,6 +416,7 @@ files, and are recorded under Notes below.
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
 [Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.0...HEAD
+[0.4.0]: https://github.com/jcschuster/tptp/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/jcschuster/tptp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jcschuster/tptp/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jcschuster/tptp/compare/v0.2.0...v0.2.1
