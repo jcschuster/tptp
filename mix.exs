@@ -145,6 +145,8 @@ defmodule Tptp.MixProject do
         "NOTICE",
         "LICENSE"
       ],
+      # The changelog names functions that later releases removed.
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
       groups_for_modules: [
         "Reading a file": [
           Tptp,
