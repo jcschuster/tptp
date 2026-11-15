@@ -43,7 +43,7 @@ defmodule Tptp.PrinterCorpusTest do
     files = Corpus.files(every: 3, max_bytes: 2_000_000)
 
     if files == [] do
-      raise "no TPTP library found; set $TPTP_ROOT to enable the corpus tests"
+      raise "no TPTP library found; set $TPTP to enable the corpus tests"
     end
 
     %{files: files}

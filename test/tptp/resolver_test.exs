@@ -293,7 +293,7 @@ end
 
 defmodule Tptp.ResolverEnvTest do
   @moduledoc """
-  The two tests that read `$TPTP_ROOT`, kept apart from the rest.
+  The tests that read `$TPTP`, kept apart from the rest.
 
   They have to set a process-wide environment variable to test that it is honoured,
   and the corpus tests read the same variable to find the library. `async: false`
@@ -314,18 +314,21 @@ defmodule Tptp.ResolverEnvTest do
     File.write!(Path.join([library, "Axioms", "shared.ax"]), "fof(library, axiom, p).\n")
     File.write!(Path.join(local, "shared.ax"), "fof(local, axiom, p).\n")
 
-    previous = System.get_env("TPTP_ROOT")
-    System.put_env("TPTP_ROOT", library)
+    previous = Map.new(~w(TPTP_ROOT TPTP), &{&1, System.get_env(&1)})
+    System.put_env("TPTP", library)
+    System.delete_env("TPTP_ROOT")
 
     on_exit(fn ->
-      if previous, do: System.put_env("TPTP_ROOT", previous), else: System.delete_env("TPTP_ROOT")
+      for {name, value} <- previous,
+          do: if(value, do: System.put_env(name, value), else: System.delete_env(name))
+
       File.rm_rf!(@tmp)
     end)
 
     %{library: library, local: local}
   end
 
-  test "$TPTP_ROOT is used when :root is absent" do
+  test "$TPTP is used when :root is absent" do
     assert {:ok, _path, "fof(library, axiom, p).\n"} =
              Resolver.resolve({Tptp.Resolver.Fs, cwd: false}, "Axioms/shared.ax", nil)
   end
@@ -334,5 +337,19 @@ defmodule Tptp.ResolverEnvTest do
     resolver = {Tptp.Resolver.Fs, root: local, cwd: false}
 
     assert {:ok, _path, "fof(local, axiom, p).\n"} = Resolver.resolve(resolver, "shared.ax", nil)
+  end
+
+  test "a quoted ~ in the environment reads as the home directory, and an empty one is skipped" do
+    System.put_env("TPTP", "~/library")
+    System.put_env("TPTP_ROOT", "")
+
+    assert Resolver.Fs.roots(nil, cwd: false) == [Path.expand("~/library")]
+  end
+
+  test "$TPTP_ROOT, the variable it replaced, is still searched after $TPTP",
+       %{library: library, local: local} do
+    System.put_env("TPTP_ROOT", local)
+
+    assert Resolver.Fs.roots(nil, cwd: false) == [library, local]
   end
 end

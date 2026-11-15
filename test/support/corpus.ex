@@ -3,7 +3,7 @@ defmodule Tptp.Test.Corpus do
   Locates a local TPTP library for the tests tagged `:corpus`.
 
   Those tests are excluded by default so that a contributor without the library
-  can still run `mix test`. Point `$TPTP_ROOT` at a checkout to enable them, or
+  can still run `mix test`. Point `$TPTP` at a checkout to enable them, or
   rely on the conventional `/opt/TPTP`.
 
   ## Two sweeps, and which one is running
@@ -22,15 +22,6 @@ defmodule Tptp.Test.Corpus do
 
   File selection itself is `Mix.Tasks.Tptp.Corpus`, so the committed report and
   these tests are describing the same set of files rather than two that drifted.
-
-  ## The files this parser refuses
-
-  `Corpus.known_failures/0` lists the library files that do not
-  parse, each chased down to a gap between the vendored BNF release and the library
-  that ships beside it. `files/1` leaves them out, because a sweep asserting "every
-  file parses" cannot also carry an exception in its result, and
-  `Tptp.CorpusTest` asserts separately that each of them still fails. An exception
-  that stopped being needed would fail that test rather than sit here.
   """
 
   alias Mix.Tasks.Tptp.Corpus
@@ -52,14 +43,7 @@ defmodule Tptp.Test.Corpus do
     options
     |> Keyword.put(:every, every(options))
     |> Corpus.files()
-    |> Enum.reject(&Map.has_key?(known_failures(), Path.basename(&1)))
   end
-
-  @doc """
-  The library files this parser refuses, and why, keyed by base name.
-  """
-  @spec known_failures() :: %{binary() => binary()}
-  defdelegate known_failures(), to: Mix.Tasks.Tptp.Corpus
 
   @doc """
   Whether the nightly full sweep is on.

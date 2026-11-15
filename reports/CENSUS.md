@@ -28,7 +28,7 @@ results below have gone stale against the library on this machine.
 
 | | Files |
 |---|---:|
-| Scanned | 29358 |
+| Scanned | 29397 |
 | With an applied type constructor (TFF, exact) | 885 |
 | — of those, outside the base languages | 885 |
 | — of those, at arity ≥ 2 over a type variable | 884 |
@@ -125,7 +125,7 @@ arity ≥ 2, `Var nested` where one appeared anywhere beneath an argument.
 
 | | |
 |---|---|
-| BNF | 9.3.1.3 |
+| BNF | 10.0.0.1 |
 
 <!-- end results -->
 
@@ -133,10 +133,10 @@ arity ≥ 2, `Var nested` where one appeared anywhere beneath an argument.
 
 | | |
 |---|---|
-| Library | `/opt/TPTP` |
-| Elixir | 1.20.4 |
-| OTP | 28 |
-| Schedulers | 8 |
-| Workers | 4 on 28125, 2 on 913, 1 on 320 |
+| Library | `/home/johannes/Documents/TPTP-v10.0.0` |
+| Elixir | 1.20.5 |
+| OTP | 29 |
+| Schedulers | 16 |
+| Workers | 4 on 28164, 2 on 913, 1 on 320 |
 | Thinning | none — every file |
-| Wall clock | 3977.7 s |
+| Wall clock | 2506.0 s |

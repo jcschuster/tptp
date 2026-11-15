@@ -209,5 +209,5 @@ starts them.
 # end)
 ```
 
-Set `TPTP_ROOT` instead and `Tptp.Resolver.Fs` reads the library from disk;
+Set `TPTP` instead and `Tptp.Resolver.Fs` reads the library from disk;
 `Tptp.Resolver.Cascade` tries local first and falls back to the network.

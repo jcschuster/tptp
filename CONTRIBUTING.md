@@ -21,7 +21,7 @@ The toolchain is in `.tool-versions` (any `~> 1.20` Elixir works). Then:
 mix deps.get
 mix check                   # format, compile --warnings-as-errors, credo --strict, test, dialyzer
 mix test                    # unit and property tests
-mix test --include corpus   # reads a TPTP library under $TPTP_ROOT
+mix test --include corpus   # reads a TPTP library under $TPTP
 mix test --include network  # re-checks the vendored files against their pages
 mix coveralls               # the suite with a coverage table
 mix docs

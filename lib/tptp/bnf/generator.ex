@@ -323,6 +323,7 @@ defmodule Tptp.Bnf.Generator do
 
     reachable = reachable_from(resolved, @root)
     kept = Map.take(resolved, Map.keys(reachable))
+    nullable = for {lhs, alternatives} <- kept, [] in alternatives, into: MapSet.new(), do: lhs
 
     for {lhs, alternatives} <- kept,
         symbols <- alternatives,
@@ -330,7 +331,31 @@ defmodule Tptp.Bnf.Generator do
         positions = child_positions(symbols),
         not splice?(lhs, symbols, positions),
         not (match?([{:terminal, _category}], symbols) and positions == []),
-        do: {lhs, length(positions), spelling_of(symbols, positions)}
+        spelling = spelling_of(symbols, positions),
+        {arity, spelling} <- absent_slots(length(positions), spelling, symbols, nullable),
+        do: {lhs, arity, spelling}
+  end
+
+  # The parser drops a child that derived `<nothing>`, so `file(<file_name><file_info>)`
+  # arrives with one child when `<file_info>` is empty and needs a one-slot shape too.
+  defp absent_slots(arity, {:separated, _sep} = spelling, _symbols, _nullable),
+    do: [{arity, spelling}]
+
+  defp absent_slots(arity, spelling, symbols, nullable) do
+    symbols
+    |> Enum.zip(spelling)
+    |> Enum.reduce([{arity, []}], fn
+      {{:nonterminal, name}, :slot}, variants ->
+        present = for {n, items} <- variants, do: {n, [:slot | items]}
+
+        if name in nullable,
+          do: present ++ for({n, items} <- variants, do: {n - 1, items}),
+          else: present
+
+      {_symbol, item}, variants ->
+        for {n, items} <- variants, do: {n, [item | items]}
+    end)
+    |> Enum.map(fn {n, items} -> {n, Enum.reverse(items)} end)
   end
 
   defp spelling_of(symbols, positions) do

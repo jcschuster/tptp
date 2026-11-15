@@ -109,7 +109,7 @@ defmodule Tptp.Unit do
 
   The entry point for a caller who has a TPTP name rather than a path — from a
   problem list, a benchmark set, or a user typing `PUZ001+1.p`. The root goes
-  through the same resolver as its includes, so pointing `$TPTP_ROOT` at a local
+  through the same resolver as its includes, so pointing `$TPTP` at a local
   library or passing `Tptp.Resolver.Http` changes where everything comes from at
   once.
 

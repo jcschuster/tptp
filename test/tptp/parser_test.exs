@@ -72,8 +72,7 @@ defmodule Tptp.ParserTest do
 
     test "an internal source takes all three of its arguments" do
       # `<internal_source> ::= introduced(<intro_type>,<useful_info>,<parents>)`, so
-      # the two-argument form is not a source. `SYN000_2.p` writes it, which is why
-      # that file is in `Mix.Tasks.Tptp.Corpus.known_failures/0`.
+      # the two-argument form is not a source.
       statement = parse!("fof(a, axiom, p, introduced(assumption, [from, the, world], [])).")
 
       assert statement.source.kind == :internal_source

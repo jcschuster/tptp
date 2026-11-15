@@ -56,7 +56,7 @@ defmodule Tptp.ParserCorpusTest do
     files = Corpus.files(every: 3, max_bytes: 3_000_000)
 
     if files == [] do
-      raise "no TPTP library found; set $TPTP_ROOT to enable the corpus tests"
+      raise "no TPTP library found; set $TPTP to enable the corpus tests"
     end
 
     %{files: files, emitted: emitted_kinds()}
@@ -204,7 +204,18 @@ defmodule Tptp.ParserCorpusTest do
       |> Enum.map(&hd/1)
       |> Enum.filter(&MapSet.member?(categories, &1))
 
-    (named ++ spliced_terminals)
+    # Tokens a node keeps as children, such as `$fof` in `<formula_data>`.
+    productions = ~r/^'[\w']+' -> (.*) : \{'\$node', '[\w']+', \d+, \[(.*?)\]/m
+
+    child_terminals =
+      for [rhs, children] <- Regex.scan(productions, grammar, capture: :all_but_first),
+          symbols = String.split(rhs),
+          [index] <- Regex.scan(~r/'\$(\d+)'/, children, capture: :all_but_first),
+          symbol = symbols |> Enum.at(String.to_integer(index) - 1) |> String.trim("'"),
+          MapSet.member?(categories, symbol),
+          do: symbol
+
+    (named ++ spliced_terminals ++ child_terminals)
     |> Enum.reject(&String.ends_with?(&1, "_rep"))
     |> MapSet.new(&String.to_existing_atom/1)
     |> MapSet.difference(@consumed)

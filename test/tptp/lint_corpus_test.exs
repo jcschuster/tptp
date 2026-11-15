@@ -27,8 +27,7 @@ defmodule Tptp.LintCorpusTest do
   declarations are in a file it does not include; that is why the gate lints units.
   It applies to THF only. The first-order typed dialects give an undeclared symbol a
   default type, which the rule ignored until this was found, and so it reported 517
-  legal occurrences across seventeen files that this gate carried as true. The one
-  library file it is right about is listed in `@known_undeclared` with the reason.
+  legal occurrences across seventeen files that this gate carried as true.
 
   `TPTP0505` is gone. It reported a symbol applied at two arities, and it fired on
   eleven library files, ten of which were doing something the TPTP explicitly permits
@@ -50,42 +49,19 @@ defmodule Tptp.LintCorpusTest do
   @moduletag :corpus
   @moduletag timeout: Corpus.timeout()
 
-  # The library files that really do use a symbol nothing declares, in a dialect
-  # where that is an error. There is one.
-  #
-  #   * `SYN000^2.p`, the THF syntax demonstration. Its `let_tuple_4` applies
-  #     `qll @ a @ b` and nothing declares `qll`, while `ql: $int > $int > $o` is
-  #     declared with exactly the type that use needs. It is also in
-  #     `Mix.Tasks.Tptp.Corpus.known_failures/0` until the `theory(equality)` fix of
-  #     10/09/26 reaches the distributed tarball, and is listed here so that this gate
-  #     does not start failing on the day it leaves that list.
-  #
-  # Seventeen first-order files — 517 occurrences across thirteen `SWX` problems,
-  # `LCL977_1.p`, `MSC034_1.p`, `MSC035_1.p` and `SYN000-3.p` — sat here as true
-  # findings until the TPTP language page was read on default typing: TFF, TXF, TCF
-  # and NXF give an undeclared symbol a type, and the rule now applies to THF alone.
-  # 39 `SWW` files sat here before that, until `Tptp.Lint.Collect` learned that a
-  # `$let` binding declares its names.
-  @known_undeclared ~w(SYN000^2.p)
-
   setup_all do
     root = Corpus.root()
 
     if root == nil do
-      raise "no TPTP library found; set $TPTP_ROOT to enable the corpus tests"
+      raise "no TPTP library found; set $TPTP to enable the corpus tests"
     end
 
     # `expandable/1` and not `files/1`: two of the tests below build units, and a
     # 2 KB problem that includes a 455 MB axiom set is under any root-size cap while
     # being far too large to expand. See `Tptp.Test.Corpus.expandable/1`.
-    # Both known lists come out here rather than in one test, because both tests
-    # that lint units see their findings: the tally as a code it cannot account for,
-    # the undeclared test as a file to explain. The companion test below re-checks
-    # every excluded file, so a stale exception fails rather than sits.
     problems =
       Corpus.expandable(every: 17, max_bytes: 1_000_000)
       |> Enum.filter(&(Path.extname(&1) == ".p"))
-      |> Enum.reject(&(Path.basename(&1) in @known_undeclared))
 
     %{
       problems: problems,
@@ -147,19 +123,6 @@ defmodule Tptp.LintCorpusTest do
       |> Enum.reject(&(&1 == :ok))
 
     assert noisy == []
-  end
-
-  test "the files excluded from that rule still have nothing declaring their symbols",
-       %{resolver: resolver} do
-    # The same guarantee `Mix.Tasks.Tptp.Corpus.known_failures/0` gets: an exception
-    # that stopped being needed fails here rather than sitting above unnoticed.
-    for name <- @known_undeclared do
-      [path] = Path.wildcard(Path.join([Corpus.root(), "**", name]))
-      {:ok, unit, _diagnostics} = Unit.from_file(path, resolver: resolver, max_concurrency: 1)
-
-      assert Lint.run_unit(unit, only: [Tptp.Lint.Rules.Declaration]) != [],
-             "#{name} declares its symbols now — drop it from @known_undeclared"
-    end
   end
 
   test "every library file is assigned a dialect", %{files: files} do

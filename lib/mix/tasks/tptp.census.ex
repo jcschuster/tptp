@@ -138,7 +138,7 @@ defmodule Mix.Tasks.Tptp.Census do
 
     Mix.Task.run("app.start")
 
-    root = Corpus.root() || Mix.raise("no TPTP library found; set $TPTP_ROOT to a checkout")
+    root = Corpus.root() || Corpus.not_found!()
     paths = Corpus.files(options)
 
     if paths == [], do: Mix.raise("no problem or axiom files under #{root}")

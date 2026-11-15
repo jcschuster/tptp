@@ -18,14 +18,14 @@ defmodule Mix.Tasks.Tptp.Lint do
   reading the input, and the `:==` well-formedness findings from `Tptp.Lint`. Each
   is printed as `path:line:column: severity: message [CODE]`.
 
-      Problems/SYN/SYN000+2.p:86:44: error: unexpected `(` [TPTP0301]
+      problem.p:86:44: error: unexpected `(` [TPTP0301]
 
   ## Includes are not followed unless you say so
 
   Without `--include`, each file is read alone, so a problem declaring its symbols
   in an included axiom set reports every one of them as undeclared. The finding is
   correct — the file does not itself declare them — but is rarely useful.
-  `--include` resolves the graph against `$TPTP_ROOT` and analyses the whole unit,
+  `--include` resolves the graph against `$TPTP` and analyses the whole unit,
   under which `TPTP0501` and the conjecture count can be correct.
 
   ## Exit status
@@ -36,9 +36,9 @@ defmodule Mix.Tasks.Tptp.Lint do
   ## Options
 
     * `--include` — resolve `include` directives and lint the whole unit. Uses
-      `Tptp.Resolver.Fs`, which searches the including file's directory, `$TPTP_ROOT`,
-      `$TPTP` and the working directory.
-    * `--root PATH` — a library root to resolve against, instead of `$TPTP_ROOT`.
+      `Tptp.Resolver.Fs`, which searches the including file's directory, `$TPTP`
+      and the working directory.
+    * `--root PATH` — a library root to resolve against ahead of `$TPTP`.
       Implies `--include`.
     * `--severity LEVEL` — the lowest severity that fails the run: `error`,
       `warning`, `info`, `hint`, or `none`. Defaults to `error`.

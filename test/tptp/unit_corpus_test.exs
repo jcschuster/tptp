@@ -23,7 +23,7 @@ defmodule Tptp.UnitCorpusTest do
     root = Corpus.root()
 
     if root == nil do
-      raise "no TPTP library found; set $TPTP_ROOT to enable the corpus tests"
+      raise "no TPTP library found; set $TPTP to enable the corpus tests"
     end
 
     # `expandable/1` and not `files/1`: `:max_bytes` caps the root and not its

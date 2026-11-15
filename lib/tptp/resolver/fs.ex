@@ -5,14 +5,13 @@ defmodule Tptp.Resolver.Fs do
   ## Search order
 
   1. the directory of the including file, when there is one;
-  2. `:root`, or `$TPTP_ROOT` if the option is absent;
-  3. `$TPTP`, the older variable the TPTP tools have always used;
+  2. `:root`, when given;
+  3. `$TPTP`, the variable the TPTP tools use;
   4. `:cwd`, or the current working directory.
 
-  `$TPTP_ROOT` is the documented environment variable and `:root` is the local
-  override, so that a caller directing resolution at a vendored copy, a fixture
-  directory or a second library need not set an environment variable for the whole
-  VM.
+  `:root` is the local override, so that a caller directing resolution at a vendored
+  copy, a fixture directory or a second library need not set an environment
+  variable for the whole VM.
 
       Tptp.Unit.from_file("PUZ001+1.p", resolver: Tptp.Resolver.Fs)
       Tptp.Unit.from_file("PUZ001+1.p", resolver: {Tptp.Resolver.Fs, root: "/opt/TPTP"})
@@ -23,12 +22,8 @@ defmodule Tptp.Resolver.Fs do
       {Tptp.Resolver.Fs, root: ["priv/my_axioms", "/opt/TPTP"]}
 
   `:root` does not suppress `$TPTP` or the working directory; it is inserted ahead
-  of them. To search only the named directories, pass `cwd: false` and leave the
-  environment variables unset, or use `Tptp.Resolver.Map`.
-
-  `$TPTP` is honoured after `:root` because a machine with the TPTP distribution
-  installed usually already has it set, and failing to find `Axioms/SET007+0.ax` on
-  such a machine would be a silly way to lose.
+  of them. To search only the named directories, pass `cwd: false` and leave `$TPTP`
+  unset, or use `Tptp.Resolver.Map`.
 
   ## Confinement
 
@@ -57,7 +52,9 @@ defmodule Tptp.Resolver.Fs do
   end
 
   @doc """
-  The directories this resolver would look in, in order.
+  The directories this resolver would look in, in order, expanded so that a `~`
+  quoted into `$TPTP` reads as the home directory. `$TPTP` set to the empty string
+  is skipped rather than read as the working directory.
 
   Exposed because "it could not find the file" is a much less useful thing to be
   told than "it looked here, here and here".
@@ -66,21 +63,16 @@ defmodule Tptp.Resolver.Fs do
   def roots(from, options \\ []) do
     [
       from && Path.dirname(from),
-      overrides(options),
+      Keyword.get(options, :root),
       System.get_env("TPTP"),
+      # Undocumented and to be removed: the variable this library used to document.
+      System.get_env("TPTP_ROOT"),
       cwd(options)
     ]
     |> List.flatten()
-    |> Enum.reject(&(is_nil(&1) or &1 == false))
+    |> Enum.reject(&(&1 in [nil, false, ""]))
+    |> Enum.map(&Path.expand/1)
     |> Enum.uniq()
-  end
-
-  defp overrides(options) do
-    case Keyword.get(options, :root) do
-      nil -> System.get_env("TPTP_ROOT")
-      roots when is_list(roots) -> roots
-      root when is_binary(root) -> [root]
-    end
   end
 
   defp cwd(options) do

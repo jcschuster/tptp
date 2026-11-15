@@ -60,7 +60,7 @@ defmodule Tptp.Bench do
     rungs = present(root, @rungs)
 
     if rungs == [] do
-      abort("no ladder files found under #{root}; set $TPTP_ROOT to a TPTP library")
+      abort("no ladder files found under #{root}; set $TPTP to a TPTP library")
     end
 
     report_sizes(rungs)
@@ -70,9 +70,9 @@ defmodule Tptp.Bench do
   end
 
   defp root! do
-    root = System.get_env("TPTP_ROOT") || System.get_env("TPTP") || "/opt/TPTP"
+    root = System.get_env("TPTP") || System.get_env("TPTP_ROOT") || "/opt/TPTP"
 
-    if File.dir?(root), do: root, else: abort("no TPTP library at #{root}; set $TPTP_ROOT")
+    if File.dir?(root), do: root, else: abort("no TPTP library at #{root}; set $TPTP")
   end
 
   defp present(root, rungs) do

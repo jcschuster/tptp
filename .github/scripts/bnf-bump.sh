@@ -130,11 +130,12 @@ sed -i -E "s/^version: \".*\"/version: \"$next\"/; s/^date-released: \".*\"/date
   CITATION.cff
 sed -i -E "s/\"version\": \"[^\"]+\"/\"version\": \"$next\"/" .zenodo.json
 
-# The BNF's history entries after the old version, up to the banner closing them.
-history=$(awk -v old="% v$old " '
-  /^% v/ { on = seen; if (index($0, old) == 1) seen = 1 }
-  NR > 1 && /^%-/ { on = 0; seen = 0 }
-  on' "$new_path")
+# The lines of the new BNF's history block, up to the banner closing it, that the old
+# one lacks. Not the entries after the old version's: v10.0.0.0 restarted the history,
+# so a new block need not mention the old version at all.
+history_block() { awk 'NR > 1 && /^%-/ { exit } NR > 1' "$1"; }
+history=$(grep -vxFf <(git show "HEAD:$old_path" | history_block /dev/stdin) \
+  <(history_block "$new_path")) || true
 
 section=$(mktemp)
 cat >"$section" <<EOF

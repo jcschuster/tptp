@@ -11,7 +11,7 @@ defmodule Tptp.Resolver do
 
   | Resolver | Reads |
   |----------|-------|
-  | `Tptp.Resolver.Fs` | the including file's directory, then `$TPTP_ROOT`, `$TPTP`, the working directory |
+  | `Tptp.Resolver.Fs` | the including file's directory, then `$TPTP`, the working directory |
   | `Tptp.Resolver.Http` | tptp.org over HTTPS, through a local cache |
   | `Tptp.Resolver.Cascade` | each of a list in turn |
   | `Tptp.Resolver.Map` | an in-memory map, for tests and Livebook |

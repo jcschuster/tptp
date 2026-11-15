@@ -32,7 +32,7 @@ defmodule TptpCorpusTest do
 
   setup_all do
     if Corpus.root() == nil do
-      raise "no TPTP library found; set $TPTP_ROOT to enable the corpus tests"
+      raise "no TPTP library found; set $TPTP to enable the corpus tests"
     end
 
     :ok
@@ -58,16 +58,6 @@ defmodule TptpCorpusTest do
       |> Enum.reject(&(&1 == :ok))
 
     assert noisy == []
-  end
-
-  test "the files this parser refuses still refuse to parse" do
-    for {name, why} <- Corpus.known_failures() do
-      [path] = Path.wildcard(Path.join([Corpus.root(), "**", name]))
-      {:ok, file, _diagnostics} = Tptp.from_file(path)
-
-      assert Tptp.File.any_errors?(file),
-             "#{name} parses now. Drop it from known_failures/0 — it was excluded because it #{why}"
-    end
   end
 
   test "streaming and reading eagerly agree, statement for statement" do

@@ -27,7 +27,7 @@ defmodule Tptp.LexerCorpusTest do
     files = Corpus.files(every: 3)
 
     if files == [] do
-      raise "no TPTP library found; set $TPTP_ROOT to enable the corpus tests"
+      raise "no TPTP library found; set $TPTP to enable the corpus tests"
     end
 
     %{files: files}

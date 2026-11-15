@@ -136,6 +136,8 @@ defmodule Tptp.PrinterTest do
       "fof(z, axiom, p, inference(rule, [status(thm)], [b, c])).",
       "fof(w, axiom, p, unknown, [$fof(q), description('why')]).",
       "fof(v, axiom, p, introduced(definition, [], [])).",
+      "fof(s, axiom, p, file('x.p')).",
+      "fof(s, axiom, p, file('x.p', s)).",
       "fof(u, axiom, p, inference(r, [], [a : foo, b])).",
       "include('Axioms/SET007+0.ax', [b], space).",
       "tpi(t, axiom, p)."

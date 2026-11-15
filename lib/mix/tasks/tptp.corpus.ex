@@ -84,31 +84,6 @@ defmodule Mix.Tasks.Tptp.Corpus do
   @default_max_bytes 20_000_000
   @default_heap 6 * 1024 * 1024 * 1024
   @tier_bounds [1_048_576, 4_194_304]
-  @theory "use `theory(equality)` as an inference parent, which `<source>` has not " <>
-            "derived since v9.3.1.2 replaced `<source> ::= <general_term>` with a list " <>
-            "of alternatives. Fixed upstream on 10/09/26 — see " <>
-            "<https://tptp.org/TPTP/Distribution/BuggedProblems-v9.3.1.txt> — and the " <>
-            "three parse once that edit reaches the distributed tarball. They are the " <>
-            "same demonstration of the annotated-formula syntax written once per " <>
-            "dialect, and all three carry the same two statements."
-
-  @introduced "writes `introduced(assumption,[from,the,world,[]])`, which is " <>
-                "`introduced(<intro_type>,<useful_info>)` where both the BNF and the " <>
-                "TPTP language page state `introduced(<intro_type>,<useful_info>," <>
-                "<parents>)`. The bracket belongs one place to the left: the other " <>
-                "three dialects' copies of this file write " <>
-                "`introduced(assumption,[from,the,world],[])`. Distinct from, and " <>
-                "not covered by, the `theory(equality)` fix of 10/09/26 — this file " <>
-                "carries both, and the second was reachable only once the first was " <>
-                "resolved. Reported upstream on 2026-09-11."
-
-  @known %{
-    "SYN000-2.p" => @theory,
-    "SYN000+2.p" => @theory,
-    "SYN000^2.p" => @theory,
-    "SYN000_2.p" => @introduced
-  }
-
   @open "<!-- results -->"
   @close "<!-- end results -->"
 
@@ -129,7 +104,7 @@ defmodule Mix.Tasks.Tptp.Corpus do
 
     Mix.Task.run("app.start")
 
-    root = root() || Mix.raise("no TPTP library found; set $TPTP_ROOT to a checkout")
+    root = root() || not_found!()
     paths = files(options)
 
     if paths == [], do: Mix.raise("no problem or axiom files under #{root}")
@@ -141,31 +116,32 @@ defmodule Mix.Tasks.Tptp.Corpus do
   end
 
   @doc """
-  Returns the library files this parser rejects, with the reason for each.
-
-  Keyed by base name. An entry is added only once the failure has been resolved to
-  a property of the sources. Every entry is a discrepancy between the vendored BNF
-  release and the library distributed alongside it, which a parser generated from
-  that BNF is expected to report.
-
-  The report renders each reason beside the failure it explains. The corpus tests
-  exclude these files and then assert that each still fails, so an entry that has
-  become unnecessary is reported rather than retained.
-  """
-  @spec known_failures() :: %{binary() => binary()}
-  def known_failures, do: @known
-
-  @doc """
-  Returns the library root: `$TPTP_ROOT`, `$TPTP` or `/opt/TPTP`, whichever names a
-  directory.
+  Returns the library root: `$TPTP`, or `/opt/TPTP` where that does not name a
+  directory, with a leading `~` expanded.
 
   Returns `nil` where none does, which allows the corpus tests to be skipped rather
   than fail on a machine without a copy of the library.
   """
   @spec root() :: Path.t() | nil
   def root do
-    candidate = System.get_env("TPTP_ROOT") || System.get_env("TPTP") || @conventional
-    if File.dir?(candidate), do: candidate
+    Enum.find(candidates(), &File.dir?/1)
+  end
+
+  # Expanded because a quoted `~` reaches the environment unexpanded.
+  defp candidates do
+    # `$TPTP_ROOT` is undocumented and to be removed: the variable this used to read.
+    for candidate <- [System.get_env("TPTP"), System.get_env("TPTP_ROOT"), @conventional],
+        candidate not in [nil, ""],
+        do: Path.expand(candidate)
+  end
+
+  @doc false
+  @spec not_found!() :: no_return()
+  def not_found! do
+    Mix.raise(
+      "no TPTP library found at #{Enum.join(candidates(), ", ")}; " <>
+        "export $TPTP naming a checkout"
+    )
   end
 
   @doc """
@@ -419,9 +395,7 @@ defmodule Mix.Tasks.Tptp.Corpus do
 
     A file that did not parse is listed below with the diagnostic code that refused
     it, because "did not parse" and "is not TPTP" are different claims and only the
-    code says which one this is. Where the answer is known it is written out below
-    the table, once per explanation rather than once per file, and it disappears
-    from the report along with the failures it explains.
+    code says which one this is.
 
     Regenerate with `mix tptp.corpus`; `mix tptp.corpus --check` fails if the
     results below have gone stale against the library on this machine. The nightly
@@ -515,30 +489,12 @@ defmodule Mix.Tasks.Tptp.Corpus do
           "| `#{Path.basename(result.path)}` | #{describe(result.outcome)} |"
         end)
 
-      "### What did not parse\n\n| File | Why |\n|---|---|\n" <> rows <> notes(failed)
+      "### What did not parse\n\n| File | Why |\n|---|---|\n" <> rows
     end
   end
 
   defp thinning(1), do: "none — every file"
   defp thinning(every), do: "one file in #{every}"
-
-  defp notes(failed) do
-    known =
-      failed
-      |> Enum.map(&Path.basename(&1.path))
-      |> Enum.sort()
-      |> Enum.filter(&Map.has_key?(known_failures(), &1))
-      |> Enum.group_by(&Map.fetch!(known_failures(), &1))
-
-    if known == %{} do
-      ""
-    else
-      "\n\n" <>
-        Enum.map_join(known, "\n\n", fn {why, names} ->
-          "**#{Enum.map_join(names, ", ", &"`#{&1}`")}** #{why}"
-        end)
-    end
-  end
 
   defp describe(:timeout), do: "timed out"
   defp describe(:heap), do: "exceeded the heap ceiling, alone"

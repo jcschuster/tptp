@@ -5,7 +5,7 @@ name: corpus
 # in five is a check that never looks at four fifths of the library, and the only
 # way that stops being true is to run the whole thing somewhere.
 #
-# "All of them" means the complete TPTP, all four dialects — 29,358 files and
+# "All of them" means the complete TPTP, all four dialects — 29,397 files and
 # 5.4 GB. On sixteen local workers that sweep takes nine minutes; on a two-core
 # runner it is hours, which is why the job budget is most of a day's worth of one.
 
@@ -27,7 +27,7 @@ permissions:
 
 env:
   MIX_ENV: test
-  TPTP_ROOT: ${{ github.workspace }}/TPTP
+  TPTP: ${{ github.workspace }}/TPTP
 
 jobs:
   sweep:
@@ -60,12 +60,12 @@ jobs:
       - name: Download the TPTP library
         run: |
           df -h /
-          curl -sSfL https://tptp.org/TPTP/Distribution/TPTP-v9.3.1.tgz -o TPTP.tgz
-          mkdir -p "$TPTP_ROOT"
-          tar -xzf TPTP.tgz --strip-components=1 -C "$TPTP_ROOT" \
-            --wildcards 'TPTP-v9.3.1/Problems/*' 'TPTP-v9.3.1/Axioms/*'
+          curl -sSfL https://tptp.org/TPTP/Distribution/TPTP-v10.0.0.tgz -o TPTP.tgz
+          mkdir -p "$TPTP"
+          tar -xzf TPTP.tgz --strip-components=1 -C "$TPTP" \
+            --wildcards 'TPTP-v10.0.0/Problems/*' 'TPTP-v10.0.0/Axioms/*'
           rm TPTP.tgz
-          find "$TPTP_ROOT/Problems" -name '*.p' -size +20000000c -delete
+          find "$TPTP/Problems" -name '*.p' -size +20000000c -delete
           df -h /
 
       - run: mix deps.get

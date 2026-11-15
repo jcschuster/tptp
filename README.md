@@ -12,7 +12,7 @@
 [![CI](https://github.com/jcschuster/tptp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jcschuster/tptp/actions/workflows/ci.yml)
 [![Corpus](https://github.com/jcschuster/tptp/actions/workflows/corpus.yml/badge.svg)](https://github.com/jcschuster/tptp/actions/workflows/corpus.yml)
 [![BNF](https://github.com/jcschuster/tptp/actions/workflows/bnf.yml/badge.svg)](https://github.com/jcschuster/tptp/actions/workflows/bnf.yml)
-[![SyntaxBNF](https://img.shields.io/badge/SyntaxBNF-v10.0.0.0-c4a7e7.svg)](https://github.com/TPTPWorld/SyntaxBNF)
+[![SyntaxBNF](https://img.shields.io/badge/SyntaxBNF-v10.0.0.1-c4a7e7.svg)](https://github.com/TPTPWorld/SyntaxBNF)
 [![License](https://img.shields.io/hexpm/l/tptp.svg)](LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23063474.svg)](https://doi.org/10.5281/zenodo.23063474)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jcschuster/tptp/badge)](https://scorecard.dev/viewer/?uri=github.com/jcschuster/tptp)
@@ -48,7 +48,7 @@ flowchart LR
 3. **Parse** each statement into a concrete syntax tree whose node kinds are BNF
    nonterminals.
 4. **Resolve** `include` directives against a pluggable resolver — the local
-   filesystem under `$TPTP_ROOT`, or tptp.org over HTTPS — with cycle detection.
+   filesystem under `$TPTP`, or tptp.org over HTTPS — with cycle detection.
 5. **Check** the `:==` well-formedness conditions and the cross-statement
    conditions.
 6. **Print** a tree back to TPTP: canonical, pretty, or format-preserving.
@@ -152,35 +152,23 @@ Tptp.Header.spc(header)              # %{form: "FOF", status: :theorem, features
 Tptp.Header.entries(header, "Refs")  # ["[Pel86] Pelletier (1986), ...", "[Hah94] Haehnle (1994), ..."]
 ```
 
-A line that is neither a key nor a continuation is reported as `TPTP0901`; four
-files of TPTP v9.3.1 have three each.
+A line that is neither a key nor a continuation is reported as `TPTP0901`; no
+file of TPTP v10.0.0 has one.
 
 ## Coverage
 
-Every problem and axiom file of a complete TPTP v9.3.1, across all dialects,
+Every problem and axiom file of a complete TPTP v10.0.0, across all dialects,
 through the parser alone: no `include` resolved and no lint rule applied.
 
 | Set      | Files | Parsed | Failed | Timed out |
 | -------- | ----: | -----: | -----: | --------: |
-| Problems | 26925 |  26921 |      4 |         0 |
-| Axioms   |  2433 |   2433 |      0 |         0 |
-| Total    | 29358 |  29354 |      4 |         0 |
+| Problems | 26988 |  26988 |      0 |         0 |
+| Axioms   |  2409 |   2409 |      0 |         0 |
+| Total    | 29397 |  29397 |      0 |         0 |
 
-5.4 GB in 887 seconds on eight workers, under a 60-second per-file budget that
+5.4 GB in 688 seconds on sixteen workers, under a 60-second per-file budget that
 no file reached. The preceding toolchain recorded 628 timeouts and 221 parse
 failures over the TH0/TH1 subset alone.
-
-The four failures are `SYN000-2.p`, `SYN000+2.p`, `SYN000_2.p` and `SYN000^2.p`,
-the annotated-formula demonstration written once per dialect, and they are defects
-in the files rather than in the parser. Three use `theory(equality)` as an inference
-parent, which `<source>` has not derived since v9.3.1.2 replaced
-`<source> ::= <general_term>` with a list of alternatives; that was
-[fixed upstream][bugged] on 10/09/26 and the three parse once the edit reaches the
-distributed tarball. `SYN000_2.p` carries a second, independent one — it writes
-`introduced(assumption,[from,the,world,[]])` where both the BNF and the language
-page state `introduced(<intro_type>,<useful_info>,<parents>)`, the other three
-dialects' copies writing `introduced(assumption,[from,the,world],[])`.
-[CORPUS.md](reports/CORPUS.md) carries the citation for each.
 
 The TPTP is this library's ground truth: where the two disagree, the parser is
 incorrect, being generated from the published BNF, and correcting it by hand would
@@ -208,7 +196,7 @@ installation requires neither Python, nor awk, nor the BNFs, nor network access:
 
 | Generated                    | From                                                                  |
 | ---------------------------- | --------------------------------------------------------------------- |
-| `src/tptp_parser.yrl`        | `priv/bnf/SyntaxBNF-v10.0.0.0`                                         |
+| `src/tptp_parser.yrl`        | `priv/bnf/SyntaxBNF-v10.0.0.1`                                         |
 | `lib/tptp/bnf/vocabulary.ex` | the same, `:==` rules — and `<inference_status_value>` of the SZS BNF |
 | `lib/tptp/printer/shapes.ex` | the same, `::=` rules                                                 |
 | `test/support/bnf_oracle.ex` | the same BNF, `::-` and `:::` rules                                   |
@@ -357,7 +345,7 @@ them from input. This is a security property and is enforced mechanically.
 
 This library is MIT licensed. See [LICENSE](LICENSE).
 
-Redistributed TPTP material is not. `priv/bnf/SyntaxBNF-v10.0.0.0` is the file from
+Redistributed TPTP material is not. `priv/bnf/SyntaxBNF-v10.0.0.1` is the file from
 [github.com/TPTPWorld/SyntaxBNF][bnf], `priv/bnf/SZSOntology.bnf` the file from
 [github.com/TPTPWorld/SZSOntologies][szsbnf] (CC BY 4.0), each carried unmodified
 so that installation requires no network access, and `lib/tptp/szs/page.ex` quotes
@@ -375,5 +363,4 @@ was taken at and its digest, and [tptp.org][tptp] for the TPTP itself.
 [bnf]: https://github.com/TPTPWorld/SyntaxBNF
 [szsbnf]: https://github.com/TPTPWorld/SZSOntologies
 [szs]: https://szs.tptp.org
-[bugged]: https://tptp.org/TPTP/Distribution/BuggedProblems-v9.3.1.txt
 [tptp]: https://www.tptp.org

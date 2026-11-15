@@ -10,6 +10,38 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-15
+
+### Changed
+
+- The parser is regenerated from TPTP BNF v10.0.0.1, which `Tptp.bnf_version/0` now
+  reports; it was v10.0.0.0. The release only drops redundant parentheses from
+  token rules, so the grammar is unchanged and no input parses differently. The
+  BNF records what changed:
+
+  ```text
+  % v10.0.0.1 - Removed redundant ()s from <real>, <unsigned_real>, <exp_integer>, <rational>,
+  %             <integer>, <unsigned_integer>, <do_char>, <sq_char>, <alpha>, <alpha_numeric>.
+  ```
+
+- The corpus is TPTP v10.0.0, which fixes every file the sweep excluded as a
+  defect: `SYN000-2.p`, `SYN000+2.p`, `SYN000^2.p` and `SYN000_2.p` parse, the
+  empty `ITP` axiom sets and the colonless `MGT` headers are gone. The exclusion
+  lists, and `Mix.Tasks.Tptp.Corpus.known_failures/0`, are removed.
+- `$TPTP` names the library, as it does for the TPTP tools. `Tptp.Resolver.Fs`
+  searches it after `:root`, and `mix tptp.corpus`, `mix tptp.census` and the
+  corpus tests read it, falling back to `/opt/TPTP`.
+
+### Fixed
+
+- `Tptp.Resolver.Fs.roots/2` and the corpus tasks expand a leading `~` in `$TPTP`,
+  which a quoted shell assignment leaves unexpanded, and skip it when it is empty.
+  A corpus task that finds no library says where it looked.
+
+- The canonical and pretty printers wrote `file('x.p')` as `'x.p'`, dropping the
+  `file(...)` around a `<file_source>` without a `<file_info>`. Every shape with
+  a slot that can derive `<nothing>` now also has a shape without it.
+
 ## [0.3.1] - 2026-11-06
 
 ### Changed
@@ -393,6 +425,7 @@ files, and are recorded under Notes below.
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
 [Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.0...HEAD
+[0.3.2]: https://github.com/jcschuster/tptp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/jcschuster/tptp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jcschuster/tptp/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jcschuster/tptp/compare/v0.2.0...v0.2.1
