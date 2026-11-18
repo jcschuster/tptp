@@ -10,6 +10,19 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-11-18
+
+### Fixed
+
+- `Tptp.Resolver.Http.contents/1` resolves numeric character references.
+  seetptp.tptp.org writes `"` as `&#34;`, which was left in the file: 1,765 files
+  of TPTP v10.0.0 contain a `"`, and the 12 with one in a formula, among them
+  `Axioms/CSR003+0.ax`, `SYO561_2.p` and `SYN000+2.p`, did not parse.
+- The cache is kept in a subdirectory of `:cache_dir` named for the version of
+  the recovery, so a file cached by 0.3.4 with `&#34;` left in it is fetched
+  again rather than served. The 0.3.4 entries at the top of `:cache_dir` are no
+  longer read and can be deleted.
+
 ## [0.3.4] - 2026-11-18
 
 ### Changed
@@ -457,7 +470,8 @@ files, and are recorded under Notes below.
   treated as different symbols" — so this compares two declarations at the same
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
-[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/jcschuster/tptp/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/jcschuster/tptp/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/jcschuster/tptp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/jcschuster/tptp/compare/v0.3.1...v0.3.2

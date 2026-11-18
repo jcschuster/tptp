@@ -56,7 +56,9 @@ defmodule Tptp.Resolver.Http do
        `<=>`, `<~>` or `<<`. This is what renders removing `<[^>]*>` sound in this
        context.
     2. **Resolve the entities.** `&lt;` becomes `<` only at this point, so it cannot
-       be treated as a tag by the first step.
+       be treated as a tag by the first step. Numeric references are resolved too:
+       SeeTPTP writes `"` as `&#34;` and `'` as `&#39;`. `&amp;` is resolved last,
+       so that an `&amp;lt;` in the page stays the `&lt;` that is in the file.
 
   The reverse order would delete every equivalence in the file.
 
@@ -70,6 +72,11 @@ defmodule Tptp.Resolver.Http do
   served from disk without network access, so a corpus run costs one request per
   file. The default is `~/.cache/tptp`; set `:cache_dir` to `false` to disable
   caching.
+
+  What is cached is the recovered file, not the page, so a fix to `contents/1`
+  would not reach a file already cached. Entries therefore sit in a subdirectory
+  named for the version of the recovery, which changes with it; an older
+  subdirectory is never read again and can be deleted.
 
   ## `:inets` and `:ssl` are started here, not by the application
 
@@ -112,6 +119,8 @@ defmodule Tptp.Resolver.Http do
 
   @base_url "https://seetptp.tptp.org/file/TPTPWorld/TPTP"
   @timeout 30_000
+  # Bumped whenever `contents/1` changes what it recovers from a page.
+  @cache_version "v2"
   @lib_path [:asn1, :crypto, :public_key, :ssl, :inets]
   @needed [{:public_key, :public_key}, {:ssl, :ssl}, {:inets, :httpc}]
 
@@ -326,10 +335,22 @@ defmodule Tptp.Resolver.Http do
     |> String.replace("&lt;", "<")
     |> String.replace("&gt;", ">")
     |> String.replace("&quot;", "\"")
-    |> String.replace("&#39;", "'")
     |> String.replace("&apos;", "'")
     |> String.replace("&nbsp;", " ")
+    |> numeric_references()
     |> String.replace("&amp;", "&")
+  end
+
+  defp numeric_references(text),
+    do: Regex.replace(~r/&#(?:x([0-9a-f]+)|([0-9]+));/i, text, &numeric/3)
+
+  defp numeric(reference, "", decimal), do: character(reference, String.to_integer(decimal))
+  defp numeric(reference, hex, _decimal), do: character(reference, String.to_integer(hex, 16))
+
+  defp character(reference, code) do
+    <<code::utf8>>
+  rescue
+    ArgumentError -> reference
   end
 
   defp html?(body) do
@@ -361,9 +382,14 @@ defmodule Tptp.Resolver.Http do
 
   defp cache_path(url, options) do
     case Keyword.get(options, :cache_dir, default_cache_dir()) do
-      false -> nil
-      nil -> nil
-      dir -> Path.join(dir, Base.encode16(:crypto.hash(:sha256, url), case: :lower))
+      false ->
+        nil
+
+      nil ->
+        nil
+
+      dir ->
+        Path.join([dir, @cache_version, Base.encode16(:crypto.hash(:sha256, url), case: :lower)])
     end
   end
 

@@ -208,10 +208,10 @@ defmodule Tptp.ResolverTest do
       options = [cache_dir: dir, base_url: "http://127.0.0.1:1/see"]
       url = Http.url("a.ax", options)
 
-      File.mkdir_p!(dir)
+      File.mkdir_p!(Path.join(dir, "v2"))
 
       File.write!(
-        Path.join(dir, Base.encode16(:crypto.hash(:sha256, url), case: :lower)),
+        Path.join([dir, "v2", Base.encode16(:crypto.hash(:sha256, url), case: :lower)]),
         "fof(cached, axiom, p)."
       )
 
@@ -265,6 +265,16 @@ defmodule Tptp.ResolverTest do
       assert length(file.statements) == 3
     end
 
+    test "numeric references are resolved, and &amp; last" do
+      page =
+        ~s|<pre>\ncnf(a,axiom, p(&#34;s&#34;, &#39;t&#39;, &#x22;u&#x22;)).\n| <>
+          ~s|% &amp;#34; and &amp;lt; are text\n</pre>|
+
+      assert {:ok, contents} = Http.contents(page)
+      assert contents =~ ~s|p("s", 't', "u")|
+      assert contents =~ "% &#34; and &lt; are text"
+    end
+
     test "a page with no pre block is the error page" do
       assert Http.contents("<html><body>No such file</body></html>") == :error
     end
@@ -287,10 +297,10 @@ defmodule Tptp.ResolverTest do
       options = [cache_dir: dir, base_url: "http://127.0.0.1:1/see"]
       url = Http.url("b.ax", options)
 
-      File.mkdir_p!(dir)
+      File.mkdir_p!(Path.join(dir, "v2"))
 
       File.write!(
-        Path.join(dir, Base.encode16(:crypto.hash(:sha256, url), case: :lower)),
+        Path.join([dir, "v2", Base.encode16(:crypto.hash(:sha256, url), case: :lower)]),
         "fof(c, axiom, p)."
       )
 
