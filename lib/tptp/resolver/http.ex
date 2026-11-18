@@ -19,6 +19,7 @@ defmodule Tptp.Resolver.Http do
   rather than a path:
 
       Axioms/SET007+0.ax   ->  ?Category=Axioms&File=SET007+0.ax
+      Axioms/SET007/SET007+0.ax  ->  ?Category=Axioms&File=SET007/SET007+0.ax
       SET007+0.ax          ->  ?Category=Axioms&File=SET007+0.ax
       Problems/PUZ/PUZ001+1.p  ->  ?Category=Problems&Domain=PUZ&File=PUZ001+1.p
       PUZ001+1.p           ->  ?Category=Problems&Domain=PUZ&File=PUZ001+1.p
@@ -75,9 +76,13 @@ defmodule Tptp.Resolver.Http do
   cheerfully answers `{:ok, []}`. The first symptom is an `:undef` from deep inside
   `:httpc`, raised while it builds the default HTTPS options.
 
-  So `started/0` puts the ebin directories back on the path first, resolving them
-  under `:code.root_dir/0` rather than `:code.lib_dir/1` — the latter consults the
-  code path it is trying to repair and answers `:bad_name`. It then checks a
+  Mix and Hex load `:httpc` themselves, so a loaded `:httpc` does not mean the rest
+  of `:inets` is loadable: with its directory pruned, the request exits with an
+  `:undef` from `:http_util`.
+
+  So `started/0` puts back on the path every ebin directory `:code.lib_dir/1`
+  reports missing — it consults the code path and answers `:bad_name` — resolving
+  them under `:code.root_dir/0` instead. It then checks a
   representative module of each application is really loadable, so a genuine absence
   is reported as a sentence rather than surfacing later as an `:undef`.
 
@@ -118,6 +123,9 @@ defmodule Tptp.Resolver.Http do
       iex> Tptp.Resolver.Http.url("Axioms/SET007+0.ax")
       "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2B0.ax"
 
+      iex> Tptp.Resolver.Http.url("Axioms/SET007/SET007+0.ax")
+      "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2FSET007%2B0.ax"
+
       iex> Tptp.Resolver.Http.url("SET007+0.ax")
       "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2B0.ax"
   """
@@ -137,7 +145,7 @@ defmodule Tptp.Resolver.Http do
   @spec parameters(binary()) :: [{binary(), binary()}]
   defp parameters(name) do
     case Path.split(name) do
-      ["Axioms", file] -> [{"Category", "Axioms"}, {"File", file}]
+      ["Axioms" | [_ | _] = path] -> [{"Category", "Axioms"}, {"File", Enum.join(path, "/")}]
       ["Problems", domain, file] -> [{"Category", "Problems"}, {"Domain", domain}, {"File", file}]
       [file] -> bare(file)
       other -> [{"Category", "Problems"}, {"File", List.last(other)}]
@@ -183,7 +191,7 @@ defmodule Tptp.Resolver.Http do
   """
   @spec started() :: :ok | {:error, binary()}
   def started do
-    if not ready?(), do: Enum.each(@lib_path, &extend_path/1)
+    Enum.each(@lib_path, &extend_path/1)
 
     Enum.reduce_while(@needed, :ok, fn {application, module}, :ok ->
       case start(application, module) do
@@ -192,9 +200,6 @@ defmodule Tptp.Resolver.Http do
       end
     end)
   end
-
-  defp ready?,
-    do: Enum.all?(@needed, fn {_application, module} -> Code.ensure_loaded?(module) end)
 
   defp start(application, module) do
     if Code.ensure_loaded?(module) do
@@ -212,6 +217,10 @@ defmodule Tptp.Resolver.Http do
   end
 
   defp extend_path(application) do
+    if :code.lib_dir(application) == {:error, :bad_name}, do: append_path(application)
+  end
+
+  defp append_path(application) do
     :code.root_dir()
     |> List.to_string()
     |> Path.join("lib/#{application}-*/ebin")

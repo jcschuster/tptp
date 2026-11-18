@@ -7,7 +7,7 @@ body:
     attributes:
       label: Versions
       description: "tptp and the BNF it reports (`Tptp.bnf_version/0`), Elixir and OTP."
-      placeholder: "tptp 0.3.2 (BNF v10.0.0.1), Elixir 1.20.3, OTP 29"
+      placeholder: "tptp 0.3.3 (BNF v10.0.0.1), Elixir 1.20.3, OTP 29"
     validations:
       required: true
   - type: dropdown

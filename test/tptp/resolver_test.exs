@@ -166,6 +166,11 @@ defmodule Tptp.ResolverTest do
       assert Http.url("SET007+0.ax") == Http.url("Axioms/SET007+0.ax")
     end
 
+    test "keeps the subdirectory of a nested axiom file" do
+      assert Http.url("Axioms/SET007/SET007+0.ax") ==
+               "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2FSET007%2B0.ax"
+    end
+
     test "maps a problem name to its domain" do
       assert Http.url("Problems/PUZ/PUZ001+1.p") ==
                "https://tptp.org/cgi-bin/SeeTPTP?Category=Problems&Domain=PUZ&File=PUZ001%2B1.p"

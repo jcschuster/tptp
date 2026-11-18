@@ -10,6 +10,19 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-18
+
+### Fixed
+
+- `Tptp.Resolver.Http` keeps the subdirectory of a nested axiom file:
+  `Axioms/SET007/SET007+0.ax` maps to `?Category=Axioms&File=SET007/SET007+0.ax`
+  rather than to the `Problems` category, so includes of the 2,125 files under
+  `Axioms/*/` resolve.
+- `Tptp.Resolver.Http.started/0` restores the code path of every application Mix
+  pruned, not only when one of `:httpc`, `:ssl` or `:public_key` is unloaded. Mix
+  and Hex load `:httpc`, so with `:ssl` available a request under `mix run` exited
+  with an `:undef` from `:http_util`.
+
 ## [0.3.2] - 2026-11-15
 
 ### Changed
@@ -424,7 +437,8 @@ files, and are recorded under Notes below.
   treated as different symbols" — so this compares two declarations at the same
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
-[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/jcschuster/tptp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/jcschuster/tptp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/jcschuster/tptp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jcschuster/tptp/compare/v0.2.1...v0.3.0
