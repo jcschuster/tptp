@@ -10,6 +10,26 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-18
+
+### Changed
+
+- `Tptp.Resolver.Http` fetches from `https://seetptp.tptp.org/file/TPTPWorld/TPTP`
+  by path, `Axioms/SET007/SET007+0.ax` becoming `.../TPTP/Axioms/SET007/SET007%2B0.ax`,
+  rather than through the CGI script at `tptp.org/cgi-bin/SeeTPTP`. A `:base_url`
+  is now the library root that a name's path is appended to, not a script that
+  takes a query.
+
+### Fixed
+
+- Nested axiom files load. 0.3.3 mapped their names, but the CGI script answers
+  them with the file's header alone, followed by "problem and solutions
+  unavailable", and the resolver accepted that page as the file.
+- A bare axiom name such as `SET007+0.ax`, or `Axioms/SET007+0.ax`, finds a file
+  in the subdirectory named for its set: on a 404 at the top of `Axioms`, it is
+  tried at `Axioms/SET007/SET007+0.ax`. `Tptp.Resolver.Http.urls/2` lists the URLs
+  a name is tried at.
+
 ## [0.3.3] - 2026-11-18
 
 ### Fixed
@@ -437,7 +457,8 @@ files, and are recorded under Notes below.
   treated as different symbols" — so this compares two declarations at the same
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
-[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/jcschuster/tptp/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/jcschuster/tptp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/jcschuster/tptp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/jcschuster/tptp/compare/v0.3.0...v0.3.1

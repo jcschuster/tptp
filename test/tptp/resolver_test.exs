@@ -161,32 +161,41 @@ defmodule Tptp.ResolverTest do
   describe "Tptp.Resolver.Http" do
     test "maps an axiom name to the Axioms category" do
       assert Http.url("Axioms/SET007+0.ax") ==
-               "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2B0.ax"
+               "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007%2B0.ax"
 
       assert Http.url("SET007+0.ax") == Http.url("Axioms/SET007+0.ax")
     end
 
+    test "a bare axiom name is also tried in the subdirectory named for its set" do
+      nested = "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007/SET007%2B0.ax"
+
+      assert Http.urls("SET007+0.ax") == [Http.url("SET007+0.ax"), nested]
+      assert Http.urls("Axioms/SET007+0.ax") == Http.urls("SET007+0.ax")
+      assert Http.urls("Axioms/SET007/SET007+0.ax") == [nested]
+      assert Http.urls("PUZ001+1.p") == [Http.url("PUZ001+1.p")]
+    end
+
     test "keeps the subdirectory of a nested axiom file" do
       assert Http.url("Axioms/SET007/SET007+0.ax") ==
-               "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2FSET007%2B0.ax"
+               "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007/SET007%2B0.ax"
     end
 
     test "maps a problem name to its domain" do
       assert Http.url("Problems/PUZ/PUZ001+1.p") ==
-               "https://tptp.org/cgi-bin/SeeTPTP?Category=Problems&Domain=PUZ&File=PUZ001%2B1.p"
+               "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Problems/PUZ/PUZ001%2B1.p"
 
       assert Http.url("PUZ001+1.p") ==
                Http.url("Problems/PUZ/PUZ001+1.p")
     end
 
     test "the + in a TPTP name survives encoding" do
-      assert Http.url("PUZ123^5.p") =~ "File=PUZ123%5E5.p"
+      assert Http.url("PUZ123^5.p") =~ "/PUZ123%5E5.p"
       refute Http.url("SET007+0.ax") =~ "SET007 0.ax"
     end
 
     test "the base url can be pointed elsewhere" do
       assert Http.url("a.ax", base_url: "http://localhost:4000/see") ==
-               "http://localhost:4000/see?Category=Axioms&File=a.ax"
+               "http://localhost:4000/see/Axioms/a.ax"
     end
 
     test "it refuses an unsafe name without reaching the network" do

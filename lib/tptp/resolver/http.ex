@@ -15,35 +15,46 @@ defmodule Tptp.Resolver.Http do
 
   ## The SeeTPTP mapping
 
-  tptp.org serves the library through a CGI script taking the components of a name
-  rather than a path:
+  SeeTPTP serves the library by its path under the library root:
 
-      Axioms/SET007+0.ax   ->  ?Category=Axioms&File=SET007+0.ax
-      Axioms/SET007/SET007+0.ax  ->  ?Category=Axioms&File=SET007/SET007+0.ax
-      SET007+0.ax          ->  ?Category=Axioms&File=SET007+0.ax
-      Problems/PUZ/PUZ001+1.p  ->  ?Category=Problems&Domain=PUZ&File=PUZ001+1.p
-      PUZ001+1.p           ->  ?Category=Problems&Domain=PUZ&File=PUZ001+1.p
+      Axioms/SET007/SET007+0.ax  ->  .../TPTP/Axioms/SET007/SET007+0.ax
+      Problems/PUZ/PUZ001+1.p    ->  .../TPTP/Problems/PUZ/PUZ001+1.p
+      SET007+0.ax                ->  .../TPTP/Axioms/SET007+0.ax
+                                     .../TPTP/Axioms/SET007/SET007+0.ax
+      PUZ001+1.p                 ->  .../TPTP/Problems/PUZ/PUZ001+1.p
 
-  A bare problem name takes its domain from the leading three letters, following
-  the TPTP naming convention. `url/2` is public so that the mapping can be read and
-  tested without network access.
+  A name of more than one segment is that path. A bare problem name takes its
+  domain from the leading three letters, following the TPTP naming convention.
 
-  The `+` in `SET007+0.ax` is part of the name, and form encoding converts it to a
-  space unless the parameter is escaped. Every parameter is escaped.
+  An axiom set may sit in a subdirectory named for it, as the 2,125 files under
+  `Axioms/SET007/` and `Axioms/ITP001/` do. Which ones do cannot be told from the
+  name, so a bare axiom name, or `Axioms/` and a bare name, is tried at the top of
+  `Axioms` and, on a 404, in the subdirectory named by its leading six characters.
+  Any other failure is reported at once rather than costing a second request.
+
+  `urls/2` and `url/2` are public so that the mapping can be read and tested
+  without network access.
+
+  Not the older CGI script at `tptp.org/cgi-bin/SeeTPTP`: it redirects here for a
+  flat name, but answers a name in a subdirectory of `Axioms` with the file's
+  header alone, followed by "problem and solutions unavailable".
+
+  Every segment is percent-encoded, so the `+` in `SET007+0.ax` cannot be read as
+  a space.
 
   ## SeeTPTP answers with a web page, not a file
 
   Every successful response is an HTML page containing the file within a `<pre>`
-  block, and the block is not the file: SeeTPTP inserts an `<A NAME="...">` anchor
-  before each formula. `contents/1` recovers the file and is public so that it can
-  be read and tested without network access.
+  block, and the block need not be the file: the older CGI script inserts an
+  `<A NAME="...">` anchor before each formula. `contents/1` recovers the file and is
+  public so that it can be read and tested without network access.
 
   Two steps, in this order:
 
     1. **Remove the markup.** Every `<` belonging to the TPTP source arrives as
-       `&lt;`, the page escaping `<` while leaving `>` and `&` unescaped, so a
-       literal `<` within the block is inserted markup rather than `<=>`, `<~>` or
-       `<<`. This is what renders removing `<[^>]*>` sound in this context.
+       `&lt;`, so a literal `<` within the block is inserted markup rather than
+       `<=>`, `<~>` or `<<`. This is what renders removing `<[^>]*>` sound in this
+       context.
     2. **Resolve the entities.** `&lt;` becomes `<` only at this point, so it cannot
        be treated as a tag by the first step.
 
@@ -99,7 +110,7 @@ defmodule Tptp.Resolver.Http do
 
   @behaviour Tptp.Resolver
 
-  @base_url "https://tptp.org/cgi-bin/SeeTPTP"
+  @base_url "https://seetptp.tptp.org/file/TPTPWorld/TPTP"
   @timeout 30_000
   @lib_path [:asn1, :crypto, :public_key, :ssl, :inets]
   @needed [{:public_key, :public_key}, {:ssl, :ssl}, {:inets, :httpc}]
@@ -108,59 +119,68 @@ defmodule Tptp.Resolver.Http do
   @spec resolve(binary(), Path.t() | nil, keyword()) :: Tptp.Resolver.result()
   def resolve(name, _from, options) do
     if Tptp.Resolver.safe?(name) do
-      fetch(url(name, options), name, options)
+      name |> urls(options) |> first_found(name, options)
     else
       {:error, Tptp.Resolver.unsafe_reason(name)}
     end
   end
 
   @doc """
-  The SeeTPTP URL an include name maps to.
+  The SeeTPTP URL an include name maps to, the first of `urls/2`.
 
       iex> Tptp.Resolver.Http.url("Problems/PUZ/PUZ001+1.p")
-      "https://tptp.org/cgi-bin/SeeTPTP?Category=Problems&Domain=PUZ&File=PUZ001%2B1.p"
-
-      iex> Tptp.Resolver.Http.url("Axioms/SET007+0.ax")
-      "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2B0.ax"
+      "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Problems/PUZ/PUZ001%2B1.p"
 
       iex> Tptp.Resolver.Http.url("Axioms/SET007/SET007+0.ax")
-      "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2FSET007%2B0.ax"
+      "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007/SET007%2B0.ax"
 
       iex> Tptp.Resolver.Http.url("SET007+0.ax")
-      "https://tptp.org/cgi-bin/SeeTPTP?Category=Axioms&File=SET007%2B0.ax"
+      "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007%2B0.ax"
   """
   @spec url(binary(), keyword()) :: binary()
-  def url(name, options \\ []) when is_binary(name) do
+  def url(name, options \\ []) when is_binary(name), do: hd(urls(name, options))
+
+  @doc """
+  The SeeTPTP URLs an include name may be found at, in the order they are tried.
+
+      iex> Tptp.Resolver.Http.urls("SET007+0.ax")
+      ["https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007%2B0.ax",
+       "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007/SET007%2B0.ax"]
+  """
+  @spec urls(binary(), keyword()) :: [binary(), ...]
+  def urls(name, options \\ []) when is_binary(name) do
     base = Keyword.get(options, :base_url, @base_url)
-    base <> "?" <> query(name)
+
+    for path <- paths(name) do
+      Enum.join([base | Enum.map(path, &encode/1)], "/")
+    end
   end
 
-  defp query(name) do
-    name
-    |> parameters()
-    |> Enum.map_join("&", fn {key, value} -> key <> "=" <> URI.encode_www_form(value) end)
-    |> String.replace("+", "%2B")
-  end
+  defp encode(segment), do: URI.encode(segment, &URI.char_unreserved?/1)
 
-  @spec parameters(binary()) :: [{binary(), binary()}]
-  defp parameters(name) do
+  defp paths(name) do
     case Path.split(name) do
-      ["Axioms" | [_ | _] = path] -> [{"Category", "Axioms"}, {"File", Enum.join(path, "/")}]
-      ["Problems", domain, file] -> [{"Category", "Problems"}, {"Domain", domain}, {"File", file}]
+      ["Axioms", file] -> axiom(file)
       [file] -> bare(file)
-      other -> [{"Category", "Problems"}, {"File", List.last(other)}]
+      path -> [path]
     end
   end
 
   defp bare(file) do
     if String.ends_with?(file, ".ax") do
-      [{"Category", "Axioms"}, {"File", file}]
+      axiom(file)
     else
-      [
-        {"Category", "Problems"},
-        {"Domain", String.upcase(String.slice(file, 0, 3))},
-        {"File", file}
-      ]
+      [["Problems", String.upcase(String.slice(file, 0, 3)), file]]
+    end
+  end
+
+  defp axiom(file), do: [["Axioms", file], ["Axioms", String.slice(file, 0, 6), file]]
+
+  defp first_found([url | rest], name, options) do
+    case fetch(url, name, options) do
+      {:not_found, _reason} when rest != [] -> first_found(rest, name, options)
+      {:not_found, reason} -> {:error, reason}
+      result -> result
     end
   end
 
@@ -242,6 +262,9 @@ defmodule Tptp.Resolver.Http do
     case safe_request(request, http) do
       {:ok, {{_version, 200, _phrase}, _headers, body}} ->
         accept(IO.iodata_to_binary(body), url, name, options)
+
+      {:ok, {{_version, 404, phrase}, _headers, _body}} ->
+        {:not_found, "#{url} returned 404 #{phrase}"}
 
       {:ok, {{_version, status, phrase}, _headers, _body}} ->
         {:error, "#{url} returned #{status} #{phrase}"}
