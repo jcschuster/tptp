@@ -275,6 +275,44 @@ defmodule Tptp.ResolverTest do
       assert contents =~ "% &#34; and &lt; are text"
     end
 
+    test "a file too large to display is fetched from the .tgz the page links" do
+      root = Path.join(@tmp, "served")
+      file = "fof(big, axiom, p(\"s\") & q).\n"
+      tgz = Path.join(@tmp, "big.tgz")
+
+      :ok = :erl_tar.create(String.to_charlist(tgz), [{~c"big.ax", file}], [:compressed])
+      File.mkdir_p!(Path.join([root, "see", "Axioms"]))
+      File.mkdir_p!(Path.join(root, "download"))
+      File.cp!(tgz, Path.join([root, "download", "big.ax"]))
+
+      File.write!(
+        Path.join([root, "see", "Axioms", "big.ax"]),
+        ~s|<html><p class="note">This file is too large to display here (10.1 MB).\n| <>
+          ~s|<a href="/download/big.ax" rel="nofollow">Download it as a .tgz</a></p></html>|
+      )
+
+      assert Http.started() == :ok
+
+      {:ok, server} =
+        :inets.start(:httpd,
+          port: 0,
+          bind_address: {127, 0, 0, 1},
+          server_name: ~c"tptp-test",
+          server_root: String.to_charlist(root),
+          document_root: String.to_charlist(root)
+        )
+
+      on_exit(fn -> :inets.stop(:httpd, server) end)
+      base = "http://127.0.0.1:#{:httpd.info(server)[:port]}/see"
+      options = [cache_dir: Path.join(@tmp, "large-cache"), base_url: base]
+      url = Http.url("big.ax", options)
+
+      assert {:ok, ^url, ^file} = Resolver.resolve({Tptp.Resolver.Http, options}, "big.ax", nil)
+
+      :inets.stop(:httpd, server)
+      assert {:ok, ^url, ^file} = Resolver.resolve({Tptp.Resolver.Http, options}, "big.ax", nil)
+    end
+
     test "a page with no pre block is the error page" do
       assert Http.contents("<html><body>No such file</body></html>") == :error
     end

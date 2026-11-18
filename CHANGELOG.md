@@ -10,6 +10,15 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-11-18
+
+### Fixed
+
+- Files over 10 MiB load. seetptp.tptp.org does not display them, answering with a
+  page that links a `.tgz` of the file instead, which `Tptp.Resolver.Http` reported
+  as the error page; it now fetches that archive and unpacks it with `:erl_tar`.
+  Among them are `Axioms/BIO001+0.ax`, `Axioms/CSR003+2.ax` and `HWV098_2.p`.
+
 ## [0.3.5] - 2026-11-18
 
 ### Fixed
@@ -470,7 +479,8 @@ files, and are recorded under Notes below.
   treated as different symbols" — so this compares two declarations at the same
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
-[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.6...HEAD
+[0.3.6]: https://github.com/jcschuster/tptp/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/jcschuster/tptp/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/jcschuster/tptp/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/jcschuster/tptp/compare/v0.3.2...v0.3.3

@@ -62,8 +62,10 @@ defmodule Tptp.Resolver.Http do
 
   The reverse order would delete every equivalence in the file.
 
-  A page containing no `<pre>` block is SeeTPTP's error page and is reported as
-  such. A body that is not HTML is passed through unmodified, which is what a plain
+  A file over 10 MiB is not displayed: the page carries no `<pre>` block but links
+  a `.tgz` of the file under `/download/`, which is fetched and unpacked instead.
+  Otherwise a page containing no `<pre>` block is SeeTPTP's error page and is
+  reported as such. A body that is not HTML is passed through unmodified, which is what a plain
   file server behind `:base_url` returns.
 
   ## Caching
@@ -264,13 +266,20 @@ defmodule Tptp.Resolver.Http do
   end
 
   defp get(url, name, options) do
+    case body(url, options) do
+      {:ok, body} -> accept(body, url, name, options)
+      failure -> failure
+    end
+  end
+
+  defp body(url, options) do
     timeout = Keyword.get(options, :timeout, @timeout)
     request = {String.to_charlist(url), [{~c"user-agent", ~c"tptp-elixir"}]}
     http = [timeout: timeout, connect_timeout: timeout, autoredirect: true]
 
     case safe_request(request, http) do
       {:ok, {{_version, 200, _phrase}, _headers, body}} ->
-        accept(IO.iodata_to_binary(body), url, name, options)
+        {:ok, IO.iodata_to_binary(body)}
 
       {:ok, {{_version, 404, phrase}, _headers, _body}} ->
         {:not_found, "#{url} returned 404 #{phrase}"}
@@ -290,13 +299,37 @@ defmodule Tptp.Resolver.Http do
   end
 
   defp accept(body, url, name, options) do
-    case contents(body) do
+    with :error <- contents(body),
+         [_whole, href] <- Regex.run(~r{href="(/download/[^"]+)"}, body) do
+      download(URI.to_string(URI.merge(url, href)), url, name, options)
+    else
       {:ok, contents} ->
         store(url, contents, options)
         {:ok, url, contents}
 
-      :error ->
+      nil ->
         {:error, "#{url} returned SeeTPTP's error page rather than #{inspect(name)}"}
+    end
+  end
+
+  defp download(archive, url, name, options) do
+    with {:ok, body} <- body(archive, options),
+         {:ok, contents} <- unpack(body, archive, name) do
+      store(url, contents, options)
+      {:ok, url, contents}
+    end
+  end
+
+  defp unpack(body, archive, name) do
+    case :erl_tar.extract({:binary, body}, [:memory, :compressed]) do
+      {:ok, [{_file, contents}]} ->
+        {:ok, contents}
+
+      {:ok, files} ->
+        {:error, "#{archive} held #{length(files)} files, not #{inspect(name)} alone"}
+
+      {:error, reason} ->
+        {:error, "#{archive} could not be unpacked: #{inspect(reason)}"}
     end
   end
 

@@ -1,7 +1,7 @@
 defmodule Tptp.MixProject do
   use Mix.Project
 
-  @version "0.3.5"
+  @version "0.3.6"
   @source_url "https://github.com/jcschuster/tptp"
 
   def project do
