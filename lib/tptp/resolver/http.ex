@@ -354,9 +354,14 @@ defmodule Tptp.Resolver.Http do
     if html?(body), do: preformatted(body), else: {:ok, body}
   end
 
+  # The tags are found separately: one pattern spanning the block backtracks once per
+  # character and reaches PCRE's match limit on a block of ten million.
   defp preformatted(body) do
-    case Regex.run(~r{<pre>\r?\n?(.*?)</pre>}is, body) do
-      [_whole, inner] -> {:ok, inner |> strip_markup() |> unescape()}
+    with [{open, length}] <- Regex.run(~r{<pre>\r?\n?}i, body, return: :index),
+         start = open + length,
+         [{close, _length}] <- Regex.run(~r{</pre>}i, body, return: :index, offset: start) do
+      {:ok, body |> binary_part(start, close - start) |> strip_markup() |> unescape()}
+    else
       nil -> :error
     end
   end

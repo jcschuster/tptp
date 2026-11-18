@@ -313,6 +313,15 @@ defmodule Tptp.ResolverTest do
       assert {:ok, ^url, ^file} = Resolver.resolve({Tptp.Resolver.Http, options}, "big.ax", nil)
     end
 
+    test "a block of more than ten million characters is unwrapped" do
+      line = ~s|<a name="x"></a>fof(x, axiom, p(&#34;s&#34;) &lt;=&gt; q).\n|
+      count = div(11_000_000, byte_size(line)) + 1
+      page = "<html><pre>\n" <> String.duplicate(line, count) <> "</pre></html>"
+
+      assert {:ok, contents} = Http.contents(page)
+      assert contents == String.duplicate(~s|fof(x, axiom, p("s") <=> q).\n|, count)
+    end
+
     test "a page with no pre block is the error page" do
       assert Http.contents("<html><body>No such file</body></html>") == :error
     end
