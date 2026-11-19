@@ -7,6 +7,7 @@ defmodule Tptp.ResolverTest do
   alias Tptp.Resolver
   alias Tptp.Resolver.Fs
   alias Tptp.Resolver.Http
+  alias Tptp.ResolverTest.Site
 
   @tmp Path.join(System.tmp_dir!(), "tptp-resolver-test")
 
@@ -166,15 +167,6 @@ defmodule Tptp.ResolverTest do
       assert Http.url("SET007+0.ax") == Http.url("Axioms/SET007+0.ax")
     end
 
-    test "a bare axiom name is also tried in the subdirectory named for its set" do
-      nested = "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007/SET007%2B0.ax"
-
-      assert Http.urls("SET007+0.ax") == [Http.url("SET007+0.ax"), nested]
-      assert Http.urls("Axioms/SET007+0.ax") == Http.urls("SET007+0.ax")
-      assert Http.urls("Axioms/SET007/SET007+0.ax") == [nested]
-      assert Http.urls("PUZ001+1.p") == [Http.url("PUZ001+1.p")]
-    end
-
     test "keeps the subdirectory of a nested axiom file" do
       assert Http.url("Axioms/SET007/SET007+0.ax") ==
                "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007/SET007%2B0.ax"
@@ -313,6 +305,32 @@ defmodule Tptp.ResolverTest do
       assert {:ok, ^url, ^file} = Resolver.resolve({Tptp.Resolver.Http, options}, "big.ax", nil)
     end
 
+    test "an axiom file not at the top of Axioms is found through the folder pages" do
+      assert Http.started() == :ok
+
+      {:ok, server} =
+        :inets.start(:httpd,
+          port: 0,
+          bind_address: {127, 0, 0, 1},
+          server_name: ~c"tptp-test",
+          server_root: String.to_charlist(@tmp),
+          document_root: String.to_charlist(@tmp),
+          modules: [:mod_esi],
+          erl_script_alias: {~c"/esi", [Site]}
+        )
+
+      on_exit(fn -> :inets.stop(:httpd, server) end)
+      base = "http://127.0.0.1:#{:httpd.info(server)[:port]}#{Site.root()}file"
+      resolver = {Tptp.Resolver.Http, cache_dir: Path.join(@tmp, "search-cache"), base_url: base}
+
+      assert {:ok, url, "fof(deep, axiom, p)."} = Resolver.resolve(resolver, "deep+1.ax", nil)
+      assert url == Http.url("Axioms/B/deep+1.ax", base_url: base)
+      assert {:ok, ^url, _contents} = Resolver.resolve(resolver, "Axioms/deep+1.ax", nil)
+
+      assert {:error, reason} = Resolver.resolve(resolver, "none.ax", nil)
+      assert reason =~ ~s|returned 404 Object Not Found, and no folder below it lists "none.ax"|
+    end
+
     test "a block of more than ten million characters is unwrapped" do
       line = ~s|<a name="x"></a>fof(x, axiom, p(&#34;s&#34;) &lt;=&gt; q).\n|
       count = div(11_000_000, byte_size(line)) + 1
@@ -422,5 +440,34 @@ defmodule Tptp.ResolverEnvTest do
     System.put_env("TPTP_ROOT", local)
 
     assert Resolver.Fs.roots(nil, cwd: false) == [library, local]
+  end
+end
+
+# SeeTPTP in miniature, for the search: a 404 links up to its folder, folder pages
+# list files and folders, and a file's link leaves its `+` bare.
+defmodule Tptp.ResolverTest.Site do
+  @root "/esi/Elixir.Tptp.ResolverTest.Site:serve/"
+
+  def root, do: @root
+
+  def serve(session, env, _input) do
+    {status, page} = page(List.to_string(env[:path_info]))
+    :mod_esi.deliver(session, ~c"status: #{status}\r\ncontent-type: text/html\r\n\r\n#{page}")
+  end
+
+  defp page("file/Axioms/B/deep%2B1.ax"), do: {"200 OK", "fof(deep, axiom, p)."}
+  defp page("?folder=Axioms/"), do: folder(["?folder=Axioms/A/", "?folder=Axioms/B/"], "top.ax")
+  defp page("?folder=Axioms/A/"), do: folder([], "other.ax")
+  defp page("?folder=Axioms/B/"), do: folder([], "deep+1.ax", "file/Axioms/B/deep+1.ax")
+  defp page("file/Axioms/" <> _file), do: {"404 Not Found", up("?folder=Axioms/")}
+
+  defp up(folder), do: ~s|<html><a class="up-link" href="#{@root}#{folder}">Up</a></html>|
+
+  defp folder(folders, file, href \\ "file/elsewhere") do
+    items =
+      Enum.map(folders, &~s|<a class="item" title="#{&1}" href="#{@root}#{&1}">|) ++
+        [~s|<a class="item" title="#{file}" href="#{@root}#{href}">|]
+
+    {"200 OK", "<html>#{Enum.join(items)}</html>"}
   end
 end

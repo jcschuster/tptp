@@ -10,6 +10,31 @@ moves when TPTP moves, not when this library does.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-19
+
+### Removed
+
+- `Tptp.Resolver.Http.urls/2`. Where a bare axiom name is found can no longer be
+  told without network access; `url/2` is the first URL tried.
+
+### Changed
+
+- A bare axiom name, or `Axioms/` and a bare name, that 404s at the top of
+  `Axioms` is searched for in every subdirectory, not tried in the one named by its
+  first six characters. That guess was right for `Axioms/SET007/` but not for
+  `Axioms/ITP001/`, which holds `ITP009^7.ax` and `ITP090+5.ax` among 147
+  prefixes, so most of its files 404'd. `Tptp.Resolver.Http` follows SeeTPTP's
+  error page up to the folder and searches the folder pages below it, which are
+  cached like files. A server behind `:base_url` whose 404 links no folder, such as
+  a plain file server, is not searched, so a bare name there must be at the top of
+  `Axioms`.
+
+### Fixed
+
+- `Tptp.Resolver.Http.contents/1` no longer raises `SystemLimitError` on a page of
+  more than about ten million characters, which the six files just under
+  SeeTPTP's 10 MiB display limit are.
+
 ## [0.3.6] - 2026-11-18
 
 ### Fixed
@@ -480,6 +505,7 @@ files, and are recorded under Notes below.
   arity, and `Tptp.Lint.Table` keys on the name alone and cannot express it yet.
 
 [Unreleased]: https://github.com/jcschuster/tptp/compare/v0.3.6...HEAD
+[0.4.0]: https://github.com/jcschuster/tptp/compare/v0.3.6...v0.4.0
 [0.3.6]: https://github.com/jcschuster/tptp/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/jcschuster/tptp/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/jcschuster/tptp/compare/v0.3.3...v0.3.4

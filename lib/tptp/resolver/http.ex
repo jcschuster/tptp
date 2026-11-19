@@ -19,21 +19,25 @@ defmodule Tptp.Resolver.Http do
 
       Axioms/SET007/SET007+0.ax  ->  .../TPTP/Axioms/SET007/SET007+0.ax
       Problems/PUZ/PUZ001+1.p    ->  .../TPTP/Problems/PUZ/PUZ001+1.p
-      SET007+0.ax                ->  .../TPTP/Axioms/SET007+0.ax
-                                     .../TPTP/Axioms/SET007/SET007+0.ax
+      SET007+0.ax                ->  .../TPTP/Axioms/SET007+0.ax, then searched for
       PUZ001+1.p                 ->  .../TPTP/Problems/PUZ/PUZ001+1.p
 
   A name of more than one segment is that path. A bare problem name takes its
   domain from the leading three letters, following the TPTP naming convention.
 
-  An axiom set may sit in a subdirectory named for it, as the 2,125 files under
-  `Axioms/SET007/` and `Axioms/ITP001/` do. Which ones do cannot be told from the
-  name, so a bare axiom name, or `Axioms/` and a bare name, is tried at the top of
-  `Axioms` and, on a 404, in the subdirectory named by its leading six characters.
-  Any other failure is reported at once rather than costing a second request.
+  An axiom file may sit in a subdirectory of `Axioms`, as the 2,125 files under
+  `Axioms/SET007/` and `Axioms/ITP001/` do, and which subdirectory cannot be told
+  from the name: `Axioms/ITP001/` holds `ITP009^7.ax` and `ITP090+5.ax`. So a bare
+  axiom name, or `Axioms/` and a bare name, is tried at the top of `Axioms` and, on
+  a 404, searched for. SeeTPTP's error page links up to the folder it looked in, and
+  each folder page lists the files and folders in it; the search walks those pages
+  from that folder down and fetches the file under the first folder that lists it.
+  Folder pages are cached like files, so a search costs network access once per
+  folder. Any failure other than a 404 is reported at once, and a server whose 404
+  links no folder, such as a plain file server behind `:base_url`, is not searched.
 
-  `urls/2` and `url/2` are public so that the mapping can be read and tested
-  without network access.
+  `url/2` is public so that the mapping can be read and tested without network
+  access.
 
   Not the older CGI script at `tptp.org/cgi-bin/SeeTPTP`: it redirects here for a
   flat name, but answers a name in a subdirectory of `Axioms` with the file's
@@ -115,6 +119,11 @@ defmodule Tptp.Resolver.Http do
   error page all come back as `{:error, reason}`, and `Tptp.Include` turns that into
   a diagnostic. Nothing here raises and nothing retries — a resolver that retries on
   its own turns one slow file into a much slower run without telling anyone.
+
+  seetptp.tptp.org rate-limits: after about five requests in quick succession it
+  answers `429 Too Many Requests` for some thirty seconds, without a `Retry-After`.
+  That is reported like any other status, so a caller fetching many files should
+  pace its requests, or wait and resolve again on a reason naming 429.
   """
 
   @behaviour Tptp.Resolver
@@ -130,14 +139,14 @@ defmodule Tptp.Resolver.Http do
   @spec resolve(binary(), Path.t() | nil, keyword()) :: Tptp.Resolver.result()
   def resolve(name, _from, options) do
     if Tptp.Resolver.safe?(name) do
-      name |> urls(options) |> first_found(name, options)
+      name |> url(options) |> fetch(name, options) |> searched(name, options) |> reported()
     else
       {:error, Tptp.Resolver.unsafe_reason(name)}
     end
   end
 
   @doc """
-  The SeeTPTP URL an include name maps to, the first of `urls/2`.
+  The SeeTPTP URL an include name maps to.
 
       iex> Tptp.Resolver.Http.url("Problems/PUZ/PUZ001+1.p")
       "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Problems/PUZ/PUZ001%2B1.p"
@@ -149,49 +158,84 @@ defmodule Tptp.Resolver.Http do
       "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007%2B0.ax"
   """
   @spec url(binary(), keyword()) :: binary()
-  def url(name, options \\ []) when is_binary(name), do: hd(urls(name, options))
-
-  @doc """
-  The SeeTPTP URLs an include name may be found at, in the order they are tried.
-
-      iex> Tptp.Resolver.Http.urls("SET007+0.ax")
-      ["https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007%2B0.ax",
-       "https://seetptp.tptp.org/file/TPTPWorld/TPTP/Axioms/SET007/SET007%2B0.ax"]
-  """
-  @spec urls(binary(), keyword()) :: [binary(), ...]
-  def urls(name, options \\ []) when is_binary(name) do
+  def url(name, options \\ []) when is_binary(name) do
     base = Keyword.get(options, :base_url, @base_url)
 
-    for path <- paths(name) do
-      Enum.join([base | Enum.map(path, &encode/1)], "/")
-    end
+    Enum.join([base | Enum.map(path(name), &encode/1)], "/")
   end
 
   defp encode(segment), do: URI.encode(segment, &URI.char_unreserved?/1)
 
-  defp paths(name) do
+  defp path(name) do
     case Path.split(name) do
-      ["Axioms", file] -> axiom(file)
       [file] -> bare(file)
-      path -> [path]
+      path -> path
     end
   end
 
   defp bare(file) do
     if String.ends_with?(file, ".ax") do
-      axiom(file)
+      ["Axioms", file]
     else
-      [["Problems", String.upcase(String.slice(file, 0, 3)), file]]
+      ["Problems", String.upcase(String.slice(file, 0, 3)), file]
     end
   end
 
-  defp axiom(file), do: [["Axioms", file], ["Axioms", String.slice(file, 0, 6), file]]
+  defp searched({:not_found, page, reason}, name, options) do
+    with ["Axioms", file] <- path(name),
+         [_whole, up] <- Regex.run(~r{class="up-link" href="([^"]+)"}, page),
+         {:ok, found} <- locate(URI.to_string(URI.merge(url(name, options), up)), file, options) do
+      fetch(found, name, options)
+    else
+      :none -> {:error, "#{reason}, and no folder below it lists #{inspect(name)}"}
+      {:error, failure} -> {:error, failure}
+      _unsearchable -> {:error, reason}
+    end
+  end
 
-  defp first_found([url | rest], name, options) do
-    case fetch(url, name, options) do
-      {:not_found, _reason} when rest != [] -> first_found(rest, name, options)
-      {:not_found, reason} -> {:error, reason}
-      result -> result
+  defp searched(result, _name, _options), do: result
+
+  defp reported({:not_found, _page, reason}), do: {:error, reason}
+  defp reported(result), do: result
+
+  defp locate(folder, file, options) do
+    with {:ok, page} <- listing(folder, options) do
+      {folders, files} =
+        ~r{<a class="item" title="([^"]*)" href="([^"]*)"}
+        |> Regex.scan(page, capture: :all_but_first)
+        |> Enum.split_with(fn [_title, href] -> String.ends_with?(href, "/") end)
+
+      case Enum.find(files, &match?([^file, _href], &1)) do
+        [_title, href] -> {:ok, file_url(folder, href)}
+        nil -> locate_below(folders, folder, file, options)
+      end
+    end
+  end
+
+  defp locate_below(folders, folder, file, options) do
+    Enum.reduce_while(folders, :none, fn [_title, href], :none ->
+      case locate(URI.to_string(URI.merge(folder, href)), file, options) do
+        :none -> {:cont, :none}
+        found -> {:halt, found}
+      end
+    end)
+  end
+
+  # A folder page leaves `+` bare, which could be read as a space.
+  defp file_url(folder, href) do
+    uri = URI.merge(folder, href)
+
+    URI.to_string(%{uri | path: String.replace(uri.path, "+", "%2B")})
+  end
+
+  defp listing(folder, options) do
+    with :miss <- cached(folder, options),
+         {:ok, page} <- body(folder, options) do
+      store(folder, page, options)
+      {:ok, page}
+    else
+      {:not_found, _page, reason} -> {:error, reason}
+      other -> other
     end
   end
 
@@ -281,8 +325,8 @@ defmodule Tptp.Resolver.Http do
       {:ok, {{_version, 200, _phrase}, _headers, body}} ->
         {:ok, IO.iodata_to_binary(body)}
 
-      {:ok, {{_version, 404, phrase}, _headers, _body}} ->
-        {:not_found, "#{url} returned 404 #{phrase}"}
+      {:ok, {{_version, 404, phrase}, _headers, body}} ->
+        {:not_found, IO.iodata_to_binary(body), "#{url} returned 404 #{phrase}"}
 
       {:ok, {{_version, status, phrase}, _headers, _body}} ->
         {:error, "#{url} returned #{status} #{phrase}"}
